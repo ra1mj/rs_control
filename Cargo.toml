@@ -16,6 +16,8 @@ members = [
     "crates/protocol_module/middleware-shm",
     "crates/protocol_module/middleware-zenoh",
     "crates/protocol_module/proto-generated",
+    "crates/application_module/arm-algorithms",
+    "crates/application_module/arm-model",
     "crates/application_module/chassis-mecanum",
     "crates/application_module/chassis-model",
     "crates/application_module/chassis-omni",
@@ -46,6 +48,8 @@ config-model = { version = "0.1.0", path = "crates/integration/config-model" }
 contract-codec = { version = "0.1.0", path = "crates/protocol_module/contract-codec" }
 cross-language-contract = { version = "0.1.0", path = "crates/integration/cross-language-contract" }
 hardware-module-core = { version = "0.1.0", path = "crates/hardware_module/hardware-module-core" }
+arm-algorithms = { version = "0.1.0", path = "crates/application_module/arm-algorithms" }
+arm-model = { version = "0.1.0", path = "crates/application_module/arm-model" }
 message-model = { version = "0.1.0", path = "crates/protocol_module/message-model" }
 middleware-api = { version = "0.1.0", path = "crates/protocol_module/middleware-api" }
 middleware-local = { version = "0.1.0", path = "crates/protocol_module/middleware-local" }
@@ -55,11 +59,15 @@ motor-damiao = { version = "0.1.0", path = "crates/hardware_module/motor-damiao"
 prost = "0.14.4"
 prost-build = "0.14.4"
 prost-types = "0.14.4"
+quick-xml = "=0.41.0"
 memmap2 = "=0.9.11"
+nalgebra = { version = "=0.35.0", default-features = false, features = ["std"] }
 proto-generated = { version = "0.1.0", path = "crates/protocol_module/proto-generated" }
 ros2-mapping = { version = "0.1.0", path = "crates/integration/ros2-mapping" }
 protoc-bin-vendored = "3.2.0"
 rtrb = "=0.3.4"
+rand = "=0.10.2"
+rand_chacha = "=0.10.0"
 rustix = { version = "=1.1.4", default-features = false, features = ["time"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde-saphyr = { version = "0.0.29", default-features = false, features = ["deserialize"] }
@@ -70,6 +78,7 @@ tempfile = "=3.27.0"
 thiserror = "2.0.19"
 toml = "1.1.4"
 waitfree-sync = "=0.3.3"
+featherstone = { version = "=0.1.0", default-features = false }
 zenoh = { version = "=1.9.0", default-features = false, features = ["transport_tcp"] }
 
 [workspace.lints.rust]

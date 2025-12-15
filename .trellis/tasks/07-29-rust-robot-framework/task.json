@@ -34,7 +34,8 @@
     "07-31-mission-dsl-runtime",
     "07-31-chassis-models-kinematics",
     "07-31-chassis-estimation-control",
-    "07-31-cross-language-ros2-contract"
+    "07-31-cross-language-ros2-contract",
+    "07-31-kinetic-arm-algorithms"
   ],
   "parent": null,
   "relatedFiles": [],

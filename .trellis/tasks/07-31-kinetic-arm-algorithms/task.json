@@ -1,0 +1,38 @@
+{
+  "id": "kinetic-arm-algorithms",
+  "name": "kinetic-arm-algorithms",
+  "title": "Build project-native arm algorithms informed by KINETIC",
+  "description": "Build native multi-morphology mechanical-arm algorithms and control contracts, using softmata/kinetic only as an attributed implementation reference.",
+  "status": "in_progress",
+  "dev_type": "backend",
+  "scope": "project-native pure-software multi-morphology arm model, kinematics, trajectory, dynamics, planning, reactive/task/grasp, MIT proposals and RL policy deployment; no KINETIC runtime dependency, hardware/live ROS/Orange Pi or collision qualification",
+  "package": "backend",
+  "priority": "P1",
+  "creator": "mj",
+  "assignee": "mj",
+  "createdAt": "2026-07-31",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "07-31-kinetic-arm-stack",
+    "07-31-rl-policy-control"
+  ],
+  "parent": "07-29-rust-robot-framework",
+  "relatedFiles": [
+    "crates/application_module",
+    "crates/protocol_module/message-model",
+    "proto/robot/v1/control.proto",
+    "proto/robot/v1/device.proto",
+    "config/robots",
+    "architecture.toml",
+    "deny.toml",
+    ".trellis/spec/backend"
+  ],
+  "notes": "Planning. KINETIC is an attributed algorithm/reference source only. The implementation must live natively in this project and must not add a KINETIC Git, path, submodule or workspace dependency.",
+  "meta": {}
+}

@@ -4,10 +4,12 @@
 //! allocation for stable identifiers used by local realtime channels.
 
 mod action;
+mod arm;
 mod messages;
 mod numeric;
 
 pub use action::*;
+pub use arm::*;
 pub use messages::*;
 pub use numeric::*;
 
@@ -718,6 +720,30 @@ pub enum SemanticError {
     /// Numeric field was outside [0, 1].
     #[error("field {field} must be in the closed interval [0, 1]")]
     OutsideClosedUnitInterval {
+        /// Rejected field.
+        field: &'static str,
+    },
+    /// A bounded vector did not match its declared order.
+    #[error("field {field} has length {actual}, expected {expected}")]
+    DimensionMismatch {
+        /// Rejected field.
+        field: &'static str,
+        /// Required element count.
+        expected: usize,
+        /// Observed element count.
+        actual: usize,
+    },
+    /// A tagged SI value did not match the declared joint kind.
+    #[error("field {field} has an incompatible unit at index {index}")]
+    UnitMismatch {
+        /// Rejected field.
+        field: &'static str,
+        /// Index of the incompatible value.
+        index: usize,
+    },
+    /// A finite numeric value violated its semantic range.
+    #[error("field {field} is outside its accepted range")]
+    OutsideRange {
         /// Rejected field.
         field: &'static str,
     },

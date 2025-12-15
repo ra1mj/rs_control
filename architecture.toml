@@ -32,6 +32,8 @@ path_prefixes = ["tools/"]
 
 [members]
 "architecture-check" = "tool"
+"arm-algorithms" = "application_module"
+"arm-model" = "application_module"
 "chassis-mecanum" = "application_module"
 "chassis-model" = "application_module"
 "chassis-omni" = "application_module"

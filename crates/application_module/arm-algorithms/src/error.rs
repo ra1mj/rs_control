@@ -3,6 +3,21 @@
 use message_model::{ArmJointId, KinematicGroupId};
 use thiserror::Error;
 
+/// Exact trajectory constraint class.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TrajectoryViolationKind {
+    /// Position interval.
+    Position,
+    /// Absolute velocity.
+    Velocity,
+    /// Absolute acceleration.
+    Acceleration,
+    /// Absolute jerk.
+    Jerk,
+    /// Torque or force.
+    Effort,
+}
+
 /// Mechanical-arm algorithm failure.
 #[derive(Clone, Debug, Error, PartialEq)]
 pub enum ArmAlgorithmError {
@@ -105,5 +120,71 @@ pub enum ArmAlgorithmError {
     InvalidBudget {
         /// Rejected budget.
         field: &'static str,
+    },
+    /// A bounded collection exceeded its accepted capacity.
+    #[error("{field} count {actual} exceeds maximum {maximum}")]
+    Capacity {
+        /// Rejected collection.
+        field: &'static str,
+        /// Observed count.
+        actual: usize,
+        /// Accepted maximum.
+        maximum: usize,
+    },
+    /// A timestamp/duration was zero, unordered or outside its bound.
+    #[error("{field} contains an invalid time value")]
+    InvalidTime {
+        /// Rejected time class.
+        field: &'static str,
+    },
+    /// A generated or supplied trajectory violates an exact joint constraint.
+    #[error(
+        "trajectory point {point_index} joint {joint} violates {kind:?}: |{value}| exceeds {limit}"
+    )]
+    TrajectoryViolation {
+        /// Constraint class.
+        kind: TrajectoryViolationKind,
+        /// Offending waypoint/sample.
+        point_index: usize,
+        /// Stable joint identity.
+        joint: Box<ArmJointId>,
+        /// Signed observed value.
+        value: f64,
+        /// Accepted absolute bound (or nearest position endpoint).
+        limit: f64,
+    },
+    /// Required inertial model data is absent.
+    #[error("dynamics unavailable: {reason}")]
+    DynamicsUnavailable {
+        /// Static fail-closed cause.
+        reason: &'static str,
+    },
+    /// A deterministic planner exhausted its explicit work budget.
+    #[error(
+        "planner {planner} exhausted work budget after {iterations} iterations, {samples} samples and {nodes} nodes"
+    )]
+    WorkBudgetExhausted {
+        /// Stable planner name.
+        planner: &'static str,
+        /// Consumed iterations.
+        iterations: u32,
+        /// Consumed random samples.
+        samples: u32,
+        /// Created tree/roadmap nodes.
+        nodes: u32,
+    },
+    /// A supplied state or interpolated edge failed an explicit constraint.
+    #[error("state constraint rejected sample {sample_index}: {reason}")]
+    ConstraintViolation {
+        /// Stable sample/waypoint index.
+        sample_index: usize,
+        /// Static validator evidence.
+        reason: &'static str,
+    },
+    /// A collision-dependent policy was requested without a provider.
+    #[error("collision capability is unavailable for {surface}")]
+    CollisionCapabilityUnavailable {
+        /// Rejected surface.
+        surface: &'static str,
     },
 }

@@ -8,8 +8,10 @@ license.workspace = true
 [dependencies]
 arm-model.workspace = true
 arrayvec.workspace = true
+featherstone.workspace = true
 message-model.workspace = true
 nalgebra.workspace = true
+nalgebra-featherstone.workspace = true
 rand.workspace = true
 rand_chacha.workspace = true
 thiserror.workspace = true

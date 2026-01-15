@@ -60,58 +60,58 @@ cannot be made deterministic; do not use source XML bytes as the semantic hash.
 
 ## 4. Kinematics
 
-- [ ] Scaffold `arm-algorithms` and its kinematics modules.
-- [ ] Implement chain extraction, FK/all-link/batch FK and 6×N Jacobian.
-- [ ] Implement condition/manipulability with typed singular evidence.
+- [x] Scaffold `arm-algorithms` and its kinematics modules.
+- [x] Implement chain extraction, FK/all-link/batch FK and 6×N Jacobian.
+- [x] Implement condition/manipulability with typed singular evidence.
 - [ ] Port/rewrite DLS and FABRIK with strict dimension/limit checks.
 - [ ] Port/rewrite SQP and Bio-IK with explicit bounded work.
 - [ ] Port/rewrite OPW, Paden-Kahan/subproblem and compatible 7-DOF paths.
 - [ ] Implement geometry compatibility analysis, cache and batch queries.
-- [ ] Implement deterministic workspace/reachability sampling.
-- [ ] Add solver capability reporting and deterministic `Auto` selection.
-- [ ] Add per-file provenance only where code is substantially derived.
+- [x] Implement deterministic workspace/reachability sampling.
+- [x] Add solver capability reporting and deterministic `Auto` selection.
+- [x] Add per-file provenance only where code is substantially derived.
 
 Tests:
 
-- [ ] Golden FK/Jacobian at zero, nominal and limits.
+- [x] Golden FK/Jacobian at zero, nominal and limits.
 - [ ] Reachable IK, unreachable target, wrong DOF, NaN/Inf, singular,
       non-convergent and limit-violating cases.
-- [ ] Specialized solver rejection on incompatible geometry.
-- [ ] Repeat identical seeds and compare complete results/evidence.
+- [x] Specialized solver rejection on incompatible geometry.
+- [x] Repeat identical seeds and compare complete results/evidence.
 
 ## 5. Trajectory and dynamics
 
-- [ ] Implement bounded trajectory/path constructors and caller-owned sampler.
-- [ ] Implement trapezoidal, TOTP, jerk-limited, cubic/clamped spline and
+- [x] Implement bounded trajectory/path constructors and caller-owned sampler.
+- [x] Implement trapezoidal, TOTP, jerk-limited, cubic/clamped spline and
       blending surfaces.
-- [ ] Implement validation for time, position, velocity, acceleration, jerk
+- [x] Implement validation for time, position, velocity, acceleration, jerk
       where applicable and exact group dimensions.
-- [ ] Admit the reviewed dynamics backend and implement the strict project
+- [x] Admit the reviewed dynamics backend and implement the strict project
       adapter.
-- [ ] Implement inverse/forward dynamics, gravity, mass matrix, dynamic
+- [x] Implement inverse/forward dynamics, gravity, mass matrix, dynamic
       manipulability and effort feasibility.
-- [ ] Reject missing inertia, untimed feasibility input and singular/invalid
+- [x] Reject missing inertia, untimed feasibility input and singular/invalid
       dynamics; never return empty success for unavailable analysis.
 
 Tests:
 
-- [ ] Analytic one/two-link dynamics golden vectors and matrix properties.
-- [ ] Nominal and boundary trajectory golden vectors.
+- [x] Analytic one/two-link dynamics golden vectors and matrix properties.
+- [x] Nominal and boundary trajectory golden vectors.
 - [ ] Every violation kind with exact waypoint/joint evidence.
 
 ## 6. Planning
 
-- [ ] Define planner/state-validator traits and
+- [x] Define planner/state-validator traits and
       `ArmPlan<CollisionEvidence>`.
-- [ ] Implement deterministic configs with explicit seed/work budgets.
+- [x] Implement deterministic configs with explicit seed/work budgets.
 - [ ] Port/rewrite RRT-Connect, RRT*, BiRRT* and BiTRRT.
 - [ ] Port/rewrite EST, KPIECE and PRM.
 - [ ] Port/rewrite GCS and IRIS-region surfaces.
 - [ ] Port/rewrite CHOMP and STOMP.
 - [ ] Implement Cartesian and constrained-RRT planning.
 - [ ] Implement shortcut, smoothing and pipeline composition.
-- [ ] Make every first-delivery result `CollisionUnchecked`.
-- [ ] Return typed unsupported evidence for coordinated dual-arm planning.
+- [x] Make every first-delivery result `CollisionUnchecked`.
+- [x] Return typed unsupported evidence for coordinated dual-arm planning.
 
 Tests:
 
@@ -123,16 +123,16 @@ Tests:
 
 ## 7. Reactive, grasp and task surfaces
 
-- [ ] Implement twist, joint-jog and pose-tracking servo.
-- [ ] Implement no-filter, EMA and Butterworth filters.
+- [x] Implement twist, joint-jog and pose-tracking servo.
+- [x] Implement no-filter, EMA and Butterworth filters.
 - [ ] Implement RMP reach, joint-limit, singularity and damping policies.
-- [ ] Return collision capability unavailable for obstacle/self-collision
+- [x] Return collision capability unavailable for obstacle/self-collision
       policies.
-- [ ] Implement bounded primitive object/gripper descriptions.
-- [ ] Implement deterministic antipodal, top-down, side and suction candidates
+- [x] Implement bounded primitive object/gripper descriptions.
+- [x] Implement deterministic antipodal, top-down, side and suction candidates
       plus ranking/reachability.
-- [ ] Mark candidates collision unchecked.
-- [ ] Implement bounded move/Cartesian/gripper/pick/place/sequence task stages.
+- [x] Mark candidates collision unchecked.
+- [x] Implement bounded move/Cartesian/gripper/pick/place/sequence task stages.
 - [ ] Integrate task effects with existing action/cancellation semantics.
 
 ## 8. Arm control and simulated/logged execution

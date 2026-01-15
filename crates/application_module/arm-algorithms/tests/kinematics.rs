@@ -1,54 +1,10 @@
+mod common;
+
 use arm_algorithms::{
     ArmAlgorithmError,
     kinematics::{DampedLeastSquaresConfig, IkSolverKind, KinematicChain, WorkspaceSamplingConfig},
 };
-use arm_model::{
-    ARM_PROFILE_SCHEMA_VERSION, ArmModel, ArmProfileClass, ArmProfileSpec,
-    JointAccelerationLimitSpec, KinematicGroupSpec, RotaryTransmissionSpec,
-};
-use message_model::{ArmJointId, AsciiId};
-
-const SYNTHETIC_6DOF: &str = include_str!("../../arm-model/tests/fixtures/synthetic_6dof.urdf");
-
-fn id(value: &str) -> ArmJointId {
-    AsciiId::parse(value).unwrap()
-}
-
-fn synthetic_model() -> ArmModel {
-    let joints = (1..=6)
-        .map(|index| id(&format!("joint_{index}")))
-        .collect::<Vec<_>>();
-    let spec = ArmProfileSpec {
-        schema_version: ARM_PROFILE_SCHEMA_VERSION,
-        name: id("synthetic_6dof"),
-        class: ArmProfileClass::HostFixture,
-        groups: vec![KinematicGroupSpec {
-            id: id("arm"),
-            base_link: id("base_link"),
-            tip_link: id("tool0"),
-            active_joint_order: joints.clone(),
-        }],
-        acceleration_limits: joints
-            .iter()
-            .copied()
-            .map(|joint_id| JointAccelerationLimitSpec {
-                joint_id,
-                maximum: 4.0,
-            })
-            .collect(),
-        transmissions: joints
-            .iter()
-            .enumerate()
-            .map(|(index, joint_id)| RotaryTransmissionSpec {
-                joint_id: *joint_id,
-                actuator_id: id(&format!("motor_{}", index + 1)),
-                scale_rad_per_joint_unit: 100.0,
-                offset_rad: 0.0,
-            })
-            .collect(),
-    };
-    ArmModel::compile_urdf(SYNTHETIC_6DOF, &spec).unwrap()
-}
+use common::{id, synthetic_model};
 
 fn assert_near(actual: f64, expected: f64, tolerance: f64) {
     assert!(

@@ -227,3 +227,77 @@ message ExecuteChassisTrajectoryResult {
   // Number of fully completed points.
   uint32 completed_points = 1;
 }
+
+// Supported active mechanical-arm joint kind.
+enum ArmJointKind {
+  ARM_JOINT_KIND_UNSPECIFIED = 0;
+  ARM_JOINT_KIND_REVOLUTE = 1;
+  ARM_JOINT_KIND_CONTINUOUS = 2;
+  ARM_JOINT_KIND_PRISMATIC = 3;
+}
+
+// One entry in a stable compiled arm-joint order.
+message ArmJointDescriptor {
+  // Stable project-owned joint identity.
+  string joint_id = 1;
+  // Determines whether scalar trajectory values are radians or metres.
+  ArmJointKind kind = 2;
+}
+
+// One stable joint-to-rotary-actuator binding.
+message ArmActuatorBinding {
+  // Joint identity from joint_order.
+  string joint_id = 1;
+  // Stable logical actuator resource identity.
+  string actuator_id = 2;
+}
+
+// Immutable compiled profile/group identity used by plans and controllers.
+message ArmGroupIdentity {
+  // Exactly 32 non-zero SHA-256 bytes for the compiled morphology profile.
+  bytes profile_id = 1;
+  // Exact named base-to-tip kinematic group.
+  string group_id = 2;
+  // Nonempty, duplicate-free stable active-joint order.
+  repeated ArmJointDescriptor joint_order = 3;
+  // Optional complete joint-to-actuator order; empty means unavailable.
+  repeated ArmActuatorBinding actuator_order = 4;
+}
+
+// One point in a bounded profile/group-bound arm trajectory.
+message ArmTrajectoryPoint {
+  // Strictly increasing offset from goal acceptance in nanoseconds.
+  uint64 time_from_start_ns = 1;
+  // Radians for revolute/continuous joints, metres for prismatic joints.
+  repeated double positions_si = 2;
+  // Radians/second or metres/second according to joint_order.
+  repeated double velocities_si = 3;
+  // Radians/second squared or metres/second squared according to joint_order.
+  repeated double accelerations_si = 4;
+}
+
+// Concrete goal payload for ExecuteArmTrajectory.
+message ExecuteArmTrajectoryGoal {
+  // Exactly 32 non-zero SHA-256 bytes for the compiled morphology profile.
+  bytes profile_id = 1;
+  // Exact named base-to-tip kinematic group.
+  string group_id = 2;
+  // Nonempty, duplicate-free stable active-joint order.
+  repeated ArmJointDescriptor joint_order = 3;
+  // Route-bounded, nonempty and strictly time-ordered trajectory.
+  repeated ArmTrajectoryPoint points = 4;
+}
+
+// Concrete feedback payload for ExecuteArmTrajectory.
+message ExecuteArmTrajectoryFeedback {
+  // Zero-based active point index.
+  uint32 active_point = 1;
+  // Overall progress in the closed interval [0, 1].
+  double progress = 2;
+}
+
+// Concrete terminal result payload for ExecuteArmTrajectory.
+message ExecuteArmTrajectoryResult {
+  // Number of fully completed points.
+  uint32 completed_points = 1;
+}

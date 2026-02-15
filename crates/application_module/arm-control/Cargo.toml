@@ -1,0 +1,17 @@
+[package]
+name = "arm-control"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+arm-algorithms.workspace = true
+arm-model.workspace = true
+arrayvec.workspace = true
+control-core.workspace = true
+message-model.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

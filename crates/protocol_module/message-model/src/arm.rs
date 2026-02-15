@@ -432,6 +432,72 @@ impl ArmActuatorOrder {
     }
 }
 
+/// Immutable profile/group identity and stable semantic orders.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ArmGroupIdentity {
+    profile_id: ArmProfileId,
+    group_id: KinematicGroupId,
+    joint_order: ArmJointOrder,
+    actuator_order: Option<ArmActuatorOrder>,
+}
+
+impl ArmGroupIdentity {
+    /// Validates an optional complete actuator binding against joint order.
+    pub fn new(
+        profile_id: ArmProfileId,
+        group_id: KinematicGroupId,
+        joint_order: ArmJointOrder,
+        actuator_order: Option<ArmActuatorOrder>,
+    ) -> Result<Self, SemanticError> {
+        if let Some(actuator_order) = &actuator_order {
+            if actuator_order.len() != joint_order.len() {
+                return Err(SemanticError::DimensionMismatch {
+                    field: "arm.group_identity.actuator_order",
+                    expected: joint_order.len(),
+                    actual: actuator_order.len(),
+                });
+            }
+            for (joint, binding) in joint_order.joints().iter().zip(actuator_order.bindings()) {
+                if joint.joint_id() != binding.joint_id() {
+                    return Err(SemanticError::IdentifierMismatch {
+                        field: "arm.group_identity.actuator_order",
+                    });
+                }
+            }
+        }
+        Ok(Self {
+            profile_id,
+            group_id,
+            joint_order,
+            actuator_order,
+        })
+    }
+
+    /// Returns immutable compiled profile identity.
+    #[must_use]
+    pub const fn profile_id(&self) -> ArmProfileId {
+        self.profile_id
+    }
+
+    /// Returns exact named group.
+    #[must_use]
+    pub const fn group_id(&self) -> KinematicGroupId {
+        self.group_id
+    }
+
+    /// Returns stable active-joint order.
+    #[must_use]
+    pub const fn joint_order(&self) -> &ArmJointOrder {
+        &self.joint_order
+    }
+
+    /// Returns optional complete joint-to-actuator order.
+    #[must_use]
+    pub const fn actuator_order(&self) -> Option<&ArmActuatorOrder> {
+        self.actuator_order.as_ref()
+    }
+}
+
 /// Immutable identity and generation carried by every arm-control proposal.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ArmProposalContext {
@@ -1165,9 +1231,9 @@ mod tests {
 
     use super::{
         ArmAcceleration, ArmActuatorBinding, ArmActuatorOrder, ArmActuatorVector,
-        ArmControlProposal, ArmEffort, ArmJointDescriptor, ArmJointKind, ArmJointObservation,
-        ArmJointOrder, ArmJointSample, ArmJointVector, ArmPosition, ArmProfileId,
-        ArmProfileIdError, ArmProposalContext, ArmTrajectoryPoint, ArmVelocity,
+        ArmControlProposal, ArmEffort, ArmGroupIdentity, ArmJointDescriptor, ArmJointKind,
+        ArmJointObservation, ArmJointOrder, ArmJointSample, ArmJointVector, ArmPosition,
+        ArmProfileId, ArmProfileIdError, ArmProposalContext, ArmTrajectoryPoint, ArmVelocity,
         ExecuteArmTrajectoryGoal, RotaryMitSetpoint, RotaryTorqueNm,
     };
     use crate::{
@@ -1254,6 +1320,24 @@ mod tests {
             ArmActuatorBinding::new(joint_id, AsciiId::parse("motor_2").unwrap()),
         ]);
         assert!(ArmActuatorOrder::new(duplicate_binding).is_err());
+
+        let wrong_order = ArmActuatorOrder::new(bounded([
+            ArmActuatorBinding::new(
+                AsciiId::parse("slide").unwrap(),
+                AsciiId::parse("motor_2").unwrap(),
+            ),
+            ArmActuatorBinding::new(
+                AsciiId::parse("shoulder").unwrap(),
+                AsciiId::parse("motor_1").unwrap(),
+            ),
+        ]))
+        .unwrap();
+        assert!(matches!(
+            ArmGroupIdentity::new(profile_id(), group_id(), mixed_order(), Some(wrong_order)),
+            Err(SemanticError::IdentifierMismatch {
+                field: "arm.group_identity.actuator_order"
+            })
+        ));
     }
 
     #[test]

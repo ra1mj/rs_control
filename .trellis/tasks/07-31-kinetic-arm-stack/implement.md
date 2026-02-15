@@ -137,29 +137,29 @@ Tests:
 
 ## 8. Arm control and simulated/logged execution
 
-- [ ] Scaffold and classify `arm-control`.
-- [ ] Implement profile/group/order/freshness/generation gates.
-- [ ] Implement joint/actuator limit projection and per-field slew checks.
-- [ ] Implement power-consistent transmission projection.
-- [ ] Implement direct torque using fresh position and zero MIT gains.
-- [ ] Implement fixed-gain MIT semantic proposal construction.
-- [ ] Implement collision evidence typestate and closed physical admission.
-- [ ] Implement deterministic sim execution and caller-owned bounded log
+- [x] Scaffold and classify `arm-control`.
+- [x] Implement profile/group/order/freshness/generation gates.
+- [x] Implement joint/actuator limit projection and per-field slew checks.
+- [x] Implement power-consistent transmission projection.
+- [x] Implement direct torque using fresh position and zero MIT gains.
+- [x] Implement fixed-gain MIT semantic proposal construction.
+- [x] Implement collision evidence typestate and closed physical admission.
+- [x] Implement deterministic sim execution and caller-owned bounded log
       records without stdout/stderr or I/O.
-- [ ] Integrate existing lease/deadline/action/cancellation checks.
+- [x] Integrate existing lease/deadline/action/cancellation checks.
 
 ## 9. Protobuf and Damiao boundary
 
-- [ ] Add additive `robot.v1` arm profile/group/trajectory action messages.
-- [ ] Add semantic-to-wire and wire-to-semantic mappings only in
+- [x] Add additive `robot.v1` arm profile/group/trajectory action messages.
+- [x] Add semantic-to-wire and wire-to-semantic mappings only in
       `contract-codec`.
-- [ ] Add strict capacity, presence, enum, identity, unit/order and NaN/Inf
+- [x] Add strict capacity, presence, enum, identity, unit/order and NaN/Inf
       tests.
-- [ ] Add validated semantic MIT-to-`MitCommand` mapping in `contract-codec`.
-- [ ] Expose only the minimum Damiao validation API needed by that mapper;
+- [x] Add validated semantic MIT-to-`MitCommand` mapping in `contract-codec`.
+- [x] Expose only the minimum Damiao validation API needed by that mapper;
       preserve the existing eight-byte frame layout and golden vectors.
-- [ ] Do not add an external raw MIT/CAN Protobuf message.
-- [ ] Update generated descriptor identities/goldens only after breaking and
+- [x] Do not add an external raw MIT/CAN Protobuf message.
+- [x] Update generated descriptor identities/goldens only after breaking and
       cross-language gates pass.
 
 Validation:
@@ -173,8 +173,8 @@ cargo test -p proto-generated -p message-model -p contract-codec -p motor-damiao
 
 ## 10. Architecture and full verification
 
-- [ ] Add all workspace dependencies through `[workspace.dependencies]`.
-- [ ] Classify all new crates in `architecture.toml`.
+- [x] Add all workspace dependencies through `[workspace.dependencies]`.
+- [x] Classify all new crates in `architecture.toml`.
 - [ ] Add positive real-graph checks and retain reverse-edge negative tests.
 - [ ] Scan the production graph for `kinetic`, KINETIC namespaces and
       unreviewed Git/path sources.

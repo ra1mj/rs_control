@@ -3,19 +3,22 @@
 use arrayvec::ArrayVec;
 use message_model::{
     ActionCancelDecision, ActionCancelRequest, ActionCancelResponse, ActionFeedback, ActionGoal,
-    ActionGoalIntent, ActionName, ActionResult, ActionStatus, AsciiId, ChassisSetpoint,
+    ActionGoalIntent, ActionName, ActionResult, ActionStatus, ArmAcceleration, ArmActuatorBinding,
+    ArmActuatorOrder, ArmGroupIdentity, ArmJointDescriptor, ArmJointKind, ArmJointOrder,
+    ArmPosition, ArmProfileId, ArmTrajectoryPoint, ArmVelocity, AsciiId, ChassisSetpoint,
     ChassisSetpointIntent, ChassisTrajectoryPoint, ClockState, ClockStatus, CommandIntent,
     CommandIntentFields, ComponentHealth, Covariance3, Covariance6, CovarianceStatus,
+    ExecuteArmTrajectoryFeedback, ExecuteArmTrajectoryGoal, ExecuteArmTrajectoryResult,
     ExecuteChassisTrajectoryFeedback, ExecuteChassisTrajectoryGoal, ExecuteChassisTrajectoryResult,
     Fault, FaultRecoverability, FaultSeverity, Header, HeaderFields, HealthSnapshotRequest,
     HealthSnapshotResponse, Id128, ImuMeasurement, ImuState, JointState, JointStateAggregate,
-    LifecycleState, MAX_COMPONENT_FAULTS, MAX_HEALTH_COMPONENTS, MAX_JOINTS, MAX_TRAJECTORY_POINTS,
-    MAX_TRANSFORMS, MotorState, MotorStateFields, OdometryState, OdometryStateFields, Pose3,
-    ProtobufTypeName, RegisteredPayload, ResourceId, SemanticError, SourceId, StampedTransform,
-    StampedTransformFields, TemperatureObservation, TransformBatch, Twist2, Twist3, UnitQuaternion,
-    Vector3,
+    KinematicGroupId, LifecycleState, MAX_COMPONENT_FAULTS, MAX_HEALTH_COMPONENTS, MAX_JOINTS,
+    MAX_TRAJECTORY_POINTS, MAX_TRANSFORMS, MotorState, MotorStateFields, OdometryState,
+    OdometryStateFields, Pose3, ProtobufTypeName, RegisteredPayload, ResourceId, RotaryMitSetpoint,
+    SemanticError, SourceId, StampedTransform, StampedTransformFields, TemperatureObservation,
+    TransformBatch, Twist2, Twist3, UnitQuaternion, Vector3,
 };
-use motor_damiao::DamiaoFeedback;
+use motor_damiao::{DamiaoFeedback, MitCommand, RuntimeLimits};
 use prost::Message;
 use proto_generated::robot::v1 as wire;
 
@@ -26,6 +29,118 @@ use crate::{
 
 /// Namespace for Damiao status-nibble fault codes in semantic motor state.
 pub const DAMIAO_STATUS_FAULT_BASE: u32 = 0x0001_0000;
+
+/// Verified semantic identity and runtime scaling for one Damiao actuator.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DamiaoMitMappingContext {
+    profile_id: ArmProfileId,
+    group_id: KinematicGroupId,
+    binding: ArmActuatorBinding,
+    runtime_limits: RuntimeLimits,
+}
+
+impl DamiaoMitMappingContext {
+    /// Creates an immutable expected mapping context.
+    #[must_use]
+    pub const fn new(
+        profile_id: ArmProfileId,
+        group_id: KinematicGroupId,
+        binding: ArmActuatorBinding,
+        runtime_limits: RuntimeLimits,
+    ) -> Self {
+        Self {
+            profile_id,
+            group_id,
+            binding,
+            runtime_limits,
+        }
+    }
+}
+
+/// Maps one bounded semantic MIT tuple to the existing Damiao command type.
+///
+/// This function does not encode CAN, select a motor ID or bypass the driver's
+/// verified lifecycle. The driver remains responsible for final frame
+/// admission against the same discovered runtime limits.
+pub fn arm_mit_to_damiao(
+    profile_id: ArmProfileId,
+    group_id: KinematicGroupId,
+    binding: ArmActuatorBinding,
+    setpoint: RotaryMitSetpoint,
+    context: DamiaoMitMappingContext,
+) -> Result<MitCommand, CodecError> {
+    if profile_id != context.profile_id {
+        return Err(CodecError::InvalidField {
+            field: "arm_mit.profile_id",
+            reason: "profile does not match the verified mapping context",
+        });
+    }
+    if group_id != context.group_id {
+        return Err(CodecError::InvalidField {
+            field: "arm_mit.group_id",
+            reason: "group does not match the verified mapping context",
+        });
+    }
+    if binding != context.binding {
+        return Err(CodecError::InvalidField {
+            field: "arm_mit.binding",
+            reason: "binding does not match the verified mapping context",
+        });
+    }
+    let position = finite_f32(setpoint.position_rad(), "arm_mit.position_rad")?;
+    let velocity = finite_f32(setpoint.velocity_radps(), "arm_mit.velocity_radps")?;
+    let kp = finite_f32(setpoint.kp(), "arm_mit.kp")?;
+    let kd = finite_f32(setpoint.kd(), "arm_mit.kd")?;
+    let feed_forward_torque = finite_f32(
+        setpoint.feed_forward_torque_nm(),
+        "arm_mit.feed_forward_torque_nm",
+    )?;
+    for (field, value, maximum) in [
+        (
+            "arm_mit.position_rad",
+            position.abs(),
+            context.runtime_limits.position(),
+        ),
+        (
+            "arm_mit.velocity_radps",
+            velocity.abs(),
+            context.runtime_limits.velocity(),
+        ),
+        (
+            "arm_mit.feed_forward_torque_nm",
+            feed_forward_torque.abs(),
+            context.runtime_limits.torque(),
+        ),
+        ("arm_mit.kp", kp, 500.0),
+        ("arm_mit.kd", kd, 5.0),
+    ] {
+        if value > maximum {
+            return Err(CodecError::InvalidField {
+                field,
+                reason: "value exceeds verified Damiao runtime/protocol limit",
+            });
+        }
+    }
+    Ok(MitCommand {
+        position,
+        velocity,
+        kp,
+        kd,
+        feed_forward_torque,
+    })
+}
+
+fn finite_f32(value: f64, field: &'static str) -> Result<f32, CodecError> {
+    let narrowed = value as f32;
+    if value.is_finite() && narrowed.is_finite() {
+        Ok(narrowed)
+    } else {
+        Err(CodecError::InvalidField {
+            field,
+            reason: "value cannot be represented as finite f32",
+        })
+    }
+}
 
 /// Stable process/resource metadata used to map one Damiao sample.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1298,6 +1413,312 @@ pub const fn trajectory_result_from_wire(
 ) -> ExecuteChassisTrajectoryResult {
     ExecuteChassisTrajectoryResult {
         completed_points: value.completed_points,
+    }
+}
+
+/// Encodes one immutable arm profile/group identity.
+pub fn encode_arm_group_identity(value: &ArmGroupIdentity) -> Vec<u8> {
+    arm_group_identity_to_wire(value).encode_to_vec()
+}
+
+/// Decodes and validates one immutable arm profile/group identity.
+pub fn decode_arm_group_identity(bytes: &[u8]) -> Result<ArmGroupIdentity, CodecError> {
+    arm_group_identity_from_wire(wire::ArmGroupIdentity::decode(bytes)?)
+}
+
+/// Converts semantic arm profile/group identity to wire.
+#[must_use]
+pub fn arm_group_identity_to_wire(value: &ArmGroupIdentity) -> wire::ArmGroupIdentity {
+    wire::ArmGroupIdentity {
+        profile_id: value.profile_id().as_bytes().to_vec(),
+        group_id: value.group_id().as_str().to_owned(),
+        joint_order: value
+            .joint_order()
+            .joints()
+            .iter()
+            .map(|descriptor| wire::ArmJointDescriptor {
+                joint_id: descriptor.joint_id().as_str().to_owned(),
+                kind: arm_joint_kind_to_wire(descriptor.kind()) as i32,
+            })
+            .collect(),
+        actuator_order: value.actuator_order().map_or_else(Vec::new, |order| {
+            order
+                .bindings()
+                .iter()
+                .map(|binding| wire::ArmActuatorBinding {
+                    joint_id: binding.joint_id().as_str().to_owned(),
+                    actuator_id: binding.actuator_id().as_str().to_owned(),
+                })
+                .collect()
+        }),
+    }
+}
+
+/// Converts and validates wire arm profile/group identity.
+pub fn arm_group_identity_from_wire(
+    value: wire::ArmGroupIdentity,
+) -> Result<ArmGroupIdentity, CodecError> {
+    if value.joint_order.len() > MAX_JOINTS {
+        return Err(CodecError::TooMany {
+            field: "arm_group_identity.joint_order",
+            maximum: MAX_JOINTS,
+            actual: value.joint_order.len(),
+        });
+    }
+    if value.actuator_order.len() > MAX_JOINTS {
+        return Err(CodecError::TooMany {
+            field: "arm_group_identity.actuator_order",
+            maximum: MAX_JOINTS,
+            actual: value.actuator_order.len(),
+        });
+    }
+    let profile_id =
+        ArmProfileId::from_slice(&value.profile_id).map_err(|_| CodecError::InvalidField {
+            field: "arm_group_identity.profile_id",
+            reason: "identity must contain exactly 32 non-zero bytes",
+        })?;
+    let group_id = AsciiId::parse(&value.group_id)?;
+    let mut descriptors = ArrayVec::new();
+    for descriptor in value.joint_order {
+        descriptors.push(ArmJointDescriptor::new(
+            AsciiId::parse(&descriptor.joint_id)?,
+            arm_joint_kind_from_wire(descriptor.kind)?,
+        ));
+    }
+    let joint_order = ArmJointOrder::new(descriptors)?;
+    let actuator_order = if value.actuator_order.is_empty() {
+        None
+    } else {
+        let mut bindings = ArrayVec::new();
+        for binding in value.actuator_order {
+            bindings.push(ArmActuatorBinding::new(
+                AsciiId::parse(&binding.joint_id)?,
+                AsciiId::parse(&binding.actuator_id)?,
+            ));
+        }
+        Some(ArmActuatorOrder::new(bindings)?)
+    };
+    ArmGroupIdentity::new(profile_id, group_id, joint_order, actuator_order)
+        .map_err(CodecError::from)
+}
+
+/// Encodes a validated morphology-bound arm trajectory goal.
+pub fn encode_arm_trajectory_goal(value: &ExecuteArmTrajectoryGoal) -> Result<Vec<u8>, CodecError> {
+    Ok(arm_trajectory_goal_to_wire(value).encode_to_vec())
+}
+
+/// Decodes and validates a morphology-bound arm trajectory goal.
+pub fn decode_arm_trajectory_goal(bytes: &[u8]) -> Result<ExecuteArmTrajectoryGoal, CodecError> {
+    arm_trajectory_goal_from_wire(wire::ExecuteArmTrajectoryGoal::decode(bytes)?)
+}
+
+/// Converts a semantic arm trajectory goal into its wire DTO.
+#[must_use]
+pub fn arm_trajectory_goal_to_wire(
+    value: &ExecuteArmTrajectoryGoal,
+) -> wire::ExecuteArmTrajectoryGoal {
+    wire::ExecuteArmTrajectoryGoal {
+        profile_id: value.profile_id().as_bytes().to_vec(),
+        group_id: value.group_id().as_str().to_owned(),
+        joint_order: value
+            .order()
+            .joints()
+            .iter()
+            .map(|descriptor| wire::ArmJointDescriptor {
+                joint_id: descriptor.joint_id().as_str().to_owned(),
+                kind: arm_joint_kind_to_wire(descriptor.kind()) as i32,
+            })
+            .collect(),
+        points: value
+            .points()
+            .iter()
+            .map(|point| wire::ArmTrajectoryPoint {
+                time_from_start_ns: point.time_from_start_ns(),
+                positions_si: point
+                    .positions()
+                    .iter()
+                    .map(|value| value.value_si())
+                    .collect(),
+                velocities_si: point
+                    .velocities()
+                    .iter()
+                    .map(|value| value.value_si())
+                    .collect(),
+                accelerations_si: point
+                    .accelerations()
+                    .iter()
+                    .map(|value| value.value_si())
+                    .collect(),
+            })
+            .collect(),
+    }
+}
+
+/// Converts and validates an arm trajectory goal wire DTO.
+pub fn arm_trajectory_goal_from_wire(
+    value: wire::ExecuteArmTrajectoryGoal,
+) -> Result<ExecuteArmTrajectoryGoal, CodecError> {
+    if value.joint_order.len() > MAX_JOINTS {
+        return Err(CodecError::TooMany {
+            field: "arm_trajectory.joint_order",
+            maximum: MAX_JOINTS,
+            actual: value.joint_order.len(),
+        });
+    }
+    if value.points.len() > MAX_TRAJECTORY_POINTS {
+        return Err(CodecError::TooMany {
+            field: "arm_trajectory.points",
+            maximum: MAX_TRAJECTORY_POINTS,
+            actual: value.points.len(),
+        });
+    }
+    let profile_id =
+        ArmProfileId::from_slice(&value.profile_id).map_err(|_| CodecError::InvalidField {
+            field: "arm_trajectory.profile_id",
+            reason: "identity must contain exactly 32 non-zero bytes",
+        })?;
+    let group_id = AsciiId::parse(&value.group_id)?;
+    let mut descriptors = ArrayVec::new();
+    for descriptor in value.joint_order {
+        descriptors.push(ArmJointDescriptor::new(
+            AsciiId::parse(&descriptor.joint_id)?,
+            arm_joint_kind_from_wire(descriptor.kind)?,
+        ));
+    }
+    let order = ArmJointOrder::new(descriptors)?;
+    let mut points = Vec::with_capacity(value.points.len());
+    for point in value.points {
+        for (field, actual) in [
+            ("arm_trajectory.positions_si", point.positions_si.len()),
+            ("arm_trajectory.velocities_si", point.velocities_si.len()),
+            (
+                "arm_trajectory.accelerations_si",
+                point.accelerations_si.len(),
+            ),
+        ] {
+            if actual != order.len() {
+                return Err(CodecError::InvalidLength {
+                    field,
+                    expected: order.len(),
+                    actual,
+                });
+            }
+        }
+        let mut positions = ArrayVec::new();
+        let mut velocities = ArrayVec::new();
+        let mut accelerations = ArrayVec::new();
+        for (((descriptor, position), velocity), acceleration) in order
+            .joints()
+            .iter()
+            .zip(point.positions_si)
+            .zip(point.velocities_si)
+            .zip(point.accelerations_si)
+        {
+            match descriptor.kind() {
+                ArmJointKind::Revolute | ArmJointKind::Continuous => {
+                    positions.push(ArmPosition::angular_rad(position)?);
+                    velocities.push(ArmVelocity::angular_radps(velocity)?);
+                    accelerations.push(ArmAcceleration::angular_radps2(acceleration)?);
+                }
+                ArmJointKind::Prismatic => {
+                    positions.push(ArmPosition::linear_m(position)?);
+                    velocities.push(ArmVelocity::linear_mps(velocity)?);
+                    accelerations.push(ArmAcceleration::linear_mps2(acceleration)?);
+                }
+            }
+        }
+        points.push(ArmTrajectoryPoint::new(
+            point.time_from_start_ns,
+            &order,
+            positions,
+            velocities,
+            accelerations,
+        )?);
+    }
+    ExecuteArmTrajectoryGoal::new(profile_id, group_id, order, points).map_err(CodecError::from)
+}
+
+/// Encodes concrete arm trajectory feedback.
+pub fn encode_arm_trajectory_feedback(
+    value: ExecuteArmTrajectoryFeedback,
+) -> Result<Vec<u8>, CodecError> {
+    Ok(arm_trajectory_feedback_to_wire(value).encode_to_vec())
+}
+
+/// Decodes concrete arm trajectory feedback.
+pub fn decode_arm_trajectory_feedback(
+    bytes: &[u8],
+) -> Result<ExecuteArmTrajectoryFeedback, CodecError> {
+    arm_trajectory_feedback_from_wire(wire::ExecuteArmTrajectoryFeedback::decode(bytes)?)
+}
+
+/// Converts semantic arm trajectory feedback to wire.
+#[must_use]
+pub const fn arm_trajectory_feedback_to_wire(
+    value: ExecuteArmTrajectoryFeedback,
+) -> wire::ExecuteArmTrajectoryFeedback {
+    wire::ExecuteArmTrajectoryFeedback {
+        active_point: value.active_point(),
+        progress: value.progress(),
+    }
+}
+
+/// Converts and validates arm trajectory feedback from wire.
+pub fn arm_trajectory_feedback_from_wire(
+    value: wire::ExecuteArmTrajectoryFeedback,
+) -> Result<ExecuteArmTrajectoryFeedback, CodecError> {
+    ExecuteArmTrajectoryFeedback::new(value.active_point, value.progress).map_err(CodecError::from)
+}
+
+/// Encodes a concrete arm trajectory terminal result.
+pub fn encode_arm_trajectory_result(value: ExecuteArmTrajectoryResult) -> Vec<u8> {
+    arm_trajectory_result_to_wire(value).encode_to_vec()
+}
+
+/// Decodes a concrete arm trajectory terminal result.
+pub fn decode_arm_trajectory_result(
+    bytes: &[u8],
+) -> Result<ExecuteArmTrajectoryResult, CodecError> {
+    Ok(arm_trajectory_result_from_wire(
+        wire::ExecuteArmTrajectoryResult::decode(bytes)?,
+    ))
+}
+
+/// Converts semantic arm trajectory terminal result to wire.
+#[must_use]
+pub const fn arm_trajectory_result_to_wire(
+    value: ExecuteArmTrajectoryResult,
+) -> wire::ExecuteArmTrajectoryResult {
+    wire::ExecuteArmTrajectoryResult {
+        completed_points: value.completed_points(),
+    }
+}
+
+/// Converts wire arm trajectory terminal result to semantic form.
+#[must_use]
+pub const fn arm_trajectory_result_from_wire(
+    value: wire::ExecuteArmTrajectoryResult,
+) -> ExecuteArmTrajectoryResult {
+    ExecuteArmTrajectoryResult::new(value.completed_points)
+}
+
+fn arm_joint_kind_to_wire(value: ArmJointKind) -> wire::ArmJointKind {
+    match value {
+        ArmJointKind::Revolute => wire::ArmJointKind::Revolute,
+        ArmJointKind::Continuous => wire::ArmJointKind::Continuous,
+        ArmJointKind::Prismatic => wire::ArmJointKind::Prismatic,
+    }
+}
+
+fn arm_joint_kind_from_wire(value: i32) -> Result<ArmJointKind, CodecError> {
+    match wire::ArmJointKind::try_from(value) {
+        Ok(wire::ArmJointKind::Revolute) => Ok(ArmJointKind::Revolute),
+        Ok(wire::ArmJointKind::Continuous) => Ok(ArmJointKind::Continuous),
+        Ok(wire::ArmJointKind::Prismatic) => Ok(ArmJointKind::Prismatic),
+        Ok(wire::ArmJointKind::Unspecified) | Err(_) => Err(CodecError::UnknownEnum {
+            field: "arm_trajectory.joint_order.kind",
+            value,
+        }),
     }
 }
 

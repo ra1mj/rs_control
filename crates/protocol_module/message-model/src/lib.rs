@@ -665,6 +665,12 @@ pub enum SemanticError {
         /// Rejected collection.
         field: &'static str,
     },
+    /// Two stable semantic identity orders did not agree.
+    #[error("identity order {field} does not match its owning context")]
+    IdentifierMismatch {
+        /// Rejected identity/order field.
+        field: &'static str,
+    },
     /// A supplied bound was zero or exceeded the supported maximum.
     #[error("field {field} must be nonzero and no greater than {maximum}")]
     InvalidBound {

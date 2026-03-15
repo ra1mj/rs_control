@@ -1,0 +1,27 @@
+[package]
+name = "rl-policy-control"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+arm-algorithms.workspace = true
+arm-control.workspace = true
+arrayvec.workspace = true
+message-model.workspace = true
+rten.workspace = true
+rten-onnx.workspace = true
+rten-tensor.workspace = true
+rtrb.workspace = true
+serde.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+toml.workspace = true
+
+[dev-dependencies]
+arm-model.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

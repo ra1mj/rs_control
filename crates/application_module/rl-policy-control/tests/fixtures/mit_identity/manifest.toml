@@ -1,0 +1,92 @@
+schema_version = 1
+runtime = "rten"
+runtime_version = "0.24.0"
+model_format = "onnx"
+model_sha256 = "ae779fbbbe111b3901599df0897fdf88dd4e23036954f4b4ce269a8f9c0887c2"
+max_model_bytes = 1024
+arm_profile_sha256 = "af192ffe53a66335160e0da5462e712a7f531c858cb286138329de6ddb04adcc"
+kinematic_group_id = "arm"
+joint_order = ["joint_1", "joint_2"]
+actuator_order = ["act_1", "act_2"]
+inference_period_ns = 100000000
+inference_deadline_ns = 90000000
+queue_capacity = 2
+thread_count = 1
+fallback = "withdraw_proposal"
+
+[[inputs]]
+name = "observation"
+dtype = "f32"
+shape = [1, 6]
+
+[[outputs]]
+name = "action"
+dtype = "f32"
+shape = [1, 6]
+
+[[observations]]
+joint = "joint_1"
+field = "position"
+unit = "rad"
+mean = 0.0
+inverse_std = 1.0
+minimum = -2.0
+maximum = 2.0
+
+[[observations]]
+joint = "joint_1"
+field = "velocity"
+unit = "rad_per_s"
+mean = 0.0
+inverse_std = 1.0
+minimum = -4.0
+maximum = 4.0
+
+[[observations]]
+joint = "joint_1"
+field = "effort"
+unit = "nm"
+mean = 0.0
+inverse_std = 1.0
+minimum = -20.0
+maximum = 20.0
+
+[[observations]]
+joint = "joint_2"
+field = "position"
+unit = "rad"
+mean = 0.0
+inverse_std = 1.0
+minimum = -2.0
+maximum = 2.0
+
+[[observations]]
+joint = "joint_2"
+field = "velocity"
+unit = "rad_per_s"
+mean = 0.0
+inverse_std = 1.0
+minimum = -4.0
+maximum = 4.0
+
+[[observations]]
+joint = "joint_2"
+field = "effort"
+unit = "nm"
+mean = 0.0
+inverse_std = 1.0
+minimum = -20.0
+maximum = 20.0
+
+[action]
+kind = "mit"
+output = "action"
+scale = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+offset = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+hard_minimum = [-3.0, -5.0, -20.0, -3.0, -5.0, -20.0]
+hard_maximum = [3.0, 5.0, 20.0, 3.0, 5.0, 20.0]
+command_minimum = [-2.0, -4.0, -10.0, -2.0, -4.0, -10.0]
+command_maximum = [2.0, 4.0, 10.0, 2.0, 4.0, 10.0]
+slew_per_second = [10.0, 20.0, 50.0, 10.0, 20.0, 50.0]
+fixed_kp = [20.0, 20.0]
+fixed_kd = [0.5, 0.5]

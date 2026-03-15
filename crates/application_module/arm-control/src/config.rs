@@ -75,15 +75,21 @@ impl ActuatorControlLimits {
         self.binding
     }
 
-    pub(crate) const fn maximum_position_rad(self) -> f64 {
+    /// Returns the absolute actuator-position bound.
+    #[must_use]
+    pub const fn maximum_position_rad(self) -> f64 {
         self.maximum_position_rad
     }
 
-    pub(crate) const fn maximum_velocity_radps(self) -> f64 {
+    /// Returns the absolute actuator-velocity bound.
+    #[must_use]
+    pub const fn maximum_velocity_radps(self) -> f64 {
         self.maximum_velocity_radps
     }
 
-    pub(crate) const fn maximum_torque_nm(self) -> f64 {
+    /// Returns the absolute feed-forward/direct torque bound.
+    #[must_use]
+    pub const fn maximum_torque_nm(self) -> f64 {
         self.maximum_torque_nm
     }
 
@@ -99,15 +105,21 @@ impl ActuatorControlLimits {
         self.fixed_kd
     }
 
-    pub(crate) const fn maximum_position_slew_radps(self) -> f64 {
+    /// Returns the actuator-position slew bound.
+    #[must_use]
+    pub const fn maximum_position_slew_radps(self) -> f64 {
         self.maximum_position_slew_radps
     }
 
-    pub(crate) const fn maximum_velocity_slew_radps2(self) -> f64 {
+    /// Returns the actuator-velocity slew bound.
+    #[must_use]
+    pub const fn maximum_velocity_slew_radps2(self) -> f64 {
         self.maximum_velocity_slew_radps2
     }
 
-    pub(crate) const fn maximum_torque_slew_nmps(self) -> f64 {
+    /// Returns the actuator-torque slew bound.
+    #[must_use]
+    pub const fn maximum_torque_slew_nmps(self) -> f64 {
         self.maximum_torque_slew_nmps
     }
 }
@@ -206,15 +218,21 @@ impl ArmControlConfig {
         &self.actuator_order
     }
 
-    pub(crate) const fn joint_order(&self) -> &ArmJointOrder {
+    /// Returns the stable compiled joint order.
+    #[must_use]
+    pub const fn joint_order(&self) -> &ArmJointOrder {
         &self.joint_order
     }
 
-    pub(crate) const fn observation_source(&self) -> SourceId {
+    /// Returns the exact semantic observation source.
+    #[must_use]
+    pub const fn observation_source(&self) -> SourceId {
         self.observation_source
     }
 
-    pub(crate) const fn observation_boot(&self) -> Id128 {
+    /// Returns the exact source boot identity.
+    #[must_use]
+    pub const fn observation_boot(&self) -> Id128 {
         self.observation_boot
     }
 
@@ -222,7 +240,9 @@ impl ArmControlConfig {
         &self.transmissions
     }
 
-    pub(crate) fn limits(&self) -> &[ActuatorControlLimits] {
+    /// Returns per-actuator immutable limits in binding order.
+    #[must_use]
+    pub fn limits(&self) -> &[ActuatorControlLimits] {
         &self.limits
     }
 }

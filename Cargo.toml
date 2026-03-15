@@ -19,6 +19,7 @@ members = [
     "crates/application_module/arm-algorithms",
     "crates/application_module/arm-control",
     "crates/application_module/arm-model",
+    "crates/application_module/rl-policy-control",
     "crates/application_module/chassis-mecanum",
     "crates/application_module/chassis-model",
     "crates/application_module/chassis-omni",
@@ -53,6 +54,7 @@ hardware-module-core = { version = "0.1.0", path = "crates/hardware_module/hardw
 arm-algorithms = { version = "0.1.0", path = "crates/application_module/arm-algorithms" }
 arm-control = { version = "0.1.0", path = "crates/application_module/arm-control" }
 arm-model = { version = "0.1.0", path = "crates/application_module/arm-model" }
+rl-policy-control = { version = "0.1.0", path = "crates/application_module/rl-policy-control" }
 message-model = { version = "0.1.0", path = "crates/protocol_module/message-model" }
 middleware-api = { version = "0.1.0", path = "crates/protocol_module/middleware-api" }
 middleware-local = { version = "0.1.0", path = "crates/protocol_module/middleware-local" }
@@ -70,6 +72,9 @@ proto-generated = { version = "0.1.0", path = "crates/protocol_module/proto-gene
 ros2-mapping = { version = "0.1.0", path = "crates/integration/ros2-mapping" }
 protoc-bin-vendored = "3.2.0"
 rtrb = "=0.3.4"
+rten = { version = "=0.24.0", default-features = false, features = ["onnx_format"] }
+rten-onnx = "=0.24.0"
+rten-tensor = "=0.24.0"
 rand = "=0.10.2"
 rand_chacha = "=0.10.0"
 rustix = { version = "=1.1.4", default-features = false, features = ["time"] }

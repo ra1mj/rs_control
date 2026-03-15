@@ -1,0 +1,24 @@
+:Ê
+!
+observation
+state_insum"Add
+
+sumaction"Identity
+
+sum	state_out"IdentityZ
+observation
+
+
+Z
+state_in
+
+
+b
+action
+
+
+b
+	state_out
+
+
+

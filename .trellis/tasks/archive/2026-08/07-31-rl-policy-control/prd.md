@@ -85,15 +85,16 @@ without direct hardware authority.
 
 ## Acceptance Criteria
 
-- [ ] A checked-in manifest and deterministic fixture ONNX model load with
+- [x] A checked-in manifest and deterministic fixture ONNX model load with
       exact identity and tensor-contract evidence.
-- [ ] Fresh semantic observations produce a bounded typed policy proposal with
+- [x] Fresh semantic observations produce a bounded typed policy proposal with
       the expected golden values.
-- [ ] Every malformed/stale/late/non-finite/wrong-generation case yields the
+- [x] Every malformed/stale/late/non-finite/wrong-generation case yields the
       exact configured fallback and cannot refresh authority.
-- [ ] Golden tests decode and constrain direct-torque and MIT outputs in stable
+- [x] Golden tests decode and constrain direct-torque and MIT outputs in stable
       compiled joint-to-actuator binding order, including SI units,
       gain/effort/rate limits and rejection before raw motor framing.
-- [ ] Model load and inference stay outside hardware/protocol crates and the
+- [x] Model load and inference stay outside hardware/protocol crates and the
       allocation-free control hot path.
-- [ ] Architecture, Clippy, tests, dependency policy and full host CI pass.
+- [x] Architecture, Clippy, tests, dependency policy and all non-OrangePi host
+      CI gates pass.

@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package robot.v1;
+
+import "robot/v1/common.proto";
+
+// Top-level robot safety/lifecycle state.
+enum SystemState {
+  SYSTEM_STATE_UNSPECIFIED = 0;
+  SYSTEM_STATE_BOOT = 1;
+  SYSTEM_STATE_STANDBY = 2;
+  SYSTEM_STATE_ARMED = 3;
+  SYSTEM_STATE_RUNNING = 4;
+  SYSTEM_STATE_DEGRADED = 5;
+  SYSTEM_STATE_FAULT = 6;
+  SYSTEM_STATE_ESTOP = 7;
+  SYSTEM_STATE_SHUTDOWN = 8;
+}
+
+// Terminal or active state of one mission node.
+enum MissionNodeStatus {
+  MISSION_NODE_STATUS_UNSPECIFIED = 0;
+  MISSION_NODE_STATUS_IDLE = 1;
+  MISSION_NODE_STATUS_RUNNING = 2;
+  MISSION_NODE_STATUS_SUCCEEDED = 3;
+  MISSION_NODE_STATUS_FAILED = 4;
+  MISSION_NODE_STATUS_TIMED_OUT = 5;
+  MISSION_NODE_STATUS_CANCELLED = 6;
+}
+
+// Auditable lifecycle transition produced by the deterministic FSM reducer.
+message FsmTransition {
+  // Common event metadata.
+  Header header = 1;
+  // State before the event.
+  SystemState from_state = 2;
+  // State after the event.
+  SystemState to_state = 3;
+  // Stable machine-readable event code.
+  uint32 event_code = 4;
+  // Stable ID of the event that caused the transition.
+  bytes event_id = 5;
+}
+
+// Mission-node status event recorded and replayed by stable node ID.
+message MissionEvent {
+  // Common event metadata.
+  Header header = 1;
+  // Stable mission definition ID.
+  string mission_id = 2;
+  // Stable node ID within the mission IR.
+  string node_id = 3;
+  // Current node result.
+  MissionNodeStatus status = 4;
+  // Stable machine-readable failure/cancellation code.
+  uint32 result_code = 5;
+}

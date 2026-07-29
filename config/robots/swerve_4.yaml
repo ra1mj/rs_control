@@ -1,0 +1,18 @@
+schema_version: 1
+chassis:
+  morphology: swerve_4
+  motor_ids:
+    front_left_drive: 1
+    front_left_steer: 2
+    front_right_drive: 3
+    front_right_steer: 4
+    rear_left_drive: 5
+    rear_left_steer: 6
+    rear_right_drive: 7
+    rear_right_steer: 8
+arm:
+  morphology: none
+  motor_ids: {}
+imu:
+  transport: uart
+  baud_rate: 921600

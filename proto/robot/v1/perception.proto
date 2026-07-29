@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package robot.v1;
+
+import "robot/v1/common.proto";
+
+// External planar pose correction with uncertainty.
+message PoseObservation {
+  // Common sample metadata.
+  Header header = 1;
+  // Observed planar pose in Header.frame_id.
+  Pose2 pose = 2;
+  // Row-major 3x3 covariance over x, y and yaw.
+  repeated double covariance = 3;
+}
+
+// Tracked target observation; control policy remains outside perception.
+message TrackedTarget {
+  // Common sample metadata.
+  Header header = 1;
+  // Stable tracker-local target identifier.
+  string target_id = 2;
+  // Target position in metres in Header.frame_id.
+  Vector3 position_m = 3;
+  // Target velocity in metres per second in Header.frame_id.
+  Vector3 velocity_mps = 4;
+  // Confidence in the closed interval [0, 1].
+  double confidence = 5;
+}

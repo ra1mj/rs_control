@@ -1,0 +1,43 @@
+version = 1
+composition_roots = ["robotctl"]
+
+[classes.lower]
+allowed_dependencies = ["lower"]
+path_prefixes = ["crates/lower/"]
+
+[classes.middle]
+allowed_dependencies = ["middle", "lower"]
+path_prefixes = ["crates/middle/"]
+
+[classes.upper]
+allowed_dependencies = ["upper", "middle"]
+path_prefixes = ["crates/upper/"]
+
+[classes.integration]
+allowed_dependencies = ["integration", "middle"]
+path_prefixes = ["crates/integration/"]
+
+[classes.test-support]
+allowed_dependencies = ["test-support", "integration", "upper", "middle", "lower"]
+path_prefixes = ["crates/integration/test-support/"]
+
+[classes.app]
+allowed_dependencies = ["app", "integration", "upper", "middle", "lower"]
+path_prefixes = ["apps/"]
+composition_root = true
+
+[classes.tool]
+allowed_dependencies = ["tool"]
+path_prefixes = ["tools/"]
+
+[members]
+"architecture-check" = "tool"
+"config-model" = "integration"
+"contract-codec" = "middle"
+"control-core" = "upper"
+"lower-core" = "lower"
+"message-model" = "middle"
+"proto-generated" = "middle"
+"proto-compat-check" = "tool"
+"robotctl" = "app"
+"test-support" = "test-support"

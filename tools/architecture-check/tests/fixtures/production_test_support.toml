@@ -1,0 +1,12 @@
+[[packages]]
+name = "control-core"
+path = "crates/upper/control-core"
+
+[[packages]]
+name = "test-support"
+path = "crates/integration/test-support"
+
+[[dependencies]]
+source = "control-core"
+target = "test-support"
+kind = "normal"

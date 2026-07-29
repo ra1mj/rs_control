@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package robot.v1;
+
+import "robot/v1/common.proto";
+
+// Standardized motor feedback in SI units.
+message MotorState {
+  // Common sample metadata.
+  Header header = 1;
+  // Logical motor resource such as chassis.front_left.
+  string resource_id = 2;
+  // Rotor/output position in radians according to the compiled motor profile.
+  double position_rad = 3;
+  // Angular velocity in radians per second.
+  double velocity_radps = 4;
+  // Estimated torque in newton metres.
+  double torque_nm = 5;
+  // Power-stage temperature in degrees Celsius.
+  double mos_temperature_c = 6;
+  // Rotor temperature in degrees Celsius.
+  double rotor_temperature_c = 7;
+  // Stable driver-owned numeric fault code; zero means no reported device fault.
+  uint32 fault_code = 8;
+}
+
+// IMU sample expressed in the frame named by Header.frame_id.
+message ImuState {
+  // Common sample metadata.
+  Header header = 1;
+  // Orientation as a unit quaternion.
+  Quaternion orientation = 2;
+  // Angular velocity in radians per second.
+  Vector3 angular_velocity_radps = 3;
+  // Linear acceleration in metres per second squared.
+  Vector3 linear_acceleration_mps2 = 4;
+  // Row-major 3x3 orientation covariance.
+  repeated double orientation_covariance = 5;
+  // Row-major 3x3 angular-velocity covariance.
+  repeated double angular_velocity_covariance = 6;
+  // Row-major 3x3 linear-acceleration covariance.
+  repeated double linear_acceleration_covariance = 7;
+}

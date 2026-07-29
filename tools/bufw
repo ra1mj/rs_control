@@ -1,0 +1,45 @@
+#!/bin/sh
+set -eu
+
+buf_version="1.69.0"
+buf_system=$(uname -s)
+buf_arch=$(uname -m)
+
+if [ "$buf_system" != "Linux" ]; then
+    echo "bufw: unsupported system $buf_system (v1 supports Linux development hosts)" >&2
+    exit 2
+fi
+
+case "$buf_arch" in
+    x86_64)
+        buf_asset="buf-Linux-x86_64"
+        buf_sha256="c1989e0f23143c044cc4f3e1d5c0d3453fa5f83f8330aed6bab76080192740b2"
+        ;;
+    aarch64)
+        buf_asset="buf-Linux-aarch64"
+        buf_sha256="8acd7161665ce25933a7cb2c982b3137bbcaa6e70ad58ea2cc311dba4f4f2f5c"
+        ;;
+    *)
+        echo "bufw: unsupported Linux architecture $buf_arch" >&2
+        exit 2
+        ;;
+esac
+
+buf_repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+buf_cache_dir="$buf_repo_root/target/tools/buf/$buf_version/$buf_arch"
+buf_binary="$buf_cache_dir/buf"
+
+if [ ! -x "$buf_binary" ]; then
+    mkdir -p "$buf_cache_dir"
+    buf_download=$(mktemp "$buf_cache_dir/buf.download.XXXXXX")
+    trap 'rm -f "$buf_download"' EXIT INT TERM
+    curl -fsSL \
+        "https://github.com/bufbuild/buf/releases/download/v${buf_version}/${buf_asset}" \
+        -o "$buf_download"
+    printf '%s  %s\n' "$buf_sha256" "$buf_download" | sha256sum -c - >/dev/null
+    chmod 0755 "$buf_download"
+    mv "$buf_download" "$buf_binary"
+    trap - EXIT INT TERM
+fi
+
+exec "$buf_binary" "$@"

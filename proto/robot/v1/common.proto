@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package robot.v1;
+
+// Describes the relationship between a publisher clock and the receiver clock.
+enum ClockState {
+  CLOCK_STATE_UNSPECIFIED = 0;
+  CLOCK_STATE_LOCAL = 1;
+  CLOCK_STATE_SYNCHRONIZED = 2;
+  CLOCK_STATE_UNSYNCHRONIZED = 3;
+}
+
+// Describes whether a sample may be used and how much it has degraded.
+enum DataQuality {
+  DATA_QUALITY_UNSPECIFIED = 0;
+  DATA_QUALITY_VALID = 1;
+  DATA_QUALITY_DEGRADED = 2;
+  DATA_QUALITY_STALE = 3;
+  DATA_QUALITY_CALIBRATING = 4;
+  DATA_QUALITY_FAULTED = 5;
+}
+
+// Clock synchronization state and its estimated one-way uncertainty.
+message ClockStatus {
+  // Clock relationship classification.
+  ClockState state = 1;
+  // Estimated clock relationship uncertainty in nanoseconds.
+  uint64 uncertainty_ns = 2;
+}
+
+// Metadata carried by every externally visible sample or command.
+message Header {
+  // Stable publisher identity. Limited to portable ASCII by the semantic model.
+  string source_id = 1;
+  // Exactly 16 bytes and regenerated whenever the publisher process starts.
+  bytes boot_id = 2;
+  // Monotonic sequence within one boot_id.
+  uint64 sequence = 3;
+  // Timestamp at the physical or algorithm source in its monotonic clock domain.
+  uint64 source_monotonic_ns = 4;
+  // Optional Unix timestamp used only for cross-system correlation.
+  optional uint64 publish_unix_ns = 5;
+  // Maximum validity duration for this message in nanoseconds.
+  uint64 valid_for_ns = 6;
+  // Right-handed coordinate frame identifier when applicable.
+  string frame_id = 7;
+  // Publisher/receiver clock relationship.
+  ClockStatus clock_status = 8;
+  // Semantic sample quality.
+  DataQuality quality = 9;
+}
+
+// Three-dimensional vector with units defined by the owning field.
+message Vector3 {
+  // X component.
+  double x = 1;
+  // Y component.
+  double y = 2;
+  // Z component.
+  double z = 3;
+}
+
+// Unit quaternion using x, y, z, w ordering.
+message Quaternion {
+  // Quaternion x component.
+  double x = 1;
+  // Quaternion y component.
+  double y = 2;
+  // Quaternion z component.
+  double z = 3;
+  // Quaternion w component.
+  double w = 4;
+}
+
+// Planar pose using x forward, y left and positive yaw counter-clockwise.
+message Pose2 {
+  // Forward position in metres.
+  double x_m = 1;
+  // Left position in metres.
+  double y_m = 2;
+  // Heading in radians.
+  double yaw_rad = 3;
+}
+
+// Planar body velocity using x forward, y left and positive yaw counter-clockwise.
+message Twist2 {
+  // Forward velocity in metres per second.
+  double vx_mps = 1;
+  // Left velocity in metres per second.
+  double vy_mps = 2;
+  // Yaw rate in radians per second.
+  double yaw_rate_radps = 3;
+}

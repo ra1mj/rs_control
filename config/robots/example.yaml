@@ -1,0 +1,14 @@
+schema_version: 1
+chassis:
+  morphology: mecanum_4
+  motor_ids:
+    front_left: 1
+    front_right: 2
+    rear_left: 3
+    rear_right: 4
+arm:
+  morphology: none
+  motor_ids: {}
+imu:
+  transport: uart
+  baud_rate: 921600

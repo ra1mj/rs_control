@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package robot.v1;
+
+import "robot/v1/common.proto";
+
+// Common component lifecycle exposed to supervision and the FSM.
+enum LifecycleState {
+  LIFECYCLE_STATE_UNSPECIFIED = 0;
+  LIFECYCLE_STATE_STARTING = 1;
+  LIFECYCLE_STATE_READY = 2;
+  LIFECYCLE_STATE_ACTIVE = 3;
+  LIFECYCLE_STATE_DEGRADED = 4;
+  LIFECYCLE_STATE_FAULTED = 5;
+  LIFECYCLE_STATE_STOPPING = 6;
+}
+
+// Safety significance independent of log level.
+enum FaultSeverity {
+  FAULT_SEVERITY_UNSPECIFIED = 0;
+  FAULT_SEVERITY_INFO = 1;
+  FAULT_SEVERITY_WARNING = 2;
+  FAULT_SEVERITY_ERROR = 3;
+  FAULT_SEVERITY_CRITICAL = 4;
+}
+
+// Whether and how a component may recover from a fault.
+enum FaultRecoverability {
+  FAULT_RECOVERABILITY_UNSPECIFIED = 0;
+  FAULT_RECOVERABILITY_AUTOMATIC = 1;
+  FAULT_RECOVERABILITY_OPERATOR = 2;
+  FAULT_RECOVERABILITY_POWER_CYCLE = 3;
+  FAULT_RECOVERABILITY_NOT_RECOVERABLE = 4;
+}
+
+// Typed fault consumed by automation and recorded for diagnosis.
+message Fault {
+  // Stable component-owned numeric fault code.
+  uint32 code = 1;
+  // Safety significance.
+  FaultSeverity severity = 2;
+  // Whether explicit reset is required after the condition disappears.
+  bool latched = 3;
+  // Recovery classification.
+  FaultRecoverability recoverability = 4;
+  // First observation time in the publisher monotonic clock domain.
+  uint64 first_seen_monotonic_ns = 5;
+  // Most recent observation time in the publisher monotonic clock domain.
+  uint64 last_seen_monotonic_ns = 6;
+  // Number of observations in this occurrence.
+  uint64 count = 7;
+  // Component or subcomponent that raised the fault.
+  string source = 8;
+  // Optional 16-byte command identifier related to the fault.
+  bytes related_command_id = 9;
+  // Stable machine-readable recommended-action code.
+  uint32 recommended_action = 10;
+}
+
+// Current component health snapshot.
+message ComponentHealth {
+  // Common sample metadata.
+  Header header = 1;
+  // Stable component name.
+  string component_id = 2;
+  // Current lifecycle.
+  LifecycleState lifecycle = 3;
+  // Active typed faults.
+  repeated Fault faults = 4;
+  // Last successful input/output time in the publisher monotonic clock domain.
+  uint64 last_success_monotonic_ns = 5;
+}

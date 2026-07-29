@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package robot.v1;
+
+import "robot/v1/common.proto";
+
+// Result of a discrete control action.
+enum ActionStatus {
+  ACTION_STATUS_UNSPECIFIED = 0;
+  ACTION_STATUS_ACCEPTED = 1;
+  ACTION_STATUS_RUNNING = 2;
+  ACTION_STATUS_SUCCEEDED = 3;
+  ACTION_STATUS_FAILED = 4;
+  ACTION_STATUS_CANCELLED = 5;
+  ACTION_STATUS_TIMED_OUT = 6;
+  ACTION_STATUS_REJECTED = 7;
+}
+
+// Exclusive, finite-duration authority for one robot resource.
+message ResourceLease {
+  // Resource covered by this lease, for example chassis or arm.left.
+  string resource_id = 1;
+  // Logical controller that owns the lease.
+  string owner_id = 2;
+  // Exactly 16 bytes and unique for this grant.
+  bytes lease_id = 3;
+  // Changes when the authority service starts a new session.
+  uint64 session_epoch = 4;
+  // Expiration time in the local enforcement monotonic clock domain.
+  uint64 expires_monotonic_ns = 5;
+}
+
+// Authority and correlation metadata attached to every motion command.
+message CommandEnvelope {
+  // Common message metadata.
+  Header header = 1;
+  // Resource targeted by the command.
+  string resource_id = 2;
+  // Command source that must match the active lease.
+  string owner_id = 3;
+  // Exactly 16 bytes and must match the active lease.
+  bytes lease_id = 4;
+  // Authority session that must match the active lease.
+  uint64 session_epoch = 5;
+  // Exactly 16 bytes and unique for action correlation/idempotency.
+  bytes command_id = 6;
+  // Absolute local monotonic deadline after which the command is rejected.
+  uint64 deadline_monotonic_ns = 7;
+}
+
+// Chassis velocity command in the body frame.
+message ChassisSetpoint {
+  // Authority and correlation metadata.
+  CommandEnvelope envelope = 1;
+  // Requested body velocity in SI units.
+  Twist2 target = 2;
+}
+
+// Extensible discrete action request whose payload schema is selected by action_name.
+message ActionCommand {
+  // Authority and correlation metadata.
+  CommandEnvelope envelope = 1;
+  // Versioned action identifier.
+  string action_name = 2;
+  // Serialized action-specific Protobuf message, never an untyped YAML expression.
+  bytes parameters = 3;
+}
+
+// Correlated acknowledgement or terminal result for a command.
+message ActionAck {
+  // Common response metadata.
+  Header header = 1;
+  // Exactly 16 bytes copied from the command being acknowledged.
+  bytes command_id = 2;
+  // Current action status.
+  ActionStatus status = 3;
+  // Stable machine-readable result or rejection code.
+  uint32 result_code = 4;
+  // Human-readable diagnostic detail; safety logic must not parse this field.
+  string detail = 5;
+}

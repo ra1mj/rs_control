@@ -1,0 +1,12 @@
+[[packages]]
+name = "control-core"
+path = "crates/upper/control-core"
+
+[[packages]]
+name = "lower-core"
+path = "crates/lower/lower-core"
+
+[[dependencies]]
+source = "control-core"
+target = "lower-core"
+kind = "normal"

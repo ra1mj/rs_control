@@ -1,0 +1,12 @@
+[[packages]]
+name = "message-model"
+path = "crates/middle/message-model"
+
+[[packages]]
+name = "control-core"
+path = "crates/upper/control-core"
+
+[[dependencies]]
+source = "message-model"
+target = "control-core"
+kind = "normal"

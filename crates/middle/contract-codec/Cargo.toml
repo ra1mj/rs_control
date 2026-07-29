@@ -1,0 +1,15 @@
+[package]
+name = "contract-codec"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+message-model.workspace = true
+prost.workspace = true
+proto-generated.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

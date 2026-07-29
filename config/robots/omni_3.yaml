@@ -1,0 +1,13 @@
+schema_version: 1
+chassis:
+  morphology: omni_3
+  motor_ids:
+    front: 1
+    rear_left: 2
+    rear_right: 3
+arm:
+  morphology: none
+  motor_ids: {}
+imu:
+  transport: usb
+  baud_rate: 921600

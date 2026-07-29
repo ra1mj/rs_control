@@ -1,0 +1,92 @@
+# Robot Cross-Layer Contracts
+
+## Scenario: Add or change a robot contract
+
+### 1. Scope / Trigger
+
+Use this contract whenever work changes a lower trait, robot YAML field, semantic middle message, Protobuf field, command authority field, codec or composition-root startup mapping. These are safety/cross-layer changes even when the diff is small.
+
+### 2. Signatures
+
+Current executable commands:
+
+```text
+robotctl config validate <path>
+robotctl config print-normalized <path>
+architecture-check check [--workspace-root <path>] [--policy <path>]
+```
+
+Core Rust boundaries:
+
+```rust
+RobotConfig::parse(yaml: &str) -> Result<RobotConfig, ConfigError>
+Header::new(fields: HeaderFields) -> Result<Header, SemanticError>
+ResourceLease::new(fields: ResourceLeaseFields) -> Result<ResourceLease, SemanticError>
+CommandEnvelope::new(fields: CommandEnvelopeFields) -> Result<CommandEnvelope, SemanticError>
+FrameTransport::{receive, transmit, health}
+DeviceDriver::{configure, enable, disable, handle_input, encode_command}
+```
+
+### 3. Contracts
+
+Robot YAML allows only:
+
+```yaml
+schema_version: 1
+chassis: { morphology: <compiled chassis>, motor_ids: <role -> id> }
+arm: { morphology: <profile name>, motor_ids: <role -> id> }
+imu: { transport: uart|usb, baud_rate: <1200..4000000> }
+```
+
+It never contains frame layouts, checksums, controller gains, device paths, Zenoh settings or executable expressions.
+
+Every external `Header` contains source ID, 16-byte non-zero boot ID, boot-local sequence, source monotonic timestamp, optional Unix correlation timestamp, non-zero validity, optional frame ID, clock state/uncertainty and quality. Commands additionally carry resource ID, owner ID, 16-byte lease/command IDs, non-zero session epoch and deadline.
+
+Protobuf package and key-space major version are `robot.v1`. Enums reserve zero as `<ENUM>_UNSPECIFIED`; removed field numbers are reserved and never reused. SI units appear in field names/comments. Coordinates are right-handed: x forward, y left, z up, radians for angles.
+
+### 4. Validation & Error Matrix
+
+| Condition | Owner | Result |
+|---|---|---|
+| Unknown YAML field/type | `config-model` parser | `ConfigError::Syntax` |
+| Unsupported schema version | `config-model` | `UnsupportedSchemaVersion` |
+| Chassis roles differ from morphology | `config-model` | `RoleMismatch` |
+| Duplicate/out-of-range group motor ID | `config-model` | typed duplicate/range error |
+| Non-`none` arm role mismatch | later upper profile + composition root | refuse startup/arming |
+| Missing wire submessage | `contract-codec` | `CodecError::MissingField` |
+| Unknown/zero wire enum | `contract-codec` | `CodecError::UnknownEnum` |
+| ID not 16 bytes/all zero | `message-model` | `Id128Error` |
+| Zero validity/session/deadline | `message-model` constructor | `SemanticError` |
+| Expired lease/command | enforcement/codec at supplied monotonic time | `SemanticError::Expired` |
+| Forbidden Cargo edge | `architecture-check` | non-zero exit with all violations |
+
+### 5. Good/Base/Bad Cases
+
+- Good: `mecanum_4` with exactly four compiled roles, unique IDs and a valid UART IMU; normalization is stable and produces a recorded SHA-256.
+- Base: arm morphology `none` with `{}` motor IDs.
+- Bad: placing CAN bitrate in robot YAML, mapping two chassis roles to one ID, accepting `UNSPECIFIED` quality, or sending an expired command.
+
+### 6. Tests Required
+
+- Config unit tests assert every chassis profile, deterministic parse-normalize-parse/hash, unknown fields/version, role mismatch, arm identifier/`none`, duplicate/range IDs, transport/baud and size bound.
+- CLI integration tests assert exit status and byte-stable output.
+- Codec tests assert header/lease/command round trips, malformed bytes, missing submessages, identity length, unknown enums and expiry.
+- Architecture fixtures assert upper-to-lower, lower-to-middle, middle-to-upper and production-to-test-support rejection; the real graph must also pass.
+- `tools/bufw lint` and `breaking` plus `proto-compat-check` are mandatory for schema changes.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+// Generated DTO leaks into upper code and may contain quality = 0/999.
+fn control(input: proto_generated::robot::v1::Header) { /* ... */ }
+```
+
+#### Correct
+
+```rust
+// The middle boundary owns fallible conversion; upper code receives a valid semantic type.
+let header = contract_codec::decode_header(bytes)?;
+controller.step(TimedInput { header, value })?;
+```

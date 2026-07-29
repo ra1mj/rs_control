@@ -338,6 +338,8 @@ The public upper-facing API is independent of its delivery backend. In one proce
 
 Selected samples are mirrored by a non-RT bridge thread to Zenoh/Protobuf. Candidate implementations must be benchmarked on the target board; the design does not lock a queue crate before measurement.
 
+The local backend will use the source of `softmata/horus` at a pinned commit as a comparison point, specifically its cache-line-separated head/tail fields, publisher-subscriber SPSC matrix, per-slot versioned seqlock and `flock`-backed crashed-endpoint reclamation. These are patterns to benchmark, not an imported runtime dependency. The project explicitly rejects automatic POD detection based on `needs_drop`: shared-memory payloads require a reviewed fixed-layout `Pod`-equivalent contract or opaque byte/descriptor transport, with layout magic/version/schema identity and an isolated private `unsafe` boundary. Every latest/drop/reject path reports sequence gaps and counters.
+
 ### 6.6 Network inputs
 
 Ethernet Zenoh nodes may publish commands, sensor samples and algorithm results. V1 classifies ordinary Ethernet as soft realtime:
@@ -372,6 +374,8 @@ Realtime setup includes:
 - absolute monotonic wakeups to avoid period drift;
 - performance governor and documented thermal policy;
 - no blocking I/O, heap allocation, DNS, reconnect, compression or disk logging in RT threads.
+
+Affinity APIs distinguish an exact single Linux CPU, an exact CPU mask and a candidate set. Setting a candidate list to the first core that happens to succeed is not valid mask semantics. Qualified startup reads the effective thread/IRQ affinities back and fails closed when PREEMPT_RT, FIFO priority, memory locking or required placement is unavailable. General IRQs stay off the control-only CPU, while the CAN IRQ remains on its designated I/O CPU; the system never blindly moves every IRQ away from all realtime roles.
 
 The base tick is 1 ms. If the board cannot pass the full stress gate, the process starts only with an explicitly selected and separately qualified 2 ms profile. A running process never silently changes period.
 
@@ -636,3 +640,4 @@ Each milestone produces a separately runnable vertical slice. A new slice is ena
 - MCAP specification: https://mcap.dev/spec
 - Rust HSM candidate: https://github.com/mdeloof/statig
 - ROS 2 Zenoh bridge: https://github.com/eclipse-zenoh/zenoh-plugin-ros2dds
+- Horus source comparison (affinity, SHM and queues): https://github.com/softmata/horus

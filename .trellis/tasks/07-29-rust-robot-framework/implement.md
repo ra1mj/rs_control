@@ -143,6 +143,7 @@ Safety gate:
 - [ ] Pin `rt-tests` and create a wrapper that records complete environment metadata.
 - [ ] Measure baseline and stressed wakeup latency under CPU, memory, network, storage and NPU/GPU load.
 - [ ] Tune CPU governor, RT runtime settings, CPU affinity, IRQ affinity, memory locking and thermal policy.
+- [ ] Distinguish exact CPU masks from candidate-core selection, verify affinity by readback and keep the CAN IRQ on its measured I/O core rather than blindly moving all IRQs away from every RT role.
 - [ ] Define numerical pass/fail outputs for the 1 kHz and 500 Hz profiles.
 - [ ] Run long-duration thermal soak; a throttled result is a failure, not a qualified result.
 
@@ -196,10 +197,13 @@ Rollback: disable motor, remove torque, preserve CAN capture and restore known m
 ### D1. Local fast path
 
 - [ ] Implement interchangeable latest-value and ordered-event channel interfaces.
+- [ ] Pin and source-review the Horus comparison commit; prototype its useful cache-line-separated SPSC-matrix/seqlock/flock patterns without adding Horus as a runtime dependency.
 - [ ] Prototype at least two candidate mechanisms if benchmark evidence is not decisive.
 - [ ] Preallocate and prefault all RT-visible buffers.
 - [ ] Define overflow/latest-wins behavior and counters per channel.
 - [ ] Prove a blocked/crashed consumer cannot stop the producer.
+- [ ] Require explicit fixed-layout shared-memory payload safety; reject `needs_drop` or similar destructor-only POD inference and isolate any mmap/raw-atomic `unsafe` in a reviewed middle-layer boundary.
+- [ ] Version the SHM layout and test incompatible layout rejection, torn reads, SIGKILL endpoint reclamation, endpoint exhaustion, PID reuse assumptions and sequence/drop accounting.
 
 Target-board benchmark:
 

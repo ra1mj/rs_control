@@ -19,7 +19,8 @@
   "pr_url": null,
   "subtasks": [],
   "children": [
-    "07-29-core-workspace-contracts"
+    "07-29-core-workspace-contracts",
+    "07-29-orangepi-rt-platform"
   ],
   "parent": null,
   "relatedFiles": [],

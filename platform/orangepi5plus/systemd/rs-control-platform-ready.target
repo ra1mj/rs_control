@@ -1,0 +1,8 @@
+[Unit]
+Description=rs-control qualified RK3588 platform ready
+Documentation=file:/usr/share/doc/rs-control-orangepi5plus/README.md
+Requires=rs-control-platform-prepare.service rs-control-can.service
+After=rs-control-platform-prepare.service rs-control-can.service
+
+[Install]
+WantedBy=multi-user.target

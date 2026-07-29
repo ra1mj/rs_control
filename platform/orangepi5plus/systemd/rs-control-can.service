@@ -1,0 +1,35 @@
+[Unit]
+Description=rs-control classic SocketCAN link preparation
+Documentation=file:/usr/share/doc/rs-control-orangepi5plus/bring-up.md
+Requires=rs-control-platform-prepare.service
+After=rs-control-platform-prepare.service
+Before=rs-control-platform-ready.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/libexec/rs-control/orangepi5plus/scripts/can-link.sh up --config /etc/rs-control/orangepi5plus/can.env
+RemainAfterExit=yes
+TimeoutStartSec=30
+UMask=0077
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectHome=yes
+ProtectSystem=strict
+ProtectClock=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+CapabilityBoundingSet=CAP_NET_ADMIN
+
+[Install]
+WantedBy=rs-control-platform-ready.target

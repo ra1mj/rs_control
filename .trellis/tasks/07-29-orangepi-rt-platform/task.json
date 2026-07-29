@@ -1,0 +1,38 @@
+{
+  "id": "orangepi-rt-platform",
+  "name": "orangepi-rt-platform",
+  "title": "Orange Pi 5 Plus realtime platform",
+  "description": "Build and qualify the reproducible Orange Pi 5 Plus RK3588 Ubuntu 22.04 PREEMPT_RT, SocketCAN and CPU/IRQ affinity platform baseline.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": "platform/orangepi5plus",
+  "package": "platform",
+  "priority": "P2",
+  "creator": "mj",
+  "assignee": "mj",
+  "createdAt": "2026-07-29",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "07-29-rust-robot-framework",
+  "relatedFiles": [
+    "platform/orangepi5plus",
+    "tools/ci.sh",
+    "README.md",
+    ".trellis/spec/backend/realtime-platform.md",
+    ".trellis/spec/backend/robot-contracts.md",
+    ".trellis/tasks/07-29-rust-robot-framework/prd.md",
+    ".trellis/tasks/07-29-rust-robot-framework/design.md",
+    ".trellis/tasks/07-29-rust-robot-framework/implement.md"
+  ],
+  "notes": "Standing user approval permits activation, implementation, checks, commit and push without routine phase questions. The complete host gate passed on 2026-07-29; real Orange Pi boot, analyzer CAN and eight-hour evidence remain mandatory, so this task stays in progress.",
+  "meta": {
+    "host_gate": "passed-2026-07-29",
+    "target_gate": "pending-rk3588-hardware"
+  }
+}

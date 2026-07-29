@@ -4,6 +4,8 @@ set -eu
 ci_repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ci_repo_root"
 
+platform/orangepi5plus/tests/host-test.sh
+
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
 cargo test --locked --workspace --all-features

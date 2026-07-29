@@ -1,0 +1,35 @@
+[Unit]
+Description=rs-control qualified RK3588 realtime platform preparation
+Documentation=file:/usr/share/doc/rs-control-orangepi5plus/realtime-qualification.md
+DefaultDependencies=no
+After=local-fs.target systemd-modules-load.service
+Before=rs-control-can.service rs-control-platform-ready.target
+ConditionPathExists=/sys/kernel/realtime
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/libexec/rs-control/orangepi5plus/scripts/rt-affinity.sh apply --profile /etc/rs-control/orangepi5plus/rt-profile.env --confirm-disarmed --require-qualified
+RemainAfterExit=yes
+TimeoutStartSec=30
+UMask=0077
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ProtectClock=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=no
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_ADMIN CAP_SYS_NICE
+ReadWritePaths=/proc/sys/kernel/sched_rt_runtime_us /proc/sys/kernel/sched_rt_period_us /proc/irq /sys/devices/system/cpu
+
+[Install]
+WantedBy=rs-control-platform-ready.target

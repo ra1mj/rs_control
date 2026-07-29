@@ -18,6 +18,7 @@ This directory defines the executable Rust architecture, robot contract, error, 
 | [Robot Contracts](./robot-contracts.md) | Layer, YAML and Protobuf executable contracts | Active |
 | [Error Handling](./error-handling.md) | Typed boundary and safety-error conventions | Active |
 | [Quality Guidelines](./quality-guidelines.md) | Required checks and forbidden patterns | Active |
+| [Realtime Platform](./realtime-platform.md) | Kernel, affinity, CAN and qualification contracts | Active |
 | [Logging Guidelines](./logging-guidelines.md) | Structured logging and RT drain rules | Planned |
 | [Database Guidelines](./database-guidelines.md) | ORM patterns, queries, migrations | Not applicable yet |
 
@@ -31,6 +32,7 @@ Before changing Rust code or a cross-layer contract:
 2. Read `robot-contracts.md` when changing YAML, Protobuf, device traits, command authority or a composition root.
 3. Read `error-handling.md` when adding a fallible boundary.
 4. Read `quality-guidelines.md` and run the applicable commands before review.
+5. Read `realtime-platform.md` before changing `platform/`, RT placement, privileged preparation or hardware evidence.
 
 ## Quality Check
 

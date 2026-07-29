@@ -44,6 +44,14 @@ Every external `Header` contains source ID, 16-byte non-zero boot ID, boot-local
 
 Protobuf package and key-space major version are `robot.v1`. Enums reserve zero as `<ENUM>_UNSPECIFIED`; removed field numbers are reserved and never reused. SI units appear in field names/comments. Coordinates are right-handed: x forward, y left, z up, radians for angles.
 
+Local cross-process fast paths remain middle-layer implementations behind the
+same semantic ports. Shared memory uses an explicit fixed-layout payload
+contract, layout magic/version/schema identity, bounded capacity, cache-line
+separated SPSC ownership, torn-read detection, crash-reclaim leases and
+sequence/drop counters. Upper code never opens the shared-memory object. Rust
+`needs_drop::<T>() == false` is not evidence that a type is safe for shared
+memory; any mmap/raw-atomic `unsafe` stays private to a reviewed middle boundary.
+
 ### 4. Validation & Error Matrix
 
 | Condition | Owner | Result |
@@ -59,12 +67,16 @@ Protobuf package and key-space major version are `robot.v1`. Enums reserve zero 
 | Zero validity/session/deadline | `message-model` constructor | `SemanticError` |
 | Expired lease/command | enforcement/codec at supplied monotonic time | `SemanticError::Expired` |
 | Forbidden Cargo edge | `architecture-check` | non-zero exit with all violations |
+| Incompatible SHM layout/schema/endianness | middle local IPC boundary | reject attach before exposing a port |
+| Full/slow/crashed SHM endpoint | middle queue policy | explicit latest/drop/reject result plus counters; producer never blocks indefinitely |
 
 ### 5. Good/Base/Bad Cases
 
 - Good: `mecanum_4` with exactly four compiled roles, unique IDs and a valid UART IMU; normalization is stable and produces a recorded SHA-256.
 - Base: arm morphology `none` with `{}` motor IDs.
-- Bad: placing CAN bitrate in robot YAML, mapping two chassis roles to one ID, accepting `UNSPECIFIED` quality, or sending an expired command.
+- Bad: placing CAN bitrate in robot YAML, mapping two chassis roles to one ID,
+  accepting `UNSPECIFIED` quality, sending an expired command, letting upper code
+  mmap IPC directly or treating a destructor-free Rust type as shared-memory POD.
 
 ### 6. Tests Required
 
@@ -73,6 +85,9 @@ Protobuf package and key-space major version are `robot.v1`. Enums reserve zero 
 - Codec tests assert header/lease/command round trips, malformed bytes, missing submessages, identity length, unknown enums and expiry.
 - Architecture fixtures assert upper-to-lower, lower-to-middle, middle-to-upper and production-to-test-support rejection; the real graph must also pass.
 - `tools/bufw lint` and `breaking` plus `proto-compat-check` are mandatory for schema changes.
+- Middle local IPC tests assert incompatible-layout rejection, torn reads,
+  endpoint exhaustion, slow consumers, sequence/drop accounting and `SIGKILL`
+  lease reclamation; target benchmarks compare it with the pinned Horus commit.
 
 ### 7. Wrong vs Correct
 

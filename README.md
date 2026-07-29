@@ -12,7 +12,11 @@ middle ports / Zenoh / Protobuf
 lower transports / device protocols
 ```
 
-The current implementation is Phase A only. It contains core contracts, strict robot topology configuration, the Protocol Buffers v1 baseline and an executable dependency-policy gate. It does **not** yet open CAN devices, enable motors or produce torque.
+The implementation contains the Phase A contracts plus a host-verified Orange Pi
+5 Plus platform candidate. The platform code pins the PREEMPT_RT kernel inputs,
+models exact CPU/IRQ roles, prepares classic SocketCAN without transmitting and
+produces immutable timing evidence. It is **not hardware-qualified yet** and does
+not enable motors or produce torque.
 
 ## Configuration
 
@@ -40,4 +44,8 @@ tools/ci.sh
 
 `tools/bufw` pins and verifies the Buf CLI for Linux x86_64 and aarch64. Prost uses a vendored `protoc`, so Rust schema generation does not depend on a host installation.
 
-The first hardware target remains Orange Pi 5 Plus/RK3588 with a separately qualified Ubuntu 22.04 + Rockchip 5.10 PREEMPT_RT kernel. Hardware instructions and the DM-J4310-2EC driver arrive in later, separately gated tasks.
+The first hardware target is Orange Pi 5 Plus/RK3588 with Ubuntu 22.04 and the
+pinned Rockchip 5.10 PREEMPT_RT baseline. See the
+[platform runbooks](platform/orangepi5plus/README.md) for the guarded build,
+bring-up, eight-hour qualification and rollback flow. The target-board evidence
+gate and the later DM-J4310-2EC driver remain separately gated tasks.

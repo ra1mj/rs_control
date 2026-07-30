@@ -17,6 +17,8 @@
       and mandatory lock-required SHM mode.
 - [x] Verify the project binary/hash and pinned external Horus checkout/runner
       without fetching or linking Horus into the workspace.
+- [x] Source-review the pinned Horus benchmark/capacity/POD/SHM paths and require
+      validated adapter preflight evidence before creating the target bundle.
 - [x] Run an identical latest/ordered × 64/256/1024 matrix for local, SHM thread,
       SHM process and the external comparison adapter under fixed CPU/scheduler
       placement.

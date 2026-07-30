@@ -111,14 +111,28 @@ been reviewed and its immutable aggregate hash is placed in
 Build the project `middleware-qualification` executable from a clean exact
 commit and place the pinned Horus checkout and its reviewed adapter outside the
 project checkout. The adapter is an external research tool; it must not add
-Horus to the workspace or fetch during a run. Its `benchmark` subcommand emits
+Horus to the workspace or fetch during a run. Its `preflight` subcommand emits
+schema-v1 JSON proving the exact source/target, power-of-two capacity, complete
+payload/kind matrix, explicit `repr(C)` bytemuck-POD layout, Linux monotonic
+clock, `try_send`/`try_recv` hot path, successful
+`mlockall(MCL_CURRENT|MCL_FUTURE)` and fault-suite readiness. Its `benchmark`
+subcommand emits
 the same schema-v2 timing/counter/CPU/memory fields as the project runner plus
 `candidate=horus`, the exact `source_commit`, target identity and effective
-lock-required policy. Its `fault-suite` subcommand emits schema v1 with the
+lock-required policy. Each benchmark process must acquire and report its own
+process-wide memory lock. Its `fault-suite` subcommand emits schema v1 with the
 pinned commit, target architecture, and explicit `producer_bounded`,
 `no_torn_values`, `crash_reclaim`, and `losses_accounted` booleans.
 It must also report explicit slow/stopped consumer, full-queue, clean-exit and
 killed-peer outcomes; omission is not treated as a passing comparison.
+
+The adapter must not wrap the repository's bundled `all_paths_latency`
+benchmark: that program fixes different payloads/iterations/CPU IDs and uses a
+non-monotonic fallback outside x86. Comparison capacity is restricted to a
+power of two in `16..=1024`; the pinned custom-capacity path rounds allocation
+up but retains the request in its shared header, so other values are not exact
+comparisons. The retained semantic report also states that Horus's generic
+`needs_drop` POD heuristic is not the adapter payload's layout proof.
 
 First inspect the side-effect-free plan:
 
@@ -149,10 +163,13 @@ sudo platform/orangepi5plus/scripts/qualify-middleware.sh \
 ```
 
 The wrapper first refuses the wrong architecture/device tree, dirty or wrong
-source revisions, invalid hardware/profile identity, an existing output, and a
-failed FIFO + lock-required + hardware-cycle preflight. It then runs latest and
-ordered semantics at 64/256/1024 bytes for local-thread, project SHM-thread,
-project SHM-process, and pinned Horus under the same CPU/priority/config while
+source revisions, invalid hardware/profile identity, an existing output, a
+failed FIFO + lock-required + hardware-cycle preflight, or invalid Horus
+preflight evidence. The Horus preflight runs in a temporary directory and only
+successful validated evidence is moved into the new bundle. It then runs
+latest and ordered semantics at 64/256/1024 bytes for local-thread, project
+SHM-thread, project SHM-process, and pinned Horus under the same
+CPU/priority/config while
 the platform thermal/stress envelope is live. Each result has a paired raw
 `perf stat` file with cycles, instructions, task-clock, context switches, CPU
 migrations and page faults. Process CPU time and peak resident memory are also

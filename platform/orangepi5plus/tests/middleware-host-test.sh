@@ -21,9 +21,27 @@ mw_contains() { grep -F -- "$3" "$2" >/dev/null 2>&1 && mw_pass "$1" || { printf
 
 mw_run 'middleware qualification shell parses' sh -n "$mw_root/scripts/qualify-middleware.sh"
 mw_run 'middleware evaluator compiles' env PYTHONPYCACHEPREFIX="$mw_tmp/pycache" python3 -m py_compile "$mw_root/scripts/evaluate-middleware.py"
+mw_run 'Horus preflight validator compiles' env PYTHONPYCACHEPREFIX="$mw_tmp/pycache" python3 -m py_compile "$mw_root/scripts/validate-horus-preflight.py"
+mw_horus_commit=fac3cfb8704e275bde9daec6d554a17c59dd8532
+mw_preflight=$mw_tmp/horus-preflight.json
+printf '%s\n' "{\"schema_version\":1,\"candidate\":\"horus\",\"source_commit\":\"$mw_horus_commit\",\"target_os\":\"linux\",\"target_arch\":\"aarch64\",\"capacity\":64,\"payload_bytes\":[64,256,1024],\"kinds\":[\"latest\",\"ordered\"],\"latency_clock\":\"CLOCK_MONOTONIC\",\"operation_semantics\":\"try_publish_call\",\"memory_policy\":\"lock-required\",\"memory_lock_mechanism\":\"mlockall_current_future\",\"memory_lock_verified\":true,\"payload_contract\":\"repr_c_bytemuck_pod\",\"horus_generic_pod_detection\":\"needs_drop_heuristic_not_payload_proof\",\"hot_path_api\":\"try_send_try_recv\",\"fault_suite_ready\":true}" > "$mw_preflight"
+mw_run 'exact Horus preflight evidence passes' python3 -B "$mw_root/scripts/validate-horus-preflight.py" \
+    --input "$mw_preflight" --source-commit "$mw_horus_commit" --capacity 64 --expected-arch aarch64
+mw_bad_preflight=$mw_tmp/bad-horus-preflight.json
+sed 's/"memory_lock_verified":true/"memory_lock_verified":false/' "$mw_preflight" > "$mw_bad_preflight"
+mw_expect 1 'unlocked Horus preflight evidence fails' python3 -B "$mw_root/scripts/validate-horus-preflight.py" \
+    --input "$mw_bad_preflight" --source-commit "$mw_horus_commit" --capacity 64 --expected-arch aarch64
+mw_bool_preflight=$mw_tmp/bool-horus-preflight.json
+sed 's/"schema_version":1/"schema_version":true/' "$mw_preflight" > "$mw_bool_preflight"
+mw_expect 1 'boolean Horus schema version is not accepted as integer one' python3 -B "$mw_root/scripts/validate-horus-preflight.py" \
+    --input "$mw_bool_preflight" --source-commit "$mw_horus_commit" --capacity 64 --expected-arch aarch64
+mw_expect 2 'non-power-of-two Horus preflight capacity is refused' python3 -B "$mw_root/scripts/validate-horus-preflight.py" \
+    --input "$mw_preflight" --source-commit "$mw_horus_commit" --capacity 24 --expected-arch aarch64
 mw_plan=$mw_tmp/plan
 mw_run 'middleware dry-run is side-effect-free' sh -c '"$1" --profile 1khz --mode concurrent --duration 8h --capacity 64 --warmup 2 --samples 4 --dry-run > "$2"' sh "$mw_root/scripts/qualify-middleware.sh" "$mw_plan"
 mw_contains 'dry-run pins lock-required mappings' "$mw_plan" 'memory_policy=lock-required'
+mw_contains 'dry-run pins exact Horus capacity contract' "$mw_plan" 'capacity_contract=power-of-two:16..1024'
+mw_contains 'dry-run requires Horus preflight before output' "$mw_plan" 'horus_preflight=schema-v1-before-output'
 mw_contains 'dry-run names complete candidate matrix' "$mw_plan" 'local-thread,shm-thread,shm-process,horus'
 mw_contains 'dry-run retains eight-hour platform envelope' "$mw_plan" 'platform_envelope=qualify-rt.sh:concurrent:8h'
 
@@ -41,6 +59,8 @@ mw_expect 1 'middleware wrapper refuses invalid profile' "$mw_root/scripts/quali
     --profile automatic --mode baseline --duration 1s --dry-run
 mw_expect 1 'middleware wrapper refuses invalid duration' "$mw_root/scripts/qualify-middleware.sh" \
     --profile 1khz --mode baseline --duration forever --dry-run
+mw_expect 1 'middleware wrapper refuses non-power-of-two comparison capacity' "$mw_root/scripts/qualify-middleware.sh" \
+    --profile 1khz --mode baseline --duration 1s --capacity 24 --dry-run
 mkdir "$mw_tmp/existing-output"
 mw_expect 1 'middleware wrapper refuses existing output before target access' "$mw_root/scripts/qualify-middleware.sh" \
     --profile 1khz --mode baseline --duration 1s --output "$mw_tmp/existing-output" --runner /bin/true \
@@ -80,17 +100,16 @@ EOF
         done
     done
 done
-mw_horus_commit=fac3cfb8704e275bde9daec6d554a17c59dd8532
 for mw_kind in latest ordered; do
     for mw_payload in 64 256 1024; do
         cat > "$mw_results/horus-$mw_kind-$mw_payload.json" <<EOF
-{"schema_version":2,"candidate":"horus","source_commit":"$mw_horus_commit","target_os":"linux","target_arch":"aarch64","peer_execution":"separate_process_paired","effective_memory_policy":"lock-required","kind":"$mw_kind","payload_bytes":$mw_payload,"capacity":64,"warmup":2,"samples":4,"latency_semantics":"one_way_receive","latency_clock":"CLOCK_MONOTONIC","latency_jitter_semantics":"max_minus_min","latency_log2_ns":$mw_hist,"latency_min_ns":0,"latency_max_ns":0,"latency_jitter_span_ns":0,"operation_semantics":"try_publish_call","operation_clock":"CLOCK_MONOTONIC","operation_log2_ns":$mw_hist,"operation_max_ns":0,"wall_time_ns":1,"cpu_time_ns":1,"peer_cpu_time_ns":1,"cpu_time_source":"CLOCK_PROCESS_CPUTIME_ID","peak_resident_bytes":1,"peer_peak_resident_bytes":1,"memory_source":"proc_self_status_VmHWM","allocation_scope":"publisher_and_consumer","allocations":{"count":0,"bytes":0,"current_count":0,"current_bytes":0,"peak_count":0,"peak_bytes":0},"counters":{"published":6,"consumed":6,"overwritten":0,"full":0,"disconnected":0}}
+{"schema_version":2,"candidate":"horus","source_commit":"$mw_horus_commit","target_os":"linux","target_arch":"aarch64","peer_execution":"separate_process_paired","requested_memory_policy":"lock-required","effective_memory_policy":"lock-required","memory_policy_scope":"process_current_and_future_mappings","memory_lock_mechanism":"mlockall_current_future","memory_lock_verified":true,"payload_contract":"repr_c_bytemuck_pod","horus_generic_pod_detection":"needs_drop_heuristic_not_payload_proof","hot_path_api":"try_send_try_recv","kind":"$mw_kind","payload_bytes":$mw_payload,"capacity":64,"warmup":2,"samples":4,"latency_semantics":"one_way_receive","latency_clock":"CLOCK_MONOTONIC","latency_jitter_semantics":"max_minus_min","latency_log2_ns":$mw_hist,"latency_min_ns":0,"latency_max_ns":0,"latency_jitter_span_ns":0,"operation_semantics":"try_publish_call","operation_clock":"CLOCK_MONOTONIC","operation_log2_ns":$mw_hist,"operation_max_ns":0,"wall_time_ns":1,"cpu_time_ns":1,"peer_cpu_time_ns":1,"cpu_time_source":"CLOCK_PROCESS_CPUTIME_ID","peak_resident_bytes":1,"peer_peak_resident_bytes":1,"memory_source":"proc_self_status_VmHWM","allocation_scope":"publisher_and_consumer","allocations":{"count":0,"bytes":0,"current_count":0,"current_bytes":0,"peak_count":0,"peak_bytes":0},"counters":{"published":6,"consumed":6,"overwritten":0,"full":0,"disconnected":0}}
 EOF
         printf '%s\n' "$mw_perf_fixture" > "$mw_results/horus-$mw_kind-$mw_payload.perf"
     done
 done
 printf 'EXIT_CODE=0\n' > "$mw_results/project-faults.env"
-printf '%s\n' "{\"schema_version\":1,\"candidate\":\"horus\",\"source_commit\":\"$mw_horus_commit\",\"target_arch\":\"aarch64\",\"producer_bounded\":true,\"no_torn_values\":true,\"crash_reclaim\":true,\"losses_accounted\":true,\"slow_consumer_accounted\":true,\"stopped_consumer_bounded\":true,\"full_queue_explicit\":true,\"clean_exit_reclaim\":true,\"killed_peer_reclaim\":true}" > "$mw_results/horus-faults.json"
+printf '%s\n' "{\"schema_version\":1,\"candidate\":\"horus\",\"source_commit\":\"$mw_horus_commit\",\"target_arch\":\"aarch64\",\"capacity\":64,\"payload_bytes\":[64,256,1024],\"producer_bounded\":true,\"no_torn_values\":true,\"crash_reclaim\":true,\"losses_accounted\":true,\"slow_consumer_accounted\":true,\"stopped_consumer_bounded\":true,\"full_queue_explicit\":true,\"clean_exit_reclaim\":true,\"killed_peer_reclaim\":true,\"memory_lock_verified\":true,\"capacity_contract\":\"power_of_two_16_through_1024\",\"payload_contract\":\"repr_c_bytemuck_pod\",\"memory_lock_mechanism\":\"mlockall_current_future\",\"hot_path_api\":\"try_send_try_recv\"}" > "$mw_results/horus-faults.json"
 
 mw_report=$mw_tmp/report.json
 mw_run 'complete safe matrix evaluates pass' python3 -B "$mw_root/scripts/evaluate-middleware.py" \

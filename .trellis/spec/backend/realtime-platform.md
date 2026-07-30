@@ -29,6 +29,11 @@ qualify-middleware.sh --profile 1khz|500hz --mode baseline|concurrent \
   --runner <file> --workspace <dir> --app-commit <sha> \
   --app-build-id <token> --hardware-manifest <file> --overlay-file <file> \
   --horus-source <dir> --horus-runner <file> [stress/evidence inputs]
+reviewed-horus-adapter preflight|benchmark|fault-suite \
+  --source-commit <sha> --capacity <power-of-two-16..1024> \
+  --payload-bytes <64|256|1024|64,256,1024> \
+  --memory-policy lock-required --payload-contract repr_c_bytemuck_pod \
+  --output <absent-file> [row-specific inputs]
 evaluate-cyclictest.py <json> --threshold-ns <n> \
   [--expected-cpu <id>] [--minimum-cycles <n>]
 ```
@@ -90,9 +95,15 @@ REQUIRE_CONTROL_MAX_CAPACITY, REQUIRE_IO_MAX_CAPACITY
   non-aarch64/non-Orange-Pi-5-Plus/RK3588 host, dirty or wrong source revisions,
   an existing output, invalid platform identity/affinity, an unavailable FIFO/
   memory-lock runner preflight, or unavailable `perf` hardware cycles. It runs
-  the pinned external Horus adapter without fetching source, collects identical
+  the pinned external Horus adapter without fetching source, first validates
+  its schema-v1 preflight before evidence-directory creation, collects identical
   `perf stat` events for every candidate, composes `qualify-rt.sh`, and hashes
-  the retained bundle. It never edits a runtime profile.
+  the retained bundle. Horus comparison capacity is an exact power of two in
+  `16..=1024`; every adapter process reports successful process-wide
+  `mlockall`, explicit `repr(C)` POD layout, monotonic clock and
+  `try_send`/`try_recv` hot path. The generic Horus `needs_drop` POD heuristic
+  remains a recorded semantic difference, never layout proof. The envelope
+  never edits a runtime profile.
 - A 1 kHz failure may only lead to a separate explicit `--profile 500hz` run in
   a new output directory. No script performs rate fallback or candidate
   promotion automatically.
@@ -114,7 +125,7 @@ REQUIRE_CONTROL_MAX_CAPACITY, REQUIRE_IO_MAX_CAPACITY
 | Zero/excessive middleware samples/capacity or unsupported payload size | Refuse before creating channels |
 | Local backend requested with process peer | Refuse; only SHM is cross-process |
 | Existing middleware evidence output | Refuse overwrite |
-| Missing target `perf` cycles or lock/FIFO preflight | Refuse before evidence creation |
+| Missing target `perf` cycles, lock/FIFO gate or valid Horus preflight | Refuse before evidence creation |
 | Missing candidate JSON/`perf` pair or pinned Horus fault evidence | `incomplete` |
 | Torn value, unaccounted loss, producer fault, hot allocation or invalid counted evidence | `fail` |
 

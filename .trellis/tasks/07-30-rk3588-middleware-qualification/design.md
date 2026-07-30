@@ -62,6 +62,9 @@ An actual run requires:
 - an executable project runner hash;
 - an external Horus checkout whose `HEAD` equals
   `fac3cfb8704e275bde9daec6d554a17c59dd8532`, plus a recorded runner hash;
+- a schema-v1 adapter preflight proving the exact payload/kind matrix,
+  `CLOCK_MONOTONIC`, `try_send`/`try_recv`, explicit `repr(C)` bytemuck-POD
+  payloads, process-wide `mlockall` and fault-suite readiness;
 - an absent output directory.
 
 No host override can produce a passing target verdict. Fixture roots may be
@@ -77,7 +80,13 @@ preallocated atomic sample acknowledgement; producer waiting is outside the
 separately measured `try_publish` call. `SHM-process` uses a separate worker
 process and reports its CPU/memory independently.
 The external Horus adapter receives the same settings and must emit the
-versioned comparison schema while retaining semantic differences.
+versioned comparison schema while retaining semantic differences. Capacity is
+restricted to an exact power of two in `16..=1024`: the pinned Horus custom
+constructor allocates at `next_power_of_two` but initializes its shared header
+from the request. Its bundled latency benchmark is excluded because it fixes
+different messages, iterations and CPU IDs and uses wall-clock timing on
+non-x86. The adapter also records that Horus's generic `needs_drop` POD
+heuristic is broader than its independently verified payload layout.
 
 For concurrent mode the envelope launches the existing `qualify-rt.sh`
 baseline/concurrent procedure, waits for its thermal/stress evidence to become
@@ -90,7 +99,9 @@ incomplete even when every middleware sample passes.
 The target executes the full locked project SHM suite offline to cover
 live endpoint refusal, clean exit, real SIGKILL, corrupt PID/epoch, odd-stamp
 writer death and stopped consumers. Horus remains external and its adapter must
-provide equivalent raw fault results or is marked incomplete. Any torn value,
+provide equivalent raw fault results or is marked incomplete. Every adapter
+process must acquire and verify `mlockall(MCL_CURRENT | MCL_FUTURE)` itself;
+the pinned SHM mapping layer does not do this. Any torn value,
 producer timeout, unaccounted generation, nonzero hot allocation, live reclaim,
 thermal/frequency failure or identity mismatch is disqualifying.
 

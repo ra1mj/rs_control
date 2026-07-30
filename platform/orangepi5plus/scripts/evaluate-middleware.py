@@ -54,6 +54,11 @@ def exact_int(value: Any, name: str, minimum: int = 0) -> int:
     return value
 
 
+def require_exact(value: Any, expected: Any, name: str) -> None:
+    if type(value) is not type(expected) or value != expected:
+        raise ValueError(f"{name} mismatch")
+
+
 def validate_histogram(value: Any, samples: int, name: str) -> list[int]:
     if not isinstance(value, list) or len(value) != 64:
         raise ValueError(f"{name} must contain exactly 64 buckets")
@@ -142,8 +147,7 @@ def validate_common(
         "operation_clock": "CLOCK_MONOTONIC",
     }
     for key, expected_value in expected.items():
-        if value.get(key) != expected_value:
-            raise ValueError(f"{key} mismatch")
+        require_exact(value.get(key), expected_value, key)
     latency_buckets = validate_histogram(
         value.get("latency_log2_ns"), samples, "latency_log2_ns"
     )
@@ -266,8 +270,18 @@ def validate_horus(
         raise ValueError("Horus source identity mismatch")
     if value.get("target_os") != "linux" or value.get("target_arch") != args.expected_arch:
         raise ValueError("Horus target identity mismatch")
-    if value.get("effective_memory_policy") != "lock-required":
-        raise ValueError("Horus effective memory policy mismatch")
+    expected = {
+        "requested_memory_policy": "lock-required",
+        "effective_memory_policy": "lock-required",
+        "memory_policy_scope": "process_current_and_future_mappings",
+        "memory_lock_mechanism": "mlockall_current_future",
+        "memory_lock_verified": True,
+        "payload_contract": "repr_c_bytemuck_pod",
+        "horus_generic_pod_detection": "needs_drop_heuristic_not_payload_proof",
+        "hot_path_api": "try_send_try_recv",
+    }
+    for key, expected_value in expected.items():
+        require_exact(value.get(key), expected_value, f"Horus {key}")
     if value.get("peer_execution") != "separate_process_paired":
         raise ValueError("Horus peer execution mismatch")
     return validate_common(
@@ -282,7 +296,7 @@ def validate_horus(
 
 
 def validate_faults(
-    results: Path, expected_arch: str, horus_commit: str
+    results: Path, expected_arch: str, horus_commit: str, capacity: int
 ) -> tuple[list[str], list[str]]:
     failures: list[str] = []
     incomplete: list[str] = []
@@ -298,10 +312,14 @@ def validate_faults(
         try:
             value = read_json(horus_path)
             if (
-                value.get("schema_version") != 1
+                type(value.get("schema_version")) is not int
+                or value.get("schema_version") != 1
                 or value.get("candidate") != "horus"
                 or value.get("source_commit") != horus_commit
                 or value.get("target_arch") != expected_arch
+                or type(value.get("capacity")) is not int
+                or value.get("capacity") != capacity
+                or value.get("payload_bytes") != list(PAYLOADS)
             ):
                 raise ValueError("invalid Horus fault schema")
             for key in (
@@ -314,9 +332,19 @@ def validate_faults(
                 "full_queue_explicit",
                 "clean_exit_reclaim",
                 "killed_peer_reclaim",
+                "memory_lock_verified",
             ):
                 if value.get(key) is not True:
                     failures.append(f"horus_fault_{key}_failed")
+            expected = {
+                "capacity_contract": "power_of_two_16_through_1024",
+                "payload_contract": "repr_c_bytemuck_pod",
+                "memory_lock_mechanism": "mlockall_current_future",
+                "hot_path_api": "try_send_try_recv",
+            }
+            for key, expected_value in expected.items():
+                if value.get(key) != expected_value:
+                    failures.append(f"horus_fault_{key}_mismatch")
         except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as error:
             failures.append(f"horus_fault_evidence_invalid:{error}")
     return failures, incomplete
@@ -324,7 +352,7 @@ def validate_faults(
 
 def evaluate(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
     failures, incomplete = validate_faults(
-        args.results, args.expected_arch, args.horus_commit
+        args.results, args.expected_arch, args.horus_commit, args.capacity
     )
     observations: dict[str, dict[str, Any]] = {}
 
@@ -394,7 +422,7 @@ def evaluate(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
             "local-thread": "separate in-process SPSC consumer thread; shared-memory locking is not applicable",
             "shm-thread": "separate in-process SPSC consumer thread over a project fixed-layout mapping with lock-required pages",
             "shm-process": "project fixed-layout cross-process SPSC with separately reported peer CPU time",
-            "horus": "pinned external adapter; its native ownership/reclamation behavior is retained",
+            "horus": "pinned external process adapter using explicit repr(C) POD payloads; Horus generic needs_drop POD detection and native ownership/reclamation remain recorded differences",
         },
         "config": {
             "capacity": args.capacity,
@@ -415,7 +443,13 @@ def main() -> int:
     if args.output.exists():
         print(f"error: output already exists: {args.output}", file=sys.stderr)
         return 2
-    if args.capacity < 3 or args.warmup < 0 or args.samples < 1:
+    if (
+        args.capacity < 16
+        or args.capacity > 1024
+        or args.capacity & (args.capacity - 1)
+        or args.warmup < 0
+        or args.samples < 1
+    ):
         print("error: invalid bounded matrix settings", file=sys.stderr)
         return 2
     try:

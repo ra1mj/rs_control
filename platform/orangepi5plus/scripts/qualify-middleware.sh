@@ -94,7 +94,10 @@ printf '%s\n' "$mw_duration" | grep -Eq '^[1-9][0-9]*[smhd]?$' || platform_die "
 case "$mw_capacity:$mw_warmup:$mw_samples:$mw_rt_priority" in
     *[!0-9:]*) platform_die 'capacity/warmup/samples/priority must be decimal integers' ;;
 esac
-[ "$mw_capacity" -ge 3 ] && [ "$mw_capacity" -le 65536 ] || platform_die 'capacity must be in 3..=65536'
+case "$mw_capacity" in
+    16|32|64|128|256|512|1024) ;;
+    *) platform_die 'capacity must be a power of two in 16..=1024' ;;
+esac
 [ "$mw_warmup" -le 1000000 ] || platform_die 'warmup exceeds 1000000'
 [ "$mw_samples" -ge 1 ] && [ "$mw_samples" -le 10000000 ] || platform_die 'samples must be in 1..=10000000'
 [ "$mw_rt_priority" -ge 1 ] && [ "$mw_rt_priority" -le 89 ] || platform_die 'RT priority must be in 1..=89'
@@ -104,6 +107,7 @@ if [ "$mw_dry_run" -eq 1 ]; then
         "$mw_profile" "$mw_mode" "$mw_duration" "$mw_capacity" "$mw_warmup" "$mw_samples"
     printf 'identity_gate=aarch64+xunlong,orangepi-5-plus+rockchip,rk3588\n'
     printf 'memory_policy=lock-required\nsource_fetch=forbidden\n'
+    printf 'capacity_contract=power-of-two:16..1024\nhorus_preflight=schema-v1-before-output\n'
     printf 'matrix=local-thread,shm-thread,shm-process,horus_x_latest,ordered_x_64,256,1024\n'
     printf 'platform_envelope=qualify-rt.sh:%s:%s\n' "$mw_mode" "$mw_duration"
     printf 'placement=taskset:CONTROL_CPU+chrt:fifo:%s\n' "$mw_rt_priority"
@@ -182,8 +186,28 @@ perf stat --no-big-num --field-separator ';' \
     --memory-policy lock-required --warmup 0 --samples 1 >/dev/null ||
     platform_die 'scheduler/memory-lock/runner preflight failed'
 
+mw_tmp_parent=$(CDPATH= cd -- "${TMPDIR:-/tmp}" && pwd)
+mw_horus_preflight_tmp=$(mktemp -d "$mw_tmp_parent/rs-control-horus-preflight.XXXXXX")
+mw_horus_preflight=$mw_horus_preflight_tmp/horus-preflight.json
+mw_cleanup_horus_preflight() {
+    case "$mw_horus_preflight_tmp" in
+        "$mw_tmp_parent"/rs-control-horus-preflight.*) rm -rf -- "$mw_horus_preflight_tmp" ;;
+    esac
+}
+trap mw_cleanup_horus_preflight EXIT INT TERM HUP
+"$mw_horus_runner" preflight --source-commit "$mw_horus_commit" --capacity "$mw_capacity" \
+    --payload-bytes 64,256,1024 --kinds latest,ordered --latency-clock CLOCK_MONOTONIC \
+    --memory-policy lock-required --payload-contract repr_c_bytemuck_pod \
+    --output "$mw_horus_preflight" >/dev/null || platform_die 'Horus adapter preflight failed'
+python3 -B "$mw_script_dir/validate-horus-preflight.py" --input "$mw_horus_preflight" \
+    --source-commit "$mw_horus_commit" --capacity "$mw_capacity" --expected-arch aarch64 ||
+    platform_die 'Horus adapter preflight evidence failed validation'
+
 mkdir "$mw_output"
 mkdir "$mw_output/results"
+mv "$mw_horus_preflight" "$mw_output/horus-preflight.json"
+mw_cleanup_horus_preflight
+trap - EXIT INT TERM HUP
 cp "$mw_platform_root/sources.lock" "$mw_output/sources.lock"
 cp "$mw_rt_profile" "$mw_output/rt-profile.env"
 cp "$mw_hardware_manifest" "$mw_output/hardware-evidence.env"
@@ -261,7 +285,8 @@ if [ "$mw_platform_lost" -eq 0 ]; then
                 --event cycles,instructions,task-clock,context-switches,cpu-migrations,page-faults \
                 --output "$mw_horus_perf" -- taskset --cpu-list "$mw_measurement_cpu" chrt --fifo "$mw_rt_priority" "$mw_horus_runner" benchmark \
                 --kind "$mw_kind" --payload-bytes "$mw_payload" --capacity "$mw_capacity" --warmup "$mw_warmup" \
-                --samples "$mw_samples" --source-commit "$mw_horus_commit" \
+                --samples "$mw_samples" --source-commit "$mw_horus_commit" --memory-policy lock-required \
+                --latency-clock CLOCK_MONOTONIC --payload-contract repr_c_bytemuck_pod \
                 --output "$mw_horus_result" || mw_matrix_failed=1
             mw_check_platform_live
         done
@@ -277,7 +302,9 @@ if [ "$mw_platform_lost" -eq 0 ]; then
     set -e
     printf 'EXIT_CODE=%s\n' "$mw_project_fault_exit" > "$mw_output/results/project-faults.env"
     [ "$mw_project_fault_exit" -eq 0 ] || mw_matrix_failed=1
-    "$mw_horus_runner" fault-suite --source-commit "$mw_horus_commit" --output "$mw_output/results/horus-faults.json" \
+    "$mw_horus_runner" fault-suite --source-commit "$mw_horus_commit" --capacity "$mw_capacity" \
+        --payload-bytes 64,256,1024 --memory-policy lock-required --payload-contract repr_c_bytemuck_pod \
+        --output "$mw_output/results/horus-faults.json" \
         > "$mw_output/results/horus-faults.txt" 2>&1 || mw_matrix_failed=1
     mw_check_platform_live
 fi

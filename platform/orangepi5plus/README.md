@@ -75,5 +75,8 @@ adapter. `--dry-run` is host-safe. Actual execution refuses non-aarch64 or a
 device tree other than Orange Pi 5 Plus/RK3588, requires lock-backed mappings,
 clean exact source revisions and usable FIFO/`perf`/memory-lock policy, never
 fetches source, writes only to an absent evidence directory, and never promotes
-the candidate profile itself. See the middleware section of the realtime
-qualification runbook for adapter and evidence contracts.
+the candidate profile itself. A reviewed adapter `preflight` must prove the
+explicit payload layout, `CLOCK_MONOTONIC`, `try_send`/`try_recv`, process-wide
+`mlockall` and fault-suite readiness before that directory is created. See the
+middleware section of the realtime qualification runbook for adapter and
+evidence contracts.

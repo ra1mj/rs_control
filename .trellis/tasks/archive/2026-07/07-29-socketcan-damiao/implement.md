@@ -134,7 +134,7 @@ cargo test -p hardware-module-core -p transport-socketcan -p motor-damiao
 - [x] Run `git diff --check` and review every unsafe, blocking, allocation,
       hardware-access and persistent-write call site; expected local unsafe and
       physical hardware calls are both zero.
-- [ ] Commit and push host-only implementation separately from any later target
+- [x] Commit and push host-only implementation separately from any later target
       qualification evidence.
 
 ## 8. Pending target qualification

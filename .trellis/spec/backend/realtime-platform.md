@@ -54,6 +54,14 @@ REQUIRE_CONTROL_MAX_CAPACITY, REQUIRE_IO_MAX_CAPACITY
   candidate, even after all host tests pass.
 - Classic CAN is exactly 1,000,000 bit/s with bus-error reporting and
   `restart-ms 0`. No platform command transmits a frame or operates a motor.
+- The privileged platform unit alone prepares link state/bitrate and performs
+  any approved bus-off recovery. The unprivileged adapter opens an explicit
+  already-configured interface, uses close-on-exec/nonblocking socket-local
+  options, and never invokes link configuration.
+- Host SocketCAN/Damiao codec and fake-I/O lifecycle tests do not qualify the
+  installed firmware, physical timeout/disable behavior, analyzer-visible wire
+  timing, or RK3588 scheduling. Those claims require a separately approved,
+  restrained target procedure and immutable evidence.
 - Qualification evidence uses a caller-chosen absent/empty directory, preserves
   raw JSON and observations, emits `pass|fail|incomplete`, and hashes its files.
   Kernel wake latency and application deadline evidence remain separate.

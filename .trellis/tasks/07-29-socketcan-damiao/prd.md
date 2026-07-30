@@ -157,38 +157,38 @@ than implied by both tasks sharing a parent.
 
 ## Acceptance Criteria
 
-- [ ] The naming-migration task is complete and its full CI gate passed before
+- [x] The naming-migration task is complete and its full CI gate passed before
       any SocketCAN/Damiao implementation commit.
-- [ ] `hardware-module-core` exposes copyable, validated classic-CAN and
+- [x] `hardware-module-core` exposes copyable, validated classic-CAN and
       received-event types, explicit metric availability and the revised
       bounded device lifecycle contract.
-- [ ] `transport-socketcan` compiles with `unsafe_code = "forbid"`, exact
+- [x] `transport-socketcan` compiles with `unsafe_code = "forbid"`, exact
       `socketcan = 3.6.2`, default features off and no async runtime.
-- [ ] Pure tests cover frame conversion, exact filters, all subscribed error
+- [x] Pure tests cover frame conversion, exact filters, all subscribed error
       bits, combined `BUSOFF | other` classification, timestamps/capabilities,
       partial/backpressured TX, bounded RX and health counters.
-- [ ] The budget calculator proves the worst-case bit count at every DLC
+- [x] The budget calculator proves the worst-case bit count at every DLC
       `0..=8`, handles arithmetic overflow and rejects a plan one unit above the
       70% threshold.
-- [ ] MIT tests match every pinned manufacturer/SDK golden vector, exhaust raw
+- [x] MIT tests match every pinned manufacturer/SDK golden vector, exhaust raw
       16-bit and 12-bit decode domains, cover encode boundaries/non-finite input
       and never panic for arbitrary eight-byte payloads.
-- [ ] Feedback tests cover every documented status and every unknown status
+- [x] Feedback tests cover every documented status and every unknown status
       nibble, wrong ID, wrong embedded identity, RTR/extended/error input and
       every invalid DLC.
-- [ ] Register tests cover exact little-endian read/write/store bytes and reject
+- [x] Register tests cover exact little-endian read/write/store bytes and reject
       wrong reply ID, target, opcode, register, length and deadline.
-- [ ] Fake-I/O lifecycle tests prove configuration-before-enable, verified
+- [x] Fake-I/O lifecycle tests prove configuration-before-enable, verified
       scaling, explicit enable/disable confirmation, stale/fault/bus-off
       fail-safe behavior, safe-stop escalation, timeout enforcement, forbidden
       `Faulted -> Disabled` and no automatic re-enable.
-- [ ] Bus-set validation rejects every ESC/MST/reserved-ID collision.
-- [ ] A source review finds no heap collection, sleep, blocking retry, async
+- [x] Bus-set validation rejects every ESC/MST/reserved-ID collision.
+- [x] A source review finds no heap collection, sleep, blocking retry, async
       call, filesystem/network configuration or persistent motor write in any
       declared realtime path.
-- [ ] `cargo test -p hardware-module-core -p transport-socketcan -p motor-damiao`
+- [x] `cargo test -p hardware-module-core -p transport-socketcan -p motor-damiao`
       and `tools/ci.sh` pass on the host without accessing physical CAN.
-- [ ] Documentation explicitly states that hardware support remains
+- [x] Documentation explicitly states that hardware support remains
       unqualified until the target-board/analyzer gate passes.
 
 ## Out of Scope

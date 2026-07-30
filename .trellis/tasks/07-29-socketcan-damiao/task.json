@@ -3,7 +3,7 @@
   "name": "socketcan-damiao",
   "title": "Rust SocketCAN and Damiao driver",
   "description": "Implement the Rust SocketCAN adapter, classic-CAN budget gate, DM-J4310-2EC codec and safe driver lifecycle without hardware actuation in host tests.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": "feature",
   "scope": "hardware_module",
   "package": null,

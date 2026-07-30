@@ -158,23 +158,25 @@ Rollback: restore the last qualified affinity/governor/kernel bundle as a unit.
 
 ### C1. SocketCAN adapter
 
-- [ ] Implement non-blocking RX/TX, filters, timestamp extraction and error frames.
-- [ ] Preallocate frame batches and expose queue/overflow/error metrics.
-- [ ] Implement bus-off detection with safe, explicit recovery rules.
-- [ ] Implement the classic-CAN budget calculator and 70% default gate.
-- [ ] Unit-test frame/filter/error parsing using captured fixtures without hardware.
+- [x] Implement non-blocking RX/TX, filters, timestamp extraction and error frames.
+- [x] Preallocate realtime frame batches and expose queue/error metrics; mark
+      kernel overflow visibility unavailable through the selected safe API.
+- [x] Implement bus-off detection with safe, explicit recovery rules.
+- [x] Implement the classic-CAN budget calculator and 70% default gate.
+- [x] Unit-test frame/filter/error parsing using pure fixtures without hardware.
 
 ### C2. DM protocol codec
 
-- [ ] Encode/decode MIT mode from official documentation/captured reference frames.
-- [ ] Define the MIT frame layout and gain ranges statically; discover and
+- [x] Encode/decode MIT mode from pinned manufacturer documentation/reference vectors.
+- [x] Define the MIT frame layout and gain ranges statically; discover and
       verify runtime `PMAX`, `VMAX` and `TMAX` while disarmed, bounded by a typed
       safety policy. Reject out-of-range wire commands without implicit clamp.
-- [ ] Decode status, position, velocity, torque, MOS/rotor temperature and error codes.
-- [ ] Implement enable, disable, zero command and fault reset.
-- [ ] Implement read/verify of ESC_ID, MST_ID, mode, timeout and runtime scaling;
+- [x] Decode status, position, velocity, torque, MOS/rotor temperature and error codes.
+- [x] Implement pure enable, disable, zero-command and fault-reset codecs; keep
+      destructive zeroing outside the ordinary driver.
+- [x] Implement read/verify of ESC_ID, MST_ID, mode, timeout and runtime scaling;
       keep runtime and persistent writes maintenance-only.
-- [ ] Use exhaustive boundary/property tests for float-to-integer mappings.
+- [x] Use exhaustive raw-domain and boundary tests for integer/physical mappings.
 
 Validation:
 
@@ -182,16 +184,17 @@ Validation:
 cargo test -p transport-socketcan -p motor-damiao
 ```
 
-- [ ] Compare encoded/decoded frames with official tooling or a known-good CAN capture.
-- [ ] Fuzz decoders with arbitrary eight-byte frames; no panic or out-of-bounds behavior.
+- [x] Compare encoded/decoded frames with pinned official SDK-derived host vectors.
+- [x] Exercise every status, 16-bit position and 12-bit velocity/torque raw domain;
+      no panic or out-of-bounds behavior.
 
 ### C3. Safe hardware driver lifecycle
 
-- [ ] Start disabled and verify IDs/profile before enable.
-- [ ] Enforce feedback freshness and motor communication timeout.
-- [ ] Require explicit arm/enable authorization.
+- [x] Start disarmed and verify IDs/profile before enable.
+- [x] Enforce feedback freshness and require a verified nonzero motor timeout.
+- [x] Require validated bus identities and explicit enable authorization.
 - [ ] Confirm Ctrl-C/process exit, lease expiry and process kill lead to motor timeout stop.
-- [ ] Test temperature/fault/bus-off reporting without automatic unsafe re-enable.
+- [x] Test temperature/fault/transport-fault reporting without automatic unsafe re-enable.
 
 Rollback: disable motor, remove torque, preserve CAN capture and restore known motor parameters; never bulk-write flash registers during rollback.
 

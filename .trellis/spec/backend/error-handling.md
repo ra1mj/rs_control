@@ -30,6 +30,16 @@ Preserve the error source with `#[source]`/`#[from]`. Validation constructors re
 - Expired commands and leases are rejected, not clamped or refreshed implicitly.
 - Directory and schema discovery propagates entry errors; `filter_map(Result::ok)` is forbidden at contract/build boundaries.
 - Do not panic for external input. `expect` is limited to locally proven invariants such as writing to `String` or private ASCII storage.
+- A backend metric that cannot be observed is `MetricValue::Unavailable`, never
+  a measured zero. Monotonic transport counters saturate rather than wrap.
+- CAN error frames preserve the raw bitset and bytes. Classify flags with bit
+  tests so `BUSOFF | ACK` still faults the link; a restart event is evidence,
+  not permission to resume or re-enable.
+- Nonblocking CAN transmit errors preserve the accepted prefix. `WouldBlock`
+  and `ENOBUFS` are explicit backpressure; there is no hidden retry loop.
+- A device that cannot append its bounded safety-disable frame faults closed.
+  `Faulted -> Disabled` is forbidden: explicit recovery returns through a fresh
+  `Configuring` handshake.
 
 ## Common Mistakes
 

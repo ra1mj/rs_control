@@ -24,7 +24,8 @@ Header::new(fields: HeaderFields) -> Result<Header, SemanticError>
 ResourceLease::new(fields: ResourceLeaseFields) -> Result<ResourceLease, SemanticError>
 CommandEnvelope::new(fields: CommandEnvelopeFields) -> Result<CommandEnvelope, SemanticError>
 FrameTransport::{receive, transmit, health}
-DeviceDriver::{configure, enable, disable, handle_input, encode_command}
+DeviceDriver::{lifecycle, start_configure, start_enable, start_disable,
+              handle_input, poll, encode_command, report_transport_fault}
 ```
 
 ### 3. Contracts
@@ -52,6 +53,20 @@ sequence/drop counters. `application_module` code never opens the shared-memory 
 `needs_drop::<T>() == false` is not evidence that a type is safe for shared
 memory; any mmap/raw-atomic `unsafe` stays private to a reviewed `protocol_module` boundary.
 
+Classic-CAN device paths use `StandardCanId`, fixed-storage
+`ClassicCanFrame`, local-monotonic `ReceivedCanFrame` and raw `CanErrorEvent`
+contracts from `hardware-module-core`. Diagnostic socket/kernel/hardware
+timestamps retain explicit clock-domain tags and are never compared with
+`MonoTime`. Device lifecycle output is appended to caller-owned `FrameBatch`
+storage; configuration and enable/disable are bounded multi-frame handshakes,
+not successful-write aliases.
+
+Damiao robot YAML IDs are expected `ESC_ID` values. The vendor boundary narrows
+them to `1..=15`, discovers `MST_ID`, `TIMEOUT`, `CTRL_MODE`, `PMAX`, `VMAX` and
+`TMAX` read-only while disarmed, validates the complete bus ID set, and requires
+an explicit enable after verification. Runtime writes, zero-position and flash
+store are maintenance-only codecs with no ordinary driver call path.
+
 ### 4. Validation & Error Matrix
 
 | Condition | Owner | Result |
@@ -69,6 +84,10 @@ memory; any mmap/raw-atomic `unsafe` stays private to a reviewed `protocol_modul
 | Forbidden Cargo edge | `architecture-check` | non-zero exit with all violations |
 | Incompatible SHM layout/schema/endianness | `protocol_module` local IPC boundary | reject attach before exposing a port |
 | Full/slow/crashed SHM endpoint | `protocol_module` queue policy | explicit latest/drop/reject result plus counters; producer never blocks indefinitely |
+| Extended/RTR/malformed classic CAN input | `transport-socketcan` | discard with a saturating typed counter; never coerce into a device frame |
+| BUS-OFF or partial/fatal CAN transmit | transport + bus owner | fault link, report every affected driver, inhibit normal TX, require explicit disarmed recovery |
+| Missing/stale Damiao feedback | `motor-damiao` | bounded safe-stop disable path or typed fault; never synthesize numeric zero |
+| Unknown/fault motor status or mismatched reply | `motor-damiao` | `Faulted`; recovery must repeat read-only configuration and explicit enable |
 
 ### 5. Good/Base/Bad Cases
 
@@ -89,6 +108,14 @@ memory; any mmap/raw-atomic `unsafe` stays private to a reviewed `protocol_modul
 - `protocol_module` local IPC tests assert incompatible-layout rejection, torn reads,
   endpoint exhaustion, slow consumers, sequence/drop accounting and `SIGKILL`
   lease reclamation; target benchmarks compare it with the pinned Horus commit.
+- SocketCAN tests use a private fake backend for exact SFF filters, bounded RX,
+  one-shot accepted-prefix TX, raw combined error bits, unavailable kernel-drop
+  telemetry, BUS-OFF inhibition and checked classic-CAN budgeting. The optional
+  ignored `vcan` test opens only a caller-provided nonphysical interface.
+- Damiao tests assert manufacturer-derived golden vectors, every raw status,
+  exhaustive 16/12-bit decode domains, exact register correlation, read-only
+  configuration, bus collisions, feedback freshness and fail-closed lifecycle
+  transitions without opening a CAN interface.
 
 ### 7. Wrong vs Correct
 

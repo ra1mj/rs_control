@@ -148,11 +148,12 @@ Conceptual interfaces:
 
 ```rust
 trait FrameTransport {
-    type Frame;
+    type RxFrame;
+    type TxFrame;
     type Error;
 
-    fn receive(&mut self, out: &mut [Self::Frame]) -> Result<usize, Self::Error>;
-    fn transmit(&mut self, frames: &[Self::Frame]) -> Result<usize, Self::Error>;
+    fn receive(&mut self, out: &mut [Self::RxFrame]) -> Result<usize, Self::Error>;
+    fn transmit(&mut self, frames: &[Self::TxFrame]) -> Result<usize, Self::Error>;
     fn health(&self) -> TransportHealth;
 }
 
@@ -161,11 +162,14 @@ trait DeviceDriver {
     type Sample;
     type Fault;
 
-    fn configure(&mut self) -> Result<(), DeviceError<Self::Fault>>;
-    fn enable(&mut self) -> Result<(), DeviceError<Self::Fault>>;
-    fn disable(&mut self) -> Result<(), DeviceError<Self::Fault>>;
-    fn handle_input(&mut self, now: MonoTime) -> Result<Option<Self::Sample>, DeviceError<Self::Fault>>;
-    fn encode_command(&mut self, command: &Self::Command, out: &mut FrameBatch) -> Result<(), DeviceError<Self::Fault>>;
+    fn lifecycle(&self) -> LifecycleState;
+    fn start_configure(&mut self, now: MonoTime, out: &mut FrameBatch) -> Result<(), DeviceError<Self::Fault>>;
+    fn start_enable(&mut self, now: MonoTime, out: &mut FrameBatch) -> Result<(), DeviceError<Self::Fault>>;
+    fn start_disable(&mut self, now: MonoTime, out: &mut FrameBatch) -> Result<(), DeviceError<Self::Fault>>;
+    fn handle_input(&mut self, frame: Frame, received_at: MonoTime, now: MonoTime, out: &mut FrameBatch) -> Result<Option<Self::Sample>, DeviceError<Self::Fault>>;
+    fn poll(&mut self, now: MonoTime, out: &mut FrameBatch) -> Result<(), DeviceError<Self::Fault>>;
+    fn encode_command(&mut self, command: &Self::Command, now: MonoTime, out: &mut FrameBatch) -> Result<(), DeviceError<Self::Fault>>;
+    fn report_transport_fault(&mut self, now: MonoTime) -> Result<(), DeviceError<Self::Fault>>;
 }
 ```
 
@@ -178,7 +182,8 @@ The SocketCAN adapter owns:
 - non-blocking raw CAN sockets;
 - kernel receive timestamps where supported;
 - CAN error-frame subscription;
-- RX overflow, error-passive, bus-off, restart and link-state counters;
+- explicit unavailable RX-overflow telemetry when the reviewed safe API cannot
+  expose `SO_RXQ_OVFL`, plus error, bus-off, restart and link-state counters;
 - CAN filters installed per configured device set;
 - preallocated RX/TX batches;
 - a bus-budget calculator using actual classic-CAN frame cost and protocol rates.

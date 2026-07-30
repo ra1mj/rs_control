@@ -12,11 +12,12 @@ protocol_module ports / Zenoh / Protobuf
 hardware_module transports / device protocols
 ```
 
-The implementation contains the Phase A contracts plus a host-verified Orange Pi
-5 Plus platform candidate. The platform code pins the PREEMPT_RT kernel inputs,
-models exact CPU/IRQ roles, prepares classic SocketCAN without transmitting and
-produces immutable timing evidence. It is **not hardware-qualified yet** and does
-not enable motors or produce torque.
+The implementation contains the Phase A contracts, a host-verified Orange Pi 5
+Plus platform candidate, a bounded Linux SocketCAN adapter, and a pure
+DM-J4310-2EC MIT codec/read-only discovery/lifecycle driver. Default tests use
+fake I/O and never transmit motor frames. The platform and motor path are **not
+hardware-qualified yet** and do not establish physical disable, watchdog,
+firmware compatibility, or realtime timing evidence.
 
 ## Configuration
 
@@ -48,4 +49,5 @@ The first hardware target is Orange Pi 5 Plus/RK3588 with Ubuntu 22.04 and the
 pinned Rockchip 5.10 PREEMPT_RT baseline. See the
 [platform runbooks](platform/orangepi5plus/README.md) for the guarded build,
 bring-up, eight-hour qualification and rollback flow. The target-board evidence
-gate and the later DM-J4310-2EC driver remain separately gated tasks.
+gate and the restrained-motor/analyzer DM-J4310-2EC qualification remain
+separately gated tasks.

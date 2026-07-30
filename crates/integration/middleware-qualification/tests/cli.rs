@@ -17,9 +17,16 @@ fn local_run_emits_versioned_host_evidence() {
         .unwrap();
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.starts_with("{\"schema_version\":1,\"qualification\":\"host_research\""));
+    assert!(stdout.starts_with("{\"schema_version\":2,\"qualification\":\"host_research\""));
     assert!(stdout.contains("\"backend\":\"local\""));
+    assert!(stdout.contains("\"peer_execution\":\"separate_thread_paired\""));
     assert!(stdout.contains("\"samples\":4"));
+    assert!(stdout.contains("\"latency_semantics\":\"one_way_receive\""));
+    assert!(stdout.contains("\"latency_clock\":\"CLOCK_MONOTONIC\""));
+    assert!(stdout.contains("\"operation_semantics\":\"try_publish_call\""));
+    assert!(stdout.contains("\"effective_memory_policy\":\"not-applicable\""));
+    assert!(stdout.contains("\"allocation_scope\":\"publisher_and_consumer\""));
+    assert!(stdout.contains("\"allocations\":{\"count\":0,\"bytes\":0,\"current_count\":0"));
     assert!(output.stderr.is_empty());
 }
 
@@ -44,7 +51,12 @@ fn shm_process_run_completes_bounded_round_trips() {
         let stdout = String::from_utf8(output.stdout).unwrap();
         assert!(stdout.contains("\"backend\":\"shm\""));
         assert!(stdout.contains("\"peer\":\"process\""));
+        assert!(stdout.contains("\"peer_execution\":\"separate_process_paired\""));
         assert!(stdout.contains(&format!("\"kind\":\"{kind}\"")));
+        assert!(stdout.contains("\"effective_memory_policy\":\"prefault\""));
+        assert!(!stdout.contains("\"peer_cpu_time_ns\":0"));
+        assert!(stdout.contains("\"allocation_scope\":\"publisher_and_consumer\""));
+        assert!(stdout.contains("\"allocations\":{\"count\":0,\"bytes\":0,\"current_count\":0"));
     }
 }
 

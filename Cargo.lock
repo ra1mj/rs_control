@@ -1318,6 +1318,7 @@ dependencies = [
  "middleware-api",
  "middleware-local",
  "middleware-shm",
+ "rustix",
  "tempfile",
 ]
 

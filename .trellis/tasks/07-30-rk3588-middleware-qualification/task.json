@@ -3,7 +3,7 @@
   "name": "rk3588-middleware-qualification",
   "title": "RK3588 middleware qualification",
   "description": "Run and preserve Orange Pi 5 Plus/RK3588 latency, maximum jitter, CPU, allocation, contention, slow-consumer, overflow and crash evidence for local middleware candidates and the pinned Horus comparison.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": "Orange Pi 5 Plus/RK3588 local middleware performance, stress, allocation and crash evidence",
   "package": null,
@@ -28,6 +28,6 @@
     "platform/orangepi5plus/sources.lock",
     ".trellis/spec/backend/realtime-platform.md"
   ],
-  "notes": "Depends on archived host child 07-30-shm-middleware-backend. Host fixtures and short target runs remain incomplete; no hardware qualification without immutable physical evidence.",
+  "notes": "Host child archived and entry gate passed. Target envelope, schema-v2 measurements, perf/evaluator contracts, runbook and host fixtures pass full CI. Current execution host is x86_64 with no device-tree, so physical Orange Pi baseline/concurrent evidence, Horus execution and selection remain required.",
   "meta": {}
 }

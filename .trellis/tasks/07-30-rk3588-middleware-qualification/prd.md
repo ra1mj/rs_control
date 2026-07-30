@@ -56,7 +56,7 @@ earlier, but physical execution does not fetch or substitute unreviewed code.
 
 ## Acceptance criteria
 
-- [ ] The host SHM child and its full CI/fault suite are complete before target
+- [x] The host SHM child and its full CI/fault suite are complete before target
       execution begins.
 - [ ] The target procedure refuses wrong/unrecorded hardware, source, build,
       scheduler, affinity, memory-lock, duration or output state.

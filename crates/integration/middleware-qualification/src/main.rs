@@ -6,6 +6,7 @@ use std::{
     io::{self, Write as _},
     path::{Path, PathBuf},
     process::{Child, Command, ExitCode, Stdio},
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
     thread,
     time::{Duration, Instant},
 };
@@ -21,6 +22,7 @@ use middleware_local::{latest_channel, ordered_channel};
 use middleware_shm::{
     ChannelName, IdentityCodec, MemoryPolicy, ShmChannelConfig, ShmNamespace, ShmPayload,
 };
+use rustix::time::{ClockId, clock_gettime};
 use tempfile::TempDir;
 
 const MAX_WARMUP: u64 = 1_000_000;
@@ -45,6 +47,12 @@ enum PeerMode {
     Process,
 }
 
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum MemorySetting {
+    Prefault,
+    LockRequired,
+}
+
 #[derive(Debug, Parser)]
 #[command(about = "Emit bounded middleware qualification evidence as JSON")]
 struct Args {
@@ -58,6 +66,8 @@ struct Args {
     payload_bytes: u16,
     #[arg(long, default_value_t = 64)]
     capacity: u32,
+    #[arg(long, value_enum, default_value = "prefault")]
+    memory_policy: MemorySetting,
     #[arg(long, default_value_t = 1_000)]
     warmup: u64,
     #[arg(long, default_value_t = 10_000)]
@@ -88,7 +98,7 @@ struct Payload1024([u64; 128]);
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
-struct AckPayload([u64; 2]);
+struct AckPayload([u64; 7]);
 
 macro_rules! payload_contract {
     ($type:ty, $schema:literal) => {
@@ -102,11 +112,16 @@ macro_rules! payload_contract {
 payload_contract!(Payload64, b"qual-payload-064");
 payload_contract!(Payload256, b"qual-payload-256");
 payload_contract!(Payload1024, b"qual-payld-v1024");
-payload_contract!(AckPayload, b"qual-ack-v000001");
+
+impl ShmPayload for AckPayload {
+    const SCHEMA_ID: [u8; 16] = *b"qual-ack-v000001";
+    const SCHEMA_VERSION: u32 = 3;
+}
 
 trait BenchPayload: ShmPayload + Copy {
     fn sequence(self) -> u64;
-    fn with_sequence(sequence: u64) -> Self;
+    fn sent_mono_ns(self) -> u64;
+    fn with_timing(sequence: u64, sent_mono_ns: u64) -> Self;
 }
 
 macro_rules! bench_payload {
@@ -116,9 +131,14 @@ macro_rules! bench_payload {
                 self.0[0]
             }
 
-            fn with_sequence(sequence: u64) -> Self {
+            fn sent_mono_ns(self) -> u64 {
+                self.0[1]
+            }
+
+            fn with_timing(sequence: u64, sent_mono_ns: u64) -> Self {
                 let mut value = Self::zeroed();
                 value.0[0] = sequence;
+                value.0[1] = sent_mono_ns;
                 value
             }
         }
@@ -131,6 +151,7 @@ bench_payload!(Payload1024);
 
 struct Histogram {
     buckets: [u64; 64],
+    min_ns: u64,
     max_ns: u64,
 }
 
@@ -138,6 +159,7 @@ impl Default for Histogram {
     fn default() -> Self {
         Self {
             buckets: [0; 64],
+            min_ns: u64::MAX,
             max_ns: 0,
         }
     }
@@ -152,17 +174,21 @@ impl Histogram {
             (u64::BITS - nanos.leading_zeros()) as usize
         };
         self.buckets[bucket.min(self.buckets.len() - 1)] += 1;
+        self.min_ns = self.min_ns.min(nanos);
         self.max_ns = self.max_ns.max(nanos);
     }
 }
 
 struct Evidence {
-    histogram: Histogram,
-    operation_max_ns: u64,
+    latency: Histogram,
+    operation: Histogram,
     allocations: AllocationInfo,
     counters: ChannelCounters,
     wall_ns: u64,
     cpu_ns: u64,
+    peer_cpu_ns: u64,
+    peak_resident_bytes: u64,
+    peer_peak_resident_bytes: u64,
 }
 
 fn main() -> ExitCode {
@@ -180,14 +206,17 @@ fn run(args: Args) -> Result<(), String> {
     if args.worker {
         return dispatch_worker(&args);
     }
-    let cpu_before = process_cpu_ns()?;
+    let cpu_before = process_cpu_ns();
     let wall_before = Instant::now();
     let evidence = dispatch_run(&args)?;
     let wall_ns = nanos(wall_before.elapsed());
-    let cpu_ns = process_cpu_ns()?.saturating_sub(cpu_before);
+    let cpu_ns = process_cpu_ns()
+        .checked_sub(cpu_before)
+        .expect("CLOCK_PROCESS_CPUTIME_ID moved backwards");
     let evidence = Evidence {
         wall_ns,
         cpu_ns,
+        peak_resident_bytes: peak_resident_bytes()?,
         ..evidence
     };
     let json = render_json(&args, &evidence);
@@ -237,60 +266,41 @@ fn run_payload<P: BenchPayload>(args: &Args) -> Result<Evidence, String> {
 }
 
 fn run_local_latest<P: BenchPayload>(args: &Args) -> Result<Evidence, String> {
-    let (mut publisher, mut subscriber) = latest_channel();
-    for sequence in 0..args.warmup {
-        let _ = publisher.try_publish(P::with_sequence(sequence));
-        let _ = subscriber.try_read_latest();
-    }
-    let mut histogram = Histogram::default();
-    let mut operation_max_ns = 0;
-    let allocations = measure(|| {
-        for sequence in 0..args.samples {
-            let start = Instant::now();
-            let operation_start = Instant::now();
-            assert!(matches!(
-                publisher.try_publish(P::with_sequence(sequence)),
-                LatestPublish::Published { .. }
-            ));
-            operation_max_ns = operation_max_ns.max(nanos(operation_start.elapsed()));
-            let sample = subscriber.try_read_latest().expect("paired latest sample");
-            assert_eq!(sample.value.sequence(), sequence);
-            histogram.record(start.elapsed());
-        }
-    });
+    let (mut publisher, subscriber) = latest_channel::<P>();
+    let (latency, operation, allocations) = paired_thread_measure(
+        args,
+        subscriber,
+        |value| match publisher.try_publish(value) {
+            LatestPublish::Published { .. } => Ok(()),
+            LatestPublish::Disconnected => Err("local latest thread peer disconnected"),
+        },
+        |subscriber| subscriber.try_read_latest().map(|sample| sample.value),
+    )?;
     Ok(measured(
-        histogram,
-        operation_max_ns,
+        latency,
+        operation,
         allocations,
         publisher.counters(),
     ))
 }
 
 fn run_local_ordered<P: BenchPayload>(args: &Args) -> Result<Evidence, String> {
-    let (mut publisher, mut subscriber) = ordered_channel(args.capacity as usize)
+    let (mut publisher, subscriber) = ordered_channel::<P>(args.capacity as usize)
         .map_err(|error| format!("create local ordered channel: {error}"))?;
-    for sequence in 0..args.warmup {
-        publisher
-            .try_publish(P::with_sequence(sequence))
-            .map_err(|_| "unexpected local warmup backpressure")?;
-        let _ = subscriber.try_receive();
-    }
-    let mut histogram = Histogram::default();
-    let mut operation_max_ns = 0;
-    let allocations = measure(|| {
-        for sequence in 0..args.samples {
-            let start = Instant::now();
-            let operation_start = Instant::now();
-            assert!(publisher.try_publish(P::with_sequence(sequence)).is_ok());
-            operation_max_ns = operation_max_ns.max(nanos(operation_start.elapsed()));
-            let sample = subscriber.try_receive().expect("paired ordered sample");
-            assert_eq!(sample.value.sequence(), sequence);
-            histogram.record(start.elapsed());
-        }
-    });
+    let (latency, operation, allocations) = paired_thread_measure(
+        args,
+        subscriber,
+        |value| {
+            publisher
+                .try_publish(value)
+                .map(|_| ())
+                .map_err(|_| "local ordered thread peer publish failed")
+        },
+        |subscriber| subscriber.try_receive().map(|sample| sample.value),
+    )?;
     Ok(measured(
-        histogram,
-        operation_max_ns,
+        latency,
+        operation,
         allocations,
         publisher.counters(),
     ))
@@ -300,8 +310,7 @@ fn run_shm_thread<P: BenchPayload>(args: &Args, latest: bool) -> Result<Evidence
     let temp = TempDir::new().map_err(|error| format!("create temp namespace: {error}"))?;
     let namespace = ShmNamespace::new(temp.path().join("shm")).map_err(string_error)?;
     let name = ChannelName::new("qualification").map_err(string_error)?;
-    let config =
-        ShmChannelConfig::new(args.capacity, MemoryPolicy::Prefault).map_err(string_error)?;
+    let config = shm_config(args)?;
     if latest {
         namespace
             .create_latest::<P>(name, config)
@@ -309,32 +318,21 @@ fn run_shm_thread<P: BenchPayload>(args: &Args, latest: bool) -> Result<Evidence
         let mut publisher = namespace
             .attach_latest_publisher(name, config, IdentityCodec::<P>::new())
             .map_err(string_error)?;
-        let mut subscriber = namespace
+        let subscriber = namespace
             .attach_latest_subscriber(name, config, IdentityCodec::<P>::new())
             .map_err(string_error)?;
-        for sequence in 0..args.warmup {
-            let _ = publisher.try_publish(P::with_sequence(sequence));
-            let _ = subscriber.try_read_latest();
-        }
-        let mut histogram = Histogram::default();
-        let mut operation_max_ns = 0;
-        let allocations = measure(|| {
-            for sequence in 0..args.samples {
-                let start = Instant::now();
-                let operation_start = Instant::now();
-                assert!(matches!(
-                    publisher.try_publish(P::with_sequence(sequence)),
-                    LatestPublish::Published { .. }
-                ));
-                operation_max_ns = operation_max_ns.max(nanos(operation_start.elapsed()));
-                let sample = subscriber.try_read_latest().expect("paired latest sample");
-                assert_eq!(sample.value.sequence(), sequence);
-                histogram.record(start.elapsed());
-            }
-        });
+        let (latency, operation, allocations) = paired_thread_measure(
+            args,
+            subscriber,
+            |value| match publisher.try_publish(value) {
+                LatestPublish::Published { .. } => Ok(()),
+                LatestPublish::Disconnected => Err("SHM latest thread peer disconnected"),
+            },
+            |subscriber| subscriber.try_read_latest().map(|sample| sample.value),
+        )?;
         Ok(measured(
-            histogram,
-            operation_max_ns,
+            latency,
+            operation,
             allocations,
             publisher.counters(),
         ))
@@ -345,34 +343,145 @@ fn run_shm_thread<P: BenchPayload>(args: &Args, latest: bool) -> Result<Evidence
         let mut publisher = namespace
             .attach_event_publisher(name, config, IdentityCodec::<P>::new())
             .map_err(string_error)?;
-        let mut subscriber = namespace
+        let subscriber = namespace
             .attach_event_subscriber(name, config, IdentityCodec::<P>::new())
             .map_err(string_error)?;
-        for sequence in 0..args.warmup {
-            publisher
-                .try_publish(P::with_sequence(sequence))
-                .map_err(|_| "unexpected SHM warmup backpressure")?;
-            let _ = subscriber.try_receive();
-        }
-        let mut histogram = Histogram::default();
-        let mut operation_max_ns = 0;
-        let allocations = measure(|| {
-            for sequence in 0..args.samples {
-                let start = Instant::now();
-                let operation_start = Instant::now();
-                assert!(publisher.try_publish(P::with_sequence(sequence)).is_ok());
-                operation_max_ns = operation_max_ns.max(nanos(operation_start.elapsed()));
-                let sample = subscriber.try_receive().expect("paired ordered sample");
-                assert_eq!(sample.value.sequence(), sequence);
-                histogram.record(start.elapsed());
-            }
-        });
+        let (latency, operation, allocations) = paired_thread_measure(
+            args,
+            subscriber,
+            |value| {
+                publisher
+                    .try_publish(value)
+                    .map(|_| ())
+                    .map_err(|_| "SHM ordered thread peer publish failed")
+            },
+            |subscriber| subscriber.try_receive().map(|sample| sample.value),
+        )?;
         Ok(measured(
-            histogram,
-            operation_max_ns,
+            latency,
+            operation,
             allocations,
             publisher.counters(),
         ))
+    }
+}
+
+fn paired_thread_measure<P, S>(
+    args: &Args,
+    subscriber: S,
+    mut publish: impl FnMut(P) -> Result<(), &'static str>,
+    mut receive: impl FnMut(&mut S) -> Option<P> + Send,
+) -> Result<(Histogram, Histogram, AllocationInfo), String>
+where
+    P: BenchPayload,
+    S: Send,
+{
+    let progress = AtomicU64::new(0);
+    let aborted = AtomicBool::new(false);
+    let total = args.warmup.saturating_add(args.samples);
+    thread::scope(|scope| {
+        let progress_ref = &progress;
+        let aborted_ref = &aborted;
+        let consumer = scope.spawn(move || {
+            let mut subscriber = subscriber;
+            let mut latency = Histogram::default();
+            let mut consume_one = |expected: u64, record_latency: bool| {
+                let deadline = Instant::now() + PEER_TIMEOUT;
+                let value = loop {
+                    if aborted_ref.load(Ordering::Acquire) {
+                        return Err("thread peer aborted");
+                    }
+                    if let Some(value) = receive(&mut subscriber) {
+                        break value;
+                    }
+                    if Instant::now() >= deadline {
+                        aborted_ref.store(true, Ordering::Release);
+                        return Err("thread peer receive timeout");
+                    }
+                    thread::yield_now();
+                };
+                if value.sequence() != expected {
+                    aborted_ref.store(true, Ordering::Release);
+                    return Err("thread peer sequence mismatch");
+                }
+                if record_latency {
+                    latency.record(Duration::from_nanos(one_way_ns(value)));
+                }
+                progress_ref.store(expected + 1, Ordering::Release);
+                Ok(())
+            };
+            for expected in 0..args.warmup {
+                consume_one(expected, false)?;
+            }
+            let mut measurement_error = None;
+            let allocations = measure(|| {
+                for expected in args.warmup..total {
+                    if let Err(error) = consume_one(expected, true) {
+                        measurement_error = Some(error);
+                        break;
+                    }
+                }
+            });
+            if let Some(error) = measurement_error {
+                return Err(error);
+            }
+            Ok((latency, allocations))
+        });
+
+        for sequence in 0..args.warmup {
+            publish(P::with_timing(sequence, monotonic_ns())).map_err(str::to_owned)?;
+            wait_thread_progress(&progress, &aborted, sequence + 1).map_err(str::to_owned)?;
+        }
+
+        let mut operation = Histogram::default();
+        let mut measurement_error = None;
+        let allocations = measure(|| {
+            for sequence in args.warmup..total {
+                let value = P::with_timing(sequence, monotonic_ns());
+                let operation_start = Instant::now();
+                if let Err(error) = publish(value) {
+                    aborted.store(true, Ordering::Release);
+                    measurement_error = Some(error);
+                    break;
+                }
+                operation.record(operation_start.elapsed());
+                if let Err(error) = wait_thread_progress(&progress, &aborted, sequence + 1) {
+                    measurement_error = Some(error);
+                    break;
+                }
+            }
+        });
+        if let Some(error) = measurement_error {
+            return Err(error.to_owned());
+        }
+        let (latency, consumer_allocations) = consumer
+            .join()
+            .map_err(|_| "thread peer panicked".to_owned())?
+            .map_err(str::to_owned)?;
+        let mut allocations = allocations;
+        allocations += consumer_allocations;
+        Ok((latency, operation, allocations))
+    })
+}
+
+fn wait_thread_progress(
+    progress: &AtomicU64,
+    aborted: &AtomicBool,
+    expected: u64,
+) -> Result<(), &'static str> {
+    let deadline = Instant::now() + PEER_TIMEOUT;
+    loop {
+        if progress.load(Ordering::Acquire) == expected {
+            return Ok(());
+        }
+        if aborted.load(Ordering::Acquire) {
+            return Err("thread peer failed");
+        }
+        if Instant::now() >= deadline {
+            aborted.store(true, Ordering::Release);
+            return Err("thread peer acknowledgement timeout");
+        }
+        thread::yield_now();
     }
 }
 
@@ -383,9 +492,8 @@ fn run_shm_process<P: BenchPayload>(args: &Args) -> Result<Evidence, String> {
     let namespace = ShmNamespace::new(&root).map_err(string_error)?;
     let name = ChannelName::new("qualification").map_err(string_error)?;
     let ack_name = ChannelName::new("qualification-ack").map_err(string_error)?;
-    let config =
-        ShmChannelConfig::new(args.capacity, MemoryPolicy::Prefault).map_err(string_error)?;
-    let ack_config = ShmChannelConfig::new(1, MemoryPolicy::Prefault).map_err(string_error)?;
+    let config = shm_config(args)?;
+    let ack_config = ShmChannelConfig::new(2, shm_memory_policy(args)).map_err(string_error)?;
     match args.kind {
         DeliveryKind::Latest => namespace
             .create_latest::<P>(name, config)
@@ -403,59 +511,58 @@ fn run_shm_process<P: BenchPayload>(args: &Args) -> Result<Evidence, String> {
     let mut child = spawn_worker::<P>(args, &root, name, &ready)?;
     wait_file(&ready, &mut child)?;
 
-    let result = match args.kind {
+    let mut result = match args.kind {
         DeliveryKind::Latest => {
             let mut publisher = namespace
                 .attach_latest_publisher(name, config, IdentityCodec::<P>::new())
                 .map_err(string_error)?;
-            let mut histogram = Histogram::default();
-            let mut operation_max_ns = 0;
+            let mut latency = Histogram::default();
+            let mut operation = Histogram::default();
             for sequence in 0..args.warmup {
                 publish_latest_and_wait(&mut publisher, &mut ack_subscriber, sequence)?;
             }
             let allocations = measure(|| {
                 for sequence in 0..args.samples {
-                    let start = Instant::now();
-                    let operation =
+                    let (operation_elapsed, one_way_ns) =
                         publish_latest_and_wait(&mut publisher, &mut ack_subscriber, sequence)
                             .expect("live process peer");
-                    operation_max_ns = operation_max_ns.max(nanos(operation));
-                    histogram.record(start.elapsed());
+                    operation.record(operation_elapsed);
+                    latency.record(Duration::from_nanos(one_way_ns));
                 }
             });
-            measured(
-                histogram,
-                operation_max_ns,
-                allocations,
-                publisher.counters(),
-            )
+            measured(latency, operation, allocations, publisher.counters())
         }
         DeliveryKind::Ordered => {
             let mut publisher = namespace
                 .attach_event_publisher(name, config, IdentityCodec::<P>::new())
                 .map_err(string_error)?;
-            let mut histogram = Histogram::default();
-            let mut operation_max_ns = 0;
+            let mut latency = Histogram::default();
+            let mut operation = Histogram::default();
             for sequence in 0..args.warmup {
                 publish_ordered_and_wait(&mut publisher, &mut ack_subscriber, sequence)?;
             }
             let allocations = measure(|| {
                 for sequence in 0..args.samples {
-                    let start = Instant::now();
-                    let operation =
+                    let (operation_elapsed, one_way_ns) =
                         publish_ordered_and_wait(&mut publisher, &mut ack_subscriber, sequence)
                             .expect("live process peer");
-                    operation_max_ns = operation_max_ns.max(nanos(operation));
-                    histogram.record(start.elapsed());
+                    operation.record(operation_elapsed);
+                    latency.record(Duration::from_nanos(one_way_ns));
                 }
             });
-            measured(
-                histogram,
-                operation_max_ns,
-                allocations,
-                publisher.counters(),
-            )
+            measured(latency, operation, allocations, publisher.counters())
         }
+    };
+    let peer_summary = wait_ack_payload(&mut ack_subscriber, u64::MAX)?;
+    result.peer_cpu_ns = peer_summary.0[1];
+    result.peer_peak_resident_bytes = peer_summary.0[2];
+    result.allocations += AllocationInfo {
+        count_total: peer_summary.0[3],
+        count_current: 0,
+        count_max: peer_summary.0[5],
+        bytes_total: peer_summary.0[4],
+        bytes_current: 0,
+        bytes_max: peer_summary.0[6],
     };
     wait_child(&mut child)?;
     Ok(result)
@@ -465,47 +572,54 @@ fn publish_latest_and_wait<P: BenchPayload>(
     publisher: &mut impl LatestPublisher<P>,
     ack: &mut impl EventSubscriber<AckPayload>,
     sequence: u64,
-) -> Result<Duration, String> {
+) -> Result<(Duration, u64), String> {
+    let value = P::with_timing(sequence, monotonic_ns());
     let operation_start = Instant::now();
     if !matches!(
-        publisher.try_publish(P::with_sequence(sequence)),
+        publisher.try_publish(value),
         LatestPublish::Published { .. }
     ) {
         return Err("latest process peer disconnected".into());
     }
     let operation = operation_start.elapsed();
-    wait_ack(ack, sequence)?;
-    Ok(operation)
+    let one_way_ns = wait_ack(ack, sequence)?;
+    Ok((operation, one_way_ns))
 }
 
 fn publish_ordered_and_wait<P: BenchPayload>(
     publisher: &mut impl EventPublisher<P>,
     ack: &mut impl EventSubscriber<AckPayload>,
     sequence: u64,
-) -> Result<Duration, String> {
+) -> Result<(Duration, u64), String> {
+    let value = P::with_timing(sequence, monotonic_ns());
     let operation_start = Instant::now();
-    publisher
-        .try_publish(P::with_sequence(sequence))
-        .map_err(|error| match error {
-            EventPublishError::Full(_) => "ordered process channel unexpectedly full".to_owned(),
-            EventPublishError::Disconnected(_) => "ordered process peer disconnected".to_owned(),
-        })?;
+    publisher.try_publish(value).map_err(|error| match error {
+        EventPublishError::Full(_) => "ordered process channel unexpectedly full".to_owned(),
+        EventPublishError::Disconnected(_) => "ordered process peer disconnected".to_owned(),
+    })?;
     let operation = operation_start.elapsed();
-    wait_ack(ack, sequence)?;
-    Ok(operation)
+    let one_way_ns = wait_ack(ack, sequence)?;
+    Ok((operation, one_way_ns))
 }
 
 fn wait_ack(
     subscriber: &mut impl EventSubscriber<AckPayload>,
     sequence: u64,
-) -> Result<(), String> {
+) -> Result<u64, String> {
+    Ok(wait_ack_payload(subscriber, sequence)?.0[1])
+}
+
+fn wait_ack_payload(
+    subscriber: &mut impl EventSubscriber<AckPayload>,
+    sequence: u64,
+) -> Result<AckPayload, String> {
     let deadline = Instant::now() + PEER_TIMEOUT;
     loop {
         if let Some(sample) = subscriber.try_receive() {
             if sample.value.0[0] != sequence {
                 return Err("process peer acknowledgement sequence mismatch".into());
             }
-            return Ok(());
+            return Ok(sample.value);
         }
         if Instant::now() >= deadline {
             return Err("process peer acknowledgement timeout".into());
@@ -529,9 +643,8 @@ fn run_worker<P: BenchPayload>(args: &Args) -> Result<(), String> {
         .map_err(string_error)?;
     let ready = args.ready.as_ref().ok_or("worker ready path missing")?;
     let namespace = ShmNamespace::new(root).map_err(string_error)?;
-    let config =
-        ShmChannelConfig::new(args.capacity, MemoryPolicy::Prefault).map_err(string_error)?;
-    let ack_config = ShmChannelConfig::new(1, MemoryPolicy::Prefault).map_err(string_error)?;
+    let config = shm_config(args)?;
+    let ack_config = ShmChannelConfig::new(2, shm_memory_policy(args)).map_err(string_error)?;
     let ack_name = ChannelName::new("qualification-ack").map_err(string_error)?;
     let mut ack = namespace
         .attach_event_publisher(ack_name, ack_config, IdentityCodec::<AckPayload>::new())
@@ -567,22 +680,66 @@ fn worker_loop<P: BenchPayload>(
     mut receive: impl FnMut() -> Option<P>,
     ack: &mut impl EventPublisher<AckPayload>,
 ) -> Result<(), String> {
-    let total = args.warmup.saturating_add(args.samples);
-    for _ in 0..total {
-        let deadline = Instant::now() + PEER_TIMEOUT;
-        let value = loop {
-            if let Some(value) = receive() {
-                break value;
-            }
-            if Instant::now() >= deadline {
-                return Err("worker receive timeout".into());
-            }
-            thread::yield_now();
-        };
-        ack.try_publish(AckPayload([value.sequence(), 0]))
-            .map_err(|_| "worker acknowledgement backpressure")?;
+    let cpu_before = process_cpu_ns();
+    for _ in 0..args.warmup {
+        worker_receive_and_ack(&mut receive, ack)?;
     }
+    let mut measurement_error = None;
+    let allocations = measure(|| {
+        for _ in 0..args.samples {
+            if let Err(error) = worker_receive_and_ack(&mut receive, ack) {
+                measurement_error = Some(error);
+                break;
+            }
+        }
+    });
+    if let Some(error) = measurement_error {
+        return Err(error);
+    }
+    if allocations.count_current != 0 || allocations.bytes_current != 0 {
+        return Err("worker hot path retained an allocation".into());
+    }
+    let cpu_ns = process_cpu_ns()
+        .checked_sub(cpu_before)
+        .expect("CLOCK_PROCESS_CPUTIME_ID moved backwards");
+    ack.try_publish(AckPayload([
+        u64::MAX,
+        cpu_ns,
+        peak_resident_bytes()?,
+        allocations.count_total,
+        allocations.bytes_total,
+        allocations.count_max,
+        allocations.bytes_max,
+    ]))
+    .map_err(|_| "worker CPU acknowledgement backpressure")?;
     Ok(())
+}
+
+fn worker_receive_and_ack<P: BenchPayload>(
+    receive: &mut impl FnMut() -> Option<P>,
+    ack: &mut impl EventPublisher<AckPayload>,
+) -> Result<(), String> {
+    let deadline = Instant::now() + PEER_TIMEOUT;
+    let value = loop {
+        if let Some(value) = receive() {
+            break value;
+        }
+        if Instant::now() >= deadline {
+            return Err("worker receive timeout".into());
+        }
+        thread::yield_now();
+    };
+    ack.try_publish(AckPayload([
+        value.sequence(),
+        one_way_ns(value),
+        0,
+        0,
+        0,
+        0,
+        0,
+    ]))
+    .map(|_| ())
+    .map_err(|_| "worker acknowledgement backpressure".into())
 }
 
 fn spawn_worker<P: BenchPayload>(
@@ -600,6 +757,10 @@ fn spawn_worker<P: BenchPayload>(
         .arg("--peer=process")
         .arg(format!("--payload-bytes={}", std::mem::size_of::<P>()))
         .arg(format!("--capacity={}", args.capacity))
+        .arg(format!(
+            "--memory-policy={}",
+            memory_policy_name(args.memory_policy)
+        ))
         .arg(format!("--warmup={}", args.warmup))
         .arg(format!("--samples={}", args.samples))
         .arg("--namespace")
@@ -659,72 +820,76 @@ fn wait_child(child: &mut Child) -> Result<(), String> {
 }
 
 fn measured(
-    histogram: Histogram,
-    operation_max_ns: u64,
+    latency: Histogram,
+    operation: Histogram,
     allocations: AllocationInfo,
     counters: ChannelCounters,
 ) -> Evidence {
     Evidence {
-        histogram,
-        operation_max_ns,
+        latency,
+        operation,
         allocations,
         counters,
         wall_ns: 0,
         cpu_ns: 0,
+        peer_cpu_ns: 0,
+        peak_resident_bytes: 0,
+        peer_peak_resident_bytes: 0,
     }
 }
 
-fn process_cpu_ns() -> Result<u64, String> {
-    let stat = fs::read_to_string("/proc/self/stat")
-        .map_err(|error| format!("read /proc/self/stat: {error}"))?;
-    let fields = stat
-        .rsplit_once(')')
-        .ok_or("invalid /proc/self/stat comm field")?
-        .1
-        .split_whitespace()
-        .collect::<Vec<_>>();
-    let user: u64 = fields
-        .get(11)
-        .ok_or("missing process user ticks")?
+fn process_cpu_ns() -> u64 {
+    timespec_ns(
+        clock_gettime(ClockId::ProcessCPUTime),
+        "CLOCK_PROCESS_CPUTIME_ID",
+    )
+}
+
+fn peak_resident_bytes() -> Result<u64, String> {
+    let status = fs::read_to_string("/proc/self/status")
+        .map_err(|error| format!("read /proc/self/status: {error}"))?;
+    let high_water_kib = status
+        .lines()
+        .find_map(|line| line.strip_prefix("VmHWM:"))
+        .ok_or("missing VmHWM in /proc/self/status")?;
+    let mut fields = high_water_kib.split_whitespace();
+    let value: u64 = fields
+        .next()
+        .ok_or("missing VmHWM value")?
         .parse()
-        .map_err(|error| format!("parse process user ticks: {error}"))?;
-    let system: u64 = fields
-        .get(12)
-        .ok_or("missing process system ticks")?
-        .parse()
-        .map_err(|error| format!("parse process system ticks: {error}"))?;
-    let output = Command::new("getconf")
-        .arg("CLK_TCK")
-        .output()
-        .map_err(|error| format!("run getconf CLK_TCK: {error}"))?;
-    if !output.status.success() {
-        return Err("getconf CLK_TCK failed".into());
+        .map_err(|error| format!("parse VmHWM: {error}"))?;
+    if fields.next() != Some("kB") || fields.next().is_some() {
+        return Err("invalid VmHWM unit".into());
     }
-    let ticks_per_second: u64 = String::from_utf8(output.stdout)
-        .map_err(|error| format!("decode CLK_TCK: {error}"))?
-        .trim()
-        .parse()
-        .map_err(|error| format!("parse CLK_TCK: {error}"))?;
-    Ok(user.saturating_add(system).saturating_mul(1_000_000_000) / ticks_per_second)
+    value
+        .checked_mul(1024)
+        .ok_or_else(|| "VmHWM byte count overflow".into())
 }
 
 fn render_json(args: &Args, evidence: &Evidence) -> String {
-    let mut buckets = String::new();
-    for (index, count) in evidence.histogram.buckets.iter().enumerate() {
-        if index != 0 {
-            buckets.push(',');
-        }
-        write!(buckets, "{count}").expect("String writes cannot fail");
-    }
+    let latency_buckets = render_buckets(&evidence.latency);
+    let operation_buckets = render_buckets(&evidence.operation);
     format!(
         concat!(
-            "{{\"schema_version\":1,\"qualification\":\"host_research\",",
+            "{{\"schema_version\":2,\"qualification\":\"host_research\",",
             "\"runner_version\":\"{}\",\"target_os\":\"{}\",\"target_arch\":\"{}\",",
-            "\"backend\":\"{}\",\"kind\":\"{}\",\"peer\":\"{}\",",
-            "\"payload_bytes\":{},\"capacity\":{},\"warmup\":{},\"samples\":{},",
-            "\"latency_log2_ns\":[{}],\"latency_max_ns\":{},\"operation_max_ns\":{},",
-            "\"wall_time_ns\":{},\"cpu_time_ns\":{},\"cpu_time_source\":\"proc_self_stat\",",
-            "\"allocations\":{{\"count\":{},\"bytes\":{},\"peak_count\":{},\"peak_bytes\":{}}},",
+            "\"backend\":\"{}\",\"kind\":\"{}\",\"peer\":\"{}\",\"peer_execution\":\"{}\",",
+            "\"payload_bytes\":{},\"capacity\":{},",
+            "\"requested_memory_policy\":\"{}\",\"effective_memory_policy\":\"{}\",",
+            "\"memory_policy_scope\":\"shm_mappings\",",
+            "\"warmup\":{},\"samples\":{},",
+            "\"latency_semantics\":\"one_way_receive\",\"latency_clock\":\"CLOCK_MONOTONIC\",",
+            "\"latency_log2_ns\":[{}],\"latency_min_ns\":{},\"latency_max_ns\":{},",
+            "\"latency_jitter_semantics\":\"max_minus_min\",\"latency_jitter_span_ns\":{},",
+            "\"operation_semantics\":\"try_publish_call\",\"operation_clock\":\"CLOCK_MONOTONIC\",",
+            "\"operation_log2_ns\":[{}],\"operation_max_ns\":{},",
+            "\"wall_time_ns\":{},\"cpu_time_ns\":{},\"peer_cpu_time_ns\":{},",
+            "\"cpu_time_source\":\"CLOCK_PROCESS_CPUTIME_ID\",",
+            "\"peak_resident_bytes\":{},\"peer_peak_resident_bytes\":{},",
+            "\"memory_source\":\"proc_self_status_VmHWM\",",
+            "\"allocation_scope\":\"publisher_and_consumer\",",
+            "\"allocations\":{{\"count\":{},\"bytes\":{},\"current_count\":{},",
+            "\"current_bytes\":{},\"peak_count\":{},\"peak_bytes\":{}}},",
             "\"counters\":{{\"published\":{},\"consumed\":{},\"overwritten\":{},",
             "\"full\":{},\"disconnected\":{}}}}}\n"
         ),
@@ -734,17 +899,31 @@ fn render_json(args: &Args, evidence: &Evidence) -> String {
         backend_name(args.backend),
         kind_name(args.kind),
         peer_name(args.peer),
+        peer_execution_name(args.peer),
         args.payload_bytes,
         args.capacity,
+        memory_policy_name(args.memory_policy),
+        effective_memory_policy_name(args),
         args.warmup,
         args.samples,
-        buckets,
-        evidence.histogram.max_ns,
-        evidence.operation_max_ns,
+        latency_buckets,
+        evidence.latency.min_ns,
+        evidence.latency.max_ns,
+        evidence
+            .latency
+            .max_ns
+            .saturating_sub(evidence.latency.min_ns),
+        operation_buckets,
+        evidence.operation.max_ns,
         evidence.wall_ns,
         evidence.cpu_ns,
+        evidence.peer_cpu_ns,
+        evidence.peak_resident_bytes,
+        evidence.peer_peak_resident_bytes,
         evidence.allocations.count_total,
         evidence.allocations.bytes_total,
+        evidence.allocations.count_current,
+        evidence.allocations.bytes_current,
         evidence.allocations.count_max,
         evidence.allocations.bytes_max,
         evidence.counters.published,
@@ -753,6 +932,17 @@ fn render_json(args: &Args, evidence: &Evidence) -> String {
         evidence.counters.full,
         evidence.counters.disconnected,
     )
+}
+
+fn render_buckets(histogram: &Histogram) -> String {
+    let mut buckets = String::new();
+    for (index, count) in histogram.buckets.iter().enumerate() {
+        if index != 0 {
+            buckets.push(',');
+        }
+        write!(buckets, "{count}").expect("String writes cannot fail");
+    }
+    buckets
 }
 
 fn write_output(path: Option<&Path>, bytes: &[u8]) -> Result<(), String> {
@@ -793,8 +983,60 @@ fn peer_name(value: PeerMode) -> &'static str {
     }
 }
 
+fn peer_execution_name(value: PeerMode) -> &'static str {
+    match value {
+        PeerMode::Thread => "separate_thread_paired",
+        PeerMode::Process => "separate_process_paired",
+    }
+}
+
+fn memory_policy_name(value: MemorySetting) -> &'static str {
+    match value {
+        MemorySetting::Prefault => "prefault",
+        MemorySetting::LockRequired => "lock-required",
+    }
+}
+
+fn effective_memory_policy_name(args: &Args) -> &'static str {
+    match args.backend {
+        Backend::Local => "not-applicable",
+        Backend::Shm => memory_policy_name(args.memory_policy),
+    }
+}
+
+fn shm_config(args: &Args) -> Result<ShmChannelConfig, String> {
+    ShmChannelConfig::new(args.capacity, shm_memory_policy(args)).map_err(string_error)
+}
+
+fn shm_memory_policy(args: &Args) -> MemoryPolicy {
+    match args.memory_policy {
+        MemorySetting::Prefault => MemoryPolicy::Prefault,
+        MemorySetting::LockRequired => MemoryPolicy::LockRequired,
+    }
+}
+
 fn nanos(duration: Duration) -> u64 {
     duration.as_nanos().min(u128::from(u64::MAX)) as u64
+}
+
+fn monotonic_ns() -> u64 {
+    timespec_ns(clock_gettime(ClockId::Monotonic), "CLOCK_MONOTONIC")
+}
+
+fn timespec_ns(now: rustix::time::Timespec, name: &str) -> u64 {
+    let seconds =
+        u64::try_from(now.tv_sec).unwrap_or_else(|_| panic!("{name} returned negative seconds"));
+    let nanoseconds = u64::try_from(now.tv_nsec).expect("tv_nsec is nonnegative");
+    seconds
+        .checked_mul(1_000_000_000)
+        .and_then(|value| value.checked_add(nanoseconds))
+        .unwrap_or_else(|| panic!("{name} nanoseconds overflow u64"))
+}
+
+fn one_way_ns<P: BenchPayload>(value: P) -> u64 {
+    monotonic_ns()
+        .checked_sub(value.sent_mono_ns())
+        .expect("CLOCK_MONOTONIC moved backwards")
 }
 
 fn string_error(error: impl std::fmt::Display) -> String {

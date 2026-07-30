@@ -19,6 +19,7 @@ platform/orangepi5plus/kernel/build-kernel.sh --print-plan
 platform/orangepi5plus/scripts/rt-affinity.sh plan
 platform/orangepi5plus/scripts/can-link.sh plan
 platform/orangepi5plus/tests/host-test.sh
+platform/orangepi5plus/tests/middleware-host-test.sh
 ```
 
 These commands do not fetch source, build a kernel, write `/sys` or `/proc`,
@@ -34,6 +35,7 @@ configure a real network link, send CAN traffic or require root.
 | `scripts/` | Explicit link, affinity, evidence, thermal and qualification tools |
 | `systemd/` | Fail-closed privileged preparation separated from applications |
 | `tests/host-test.sh` | Fixture-only platform regression gate |
+| `tests/middleware-host-test.sh` | Middleware target-plan and evidence-evaluator fixtures |
 | `docs/` | Build, bring-up, qualification and rollback runbooks |
 
 ## Runbooks
@@ -66,3 +68,12 @@ publisher-by-subscriber SPSC layout, cache-line separation, per-slot sequence
 validation and crash-reclaim ideas. It must use an explicit fixed-layout shared
 memory contract; Rust `needs_drop::<T>() == false` is not accepted as proof that
 a type is safe for cross-process memory.
+
+The target-only `scripts/qualify-middleware.sh` composes the existing platform
+stress/thermal run with the project benchmark and an external pinned-Horus
+adapter. `--dry-run` is host-safe. Actual execution refuses non-aarch64 or a
+device tree other than Orange Pi 5 Plus/RK3588, requires lock-backed mappings,
+clean exact source revisions and usable FIFO/`perf`/memory-lock policy, never
+fetches source, writes only to an absent evidence directory, and never promotes
+the candidate profile itself. See the middleware section of the realtime
+qualification runbook for adapter and evidence contracts.

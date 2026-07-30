@@ -22,6 +22,17 @@ platform_require_absolute_path() {
     esac
 }
 
+platform_require_rk3588_target_identity() {
+    platform_target_arch=$1
+    platform_target_compatible=$2
+    [ "$platform_target_arch" = aarch64 ] || platform_die 'actual middleware qualification requires aarch64'
+    [ -r "$platform_target_compatible" ] || platform_die 'device-tree compatible identity is unavailable'
+    tr '\000' '\n' < "$platform_target_compatible" | grep -Fx 'xunlong,orangepi-5-plus' >/dev/null ||
+        platform_die 'target is not Orange Pi 5 Plus'
+    tr '\000' '\n' < "$platform_target_compatible" | grep -Fx 'rockchip,rk3588' >/dev/null ||
+        platform_die 'target is not RK3588'
+}
+
 platform_validate_data_file() {
     platform_data_file=$1
     platform_allowed_keys=$2

@@ -12,6 +12,7 @@ clap.workspace = true
 middleware-api.workspace = true
 middleware-local.workspace = true
 middleware-shm.workspace = true
+rustix.workspace = true
 tempfile.workspace = true
 
 [lints]

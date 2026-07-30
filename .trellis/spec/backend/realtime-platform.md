@@ -22,7 +22,13 @@ qualify-rt.sh --profile 1khz|500hz --mode baseline|concurrent \
   --duration <time> --output <absolute-new-directory> [stress/evidence inputs]
 middleware-qualification --backend local|shm --kind latest|ordered \
   --peer thread|process --payload-bytes 64|256|1024 \
-  --capacity <n> --warmup <n> --samples <n> [--output <absent-file>]
+  --capacity <n> --memory-policy prefault|lock-required \
+  --warmup <n> --samples <n> [--output <absent-file>]
+qualify-middleware.sh --profile 1khz|500hz --mode baseline|concurrent \
+  --duration <time> --output <absolute-new-directory> \
+  --runner <file> --workspace <dir> --app-commit <sha> \
+  --app-build-id <token> --hardware-manifest <file> --overlay-file <file> \
+  --horus-source <dir> --horus-runner <file> [stress/evidence inputs]
 evaluate-cyclictest.py <json> --threshold-ns <n> \
   [--expected-cpu <id>] [--minimum-cycles <n>]
 ```
@@ -73,13 +79,23 @@ REQUIRE_CONTROL_MAX_CAPACITY, REQUIRE_IO_MAX_CAPACITY
   carrier and peer route, and a representative accelerator workload plus
   thermal/frequency monitoring.
 - `middleware-qualification` is a bounded evidence producer, not a profile
-  mutator. It emits schema-versioned deterministic JSON labeled
-  `qualification=host_research`, includes raw settings, logarithmic latency
-  buckets/max, operation max, wall/process CPU time, allocation totals and
-  delivery counters, and creates an optional output file exclusively. Its host
-  runs and short target runs cannot set `PROFILE_QUALIFIED` or close RK3588
-  acceptance; the target task must add immutable board/kernel/affinity/stress/
-  thermal identity and the pinned Horus comparison.
+  mutator. Schema v2 deterministic JSON remains labeled
+  `qualification=host_research`; it separately records `CLOCK_MONOTONIC`
+  one-way receive and `try_publish` distributions/maxima, min/max jitter span,
+  runner/peer process CPU time, runner/peer `VmHWM`, hot allocation totals and
+  delivery counters. Thread/process consumers are separately executed and both
+  producer and consumer hot allocations are included. Requested memory policy is distinct from effective policy:
+  local-thread is `not-applicable`, while target SHM must be `lock-required`.
+- `qualify-middleware.sh` is the only target promotion envelope. It refuses a
+  non-aarch64/non-Orange-Pi-5-Plus/RK3588 host, dirty or wrong source revisions,
+  an existing output, invalid platform identity/affinity, an unavailable FIFO/
+  memory-lock runner preflight, or unavailable `perf` hardware cycles. It runs
+  the pinned external Horus adapter without fetching source, collects identical
+  `perf stat` events for every candidate, composes `qualify-rt.sh`, and hashes
+  the retained bundle. It never edits a runtime profile.
+- A 1 kHz failure may only lead to a separate explicit `--profile 500hz` run in
+  a new output directory. No script performs rate fallback or candidate
+  promotion automatically.
 
 ### 4. Validation & Error Matrix
 
@@ -98,6 +114,9 @@ REQUIRE_CONTROL_MAX_CAPACITY, REQUIRE_IO_MAX_CAPACITY
 | Zero/excessive middleware samples/capacity or unsupported payload size | Refuse before creating channels |
 | Local backend requested with process peer | Refuse; only SHM is cross-process |
 | Existing middleware evidence output | Refuse overwrite |
+| Missing target `perf` cycles or lock/FIFO preflight | Refuse before evidence creation |
+| Missing candidate JSON/`perf` pair or pinned Horus fault evidence | `incomplete` |
+| Torn value, unaccounted loss, producer fault, hot allocation or invalid counted evidence | `fail` |
 
 ### 5. Good/Base/Bad Cases
 
@@ -115,6 +134,9 @@ REQUIRE_CONTROL_MAX_CAPACITY, REQUIRE_IO_MAX_CAPACITY
   parsing, CPU role conflicts, exact IRQ/governor readback, CAN recovery gates,
   systemd privilege separation, thermal markers, evidence non-overwrite and
   concurrent partial-run behavior.
+- `platform/orangepi5plus/tests/middleware-host-test.sh` asserts target dry-run
+  identity/lock/matrix policy, host refusal, complete/missing/bad evidence,
+  deterministic comparison bytes, semantic mismatch and torn-fault rejection.
 - Cyclictest fixtures assert `100000 ns` pass, `100001 ns` fail, integer/unit
   strictness, expected CPU and minimum cycle coverage.
 - `tools/ci.sh` includes the host test but performs no fetch, kernel build, root

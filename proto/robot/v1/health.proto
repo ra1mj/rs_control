@@ -70,3 +70,23 @@ message ComponentHealth {
   // Last successful input/output time in the publisher monotonic clock domain.
   uint64 last_success_monotonic_ns = 5;
 }
+
+// Bounded, idempotent health snapshot query.
+message HealthSnapshotRequest {
+  // Common request metadata and correlation identity.
+  Header header = 1;
+  // Optional component allowlist; empty selects all within max_components.
+  repeated string component_ids = 2;
+  // Nonzero response bound enforced by the query route.
+  uint32 max_components = 3;
+}
+
+// Bounded response to HealthSnapshotRequest.
+message HealthSnapshotResponse {
+  // Common response metadata.
+  Header header = 1;
+  // Component snapshots, bounded by the correlated request and route.
+  repeated ComponentHealth components = 2;
+  // True when more components existed than the requested bound.
+  bool truncated = 3;
+}

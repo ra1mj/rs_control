@@ -2,6 +2,7 @@
 members = [
     "apps/robotctl",
     "crates/integration/config-model",
+    "crates/integration/ros2-mapping",
     "crates/integration/test-support",
     "crates/hardware_module/hardware-module-core",
     "crates/hardware_module/motor-damiao",
@@ -31,7 +32,9 @@ message-model = { version = "0.1.0", path = "crates/protocol_module/message-mode
 motor-damiao = { version = "0.1.0", path = "crates/hardware_module/motor-damiao" }
 prost = "0.14.4"
 prost-build = "0.14.4"
+prost-types = "0.14.4"
 proto-generated = { version = "0.1.0", path = "crates/protocol_module/proto-generated" }
+ros2-mapping = { version = "0.1.0", path = "crates/integration/ros2-mapping" }
 protoc-bin-vendored = "3.2.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde-saphyr = { version = "0.0.29", default-features = false, features = ["deserialize"] }

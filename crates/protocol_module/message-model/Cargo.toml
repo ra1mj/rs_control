@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+arrayvec.workspace = true
 thiserror.workspace = true
 
 [lints]

@@ -1,8 +1,13 @@
 //! Sole conversion and validation owner between semantic and Protobuf messages.
 
+mod mapping;
+
+pub use mapping::*;
+
 use message_model::{
-    AsciiId, ClockState, ClockStatus, CommandEnvelope, CommandEnvelopeFields, DataQuality, Header,
-    HeaderFields, Id128, Id128Error, IdError, ResourceLease, ResourceLeaseFields, SemanticError,
+    AcquisitionTimestamp, AsciiId, ClockState, ClockStatus, CommandEnvelope, CommandEnvelopeFields,
+    DataQuality, Header, HeaderFields, Id128, Id128Error, IdError, ResourceLease,
+    ResourceLeaseFields, SemanticError, TimestampDomain,
 };
 use prost::Message;
 use proto_generated::robot::v1 as wire;
@@ -37,6 +42,13 @@ pub fn header_to_wire(header: &Header) -> wire::Header {
             uncertainty_ns: header.clock_status().uncertainty_ns,
         }),
         quality: quality_to_wire(header.quality()) as i32,
+        acquisition_timestamp: header.acquisition_timestamp().map(|timestamp| {
+            wire::AcquisitionTimestamp {
+                timestamp_ns: timestamp.timestamp_ns,
+                domain: timestamp_domain_to_wire(timestamp.domain) as i32,
+                uncertainty_ns: timestamp.uncertainty_ns,
+            }
+        }),
     }
 }
 
@@ -51,6 +63,16 @@ pub fn header_from_wire(value: wire::Header) -> Result<Header, CodecError> {
         sequence: value.sequence,
         source_monotonic_ns: value.source_monotonic_ns,
         publish_unix_ns: value.publish_unix_ns,
+        acquisition_timestamp: value
+            .acquisition_timestamp
+            .map(|timestamp| -> Result<AcquisitionTimestamp, CodecError> {
+                Ok(AcquisitionTimestamp {
+                    timestamp_ns: timestamp.timestamp_ns,
+                    domain: timestamp_domain_from_wire(timestamp.domain)?,
+                    uncertainty_ns: timestamp.uncertainty_ns,
+                })
+            })
+            .transpose()?,
         valid_for_ns: value.valid_for_ns,
         frame_id: if value.frame_id.is_empty() {
             None
@@ -205,6 +227,24 @@ fn quality_from_wire(value: i32) -> Result<DataQuality, CodecError> {
     }
 }
 
+fn timestamp_domain_to_wire(value: TimestampDomain) -> wire::TimestampDomain {
+    match value {
+        TimestampDomain::Unix => wire::TimestampDomain::Unix,
+        TimestampDomain::Ros => wire::TimestampDomain::Ros,
+    }
+}
+
+fn timestamp_domain_from_wire(value: i32) -> Result<TimestampDomain, CodecError> {
+    match wire::TimestampDomain::try_from(value) {
+        Ok(wire::TimestampDomain::Unix) => Ok(TimestampDomain::Unix),
+        Ok(wire::TimestampDomain::Ros) => Ok(TimestampDomain::Ros),
+        Ok(wire::TimestampDomain::Unspecified) | Err(_) => Err(CodecError::UnknownEnum {
+            field: "acquisition_timestamp.domain",
+            value,
+        }),
+    }
+}
+
 /// Wire decoding or semantic validation failure.
 #[derive(Debug, Error)]
 pub enum CodecError {
@@ -231,6 +271,34 @@ pub enum CodecError {
     /// Semantic invariant was invalid.
     #[error(transparent)]
     Semantic(#[from] SemanticError),
+    /// A repeated field had the wrong exact length.
+    #[error("field {field} must contain exactly {expected} entries, got {actual}")]
+    InvalidLength {
+        /// Rejected field path.
+        field: &'static str,
+        /// Required length.
+        expected: usize,
+        /// Observed length.
+        actual: usize,
+    },
+    /// A repeated field exceeded its semantic bound.
+    #[error("field {field} contains {actual} entries, exceeding maximum {maximum}")]
+    TooMany {
+        /// Rejected field path.
+        field: &'static str,
+        /// Maximum accepted length.
+        maximum: usize,
+        /// Observed length.
+        actual: usize,
+    },
+    /// A scalar or cross-field wire value was invalid.
+    #[error("field {field} is invalid: {reason}")]
+    InvalidField {
+        /// Rejected field path.
+        field: &'static str,
+        /// Stable diagnostic reason.
+        reason: &'static str,
+    },
 }
 
 #[cfg(test)]
@@ -253,6 +321,11 @@ mod tests {
             sequence: 42,
             source_monotonic_ns: 1_000_000,
             publish_unix_ns: Some(2_000_000),
+            acquisition_timestamp: Some(message_model::AcquisitionTimestamp {
+                timestamp_ns: 1_500_000,
+                domain: message_model::TimestampDomain::Unix,
+                uncertainty_ns: 100,
+            }),
             valid_for_ns: 5_000_000,
             frame_id: Some(AsciiId::parse("base_link").unwrap()),
             clock_status: ClockStatus {

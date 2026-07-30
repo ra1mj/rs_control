@@ -42,4 +42,5 @@ path_prefixes = ["tools/"]
 "proto-generated" = "protocol_module"
 "proto-compat-check" = "tool"
 "robotctl" = "app"
+"ros2-mapping" = "integration"
 "test-support" = "test-support"

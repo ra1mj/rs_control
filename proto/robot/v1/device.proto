@@ -41,3 +41,23 @@ message ImuState {
   // Row-major 3x3 linear-acceleration covariance.
   repeated double linear_acceleration_covariance = 7;
 }
+
+// One time-aligned joint sample in SI units.
+message JointState {
+  // Stable logical joint/resource identifier.
+  string resource_id = 1;
+  // Joint position in radians.
+  double position_rad = 2;
+  // Joint velocity in radians per second.
+  double velocity_radps = 3;
+  // Joint effort in newton metres.
+  double effort_nm = 4;
+}
+
+// Time-aligned aggregation used for one ROS JointState projection.
+message JointStateAggregate {
+  // Common timestamp and provenance for every joint in this aggregation.
+  Header header = 1;
+  // Bounded by the route's semantic policy before publication.
+  repeated JointState joints = 2;
+}

@@ -14,6 +14,14 @@ enum ActionStatus {
   ACTION_STATUS_CANCELLED = 5;
   ACTION_STATUS_TIMED_OUT = 6;
   ACTION_STATUS_REJECTED = 7;
+  ACTION_STATUS_CANCELING = 8;
+}
+
+// Decision returned for a cancellation request.
+enum ActionCancelDecision {
+  ACTION_CANCEL_DECISION_UNSPECIFIED = 0;
+  ACTION_CANCEL_DECISION_ACCEPTED = 1;
+  ACTION_CANCEL_DECISION_REJECTED = 2;
 }
 
 // Exclusive, finite-duration authority for one robot resource.
@@ -64,6 +72,8 @@ message ActionCommand {
   string action_name = 2;
   // Serialized action-specific Protobuf message, never an untyped YAML expression.
   bytes parameters = 3;
+  // Registered fully-qualified Protobuf type carried by parameters.
+  string parameters_type = 4;
 }
 
 // Correlated acknowledgement or terminal result for a command.
@@ -78,4 +88,104 @@ message ActionAck {
   uint32 result_code = 4;
   // Human-readable diagnostic detail; safety logic must not parse this field.
   string detail = 5;
+  // Registered fully-qualified Protobuf type carried by result.
+  string result_type = 6;
+  // Serialized terminal result payload; empty for nonterminal acknowledgements.
+  bytes result = 7;
+}
+
+// Registered, bounded Protobuf payload used by an action lifecycle message.
+message ActionPayload {
+  // Fully-qualified Protobuf message name allowlisted by the route manifest.
+  string protobuf_type = 1;
+  // Serialized Protobuf message bytes, bounded before decoding.
+  bytes value = 2;
+}
+
+// Typed action goal submitted under local command authority.
+message ActionGoal {
+  // Authority, deadline and 16-byte action/ROS goal identity.
+  CommandEnvelope envelope = 1;
+  // Versioned action identifier allowlisted by the route manifest.
+  string action_name = 2;
+  // Registered goal payload.
+  ActionPayload goal = 3;
+}
+
+// Bounded action feedback correlated by command ID.
+message ActionFeedback {
+  // Common response metadata.
+  Header header = 1;
+  // Exactly 16 bytes copied from the goal command ID.
+  bytes command_id = 2;
+  // Current nonterminal action status.
+  ActionStatus status = 3;
+  // Registered feedback payload.
+  ActionPayload feedback = 4;
+}
+
+// Cancellation request for one action goal.
+message ActionCancelRequest {
+  // Common request metadata.
+  Header header = 1;
+  // Exactly 16 bytes copied from the goal command ID.
+  bytes command_id = 2;
+}
+
+// Cancellation decision; acceptance is not terminal completion.
+message ActionCancelResponse {
+  // Common response metadata.
+  Header header = 1;
+  // Exactly 16 bytes copied from the goal command ID.
+  bytes command_id = 2;
+  // Whether cancellation was accepted for processing.
+  ActionCancelDecision decision = 3;
+  // Stable machine-readable decision code.
+  uint32 result_code = 4;
+  // Human-readable diagnostic detail.
+  string detail = 5;
+}
+
+// Terminal result retained for the route's bounded cache duration.
+message ActionResult {
+  // Common response metadata.
+  Header header = 1;
+  // Exactly 16 bytes copied from the goal command ID.
+  bytes command_id = 2;
+  // Terminal action status.
+  ActionStatus status = 3;
+  // Stable machine-readable result code.
+  uint32 result_code = 4;
+  // Human-readable diagnostic detail.
+  string detail = 5;
+  // Registered terminal result payload.
+  ActionPayload result = 6;
+}
+
+// One point in a bounded chassis trajectory goal.
+message ChassisTrajectoryPoint {
+  // Strictly increasing offset from goal acceptance in nanoseconds.
+  uint64 time_from_start_ns = 1;
+  // Body-frame velocity target in SI units.
+  Twist2 target = 2;
+}
+
+// Concrete goal payload for ExecuteChassisTrajectory.
+message ExecuteChassisTrajectoryGoal {
+  // Route-bounded, nonempty and time-ordered trajectory.
+  repeated ChassisTrajectoryPoint points = 1;
+}
+
+// Concrete feedback payload for ExecuteChassisTrajectory.
+message ExecuteChassisTrajectoryFeedback {
+  // Zero-based active point index.
+  uint32 active_point = 1;
+  // Overall progress in the closed interval [0, 1].
+  double progress = 2;
+}
+
+// Concrete terminal result payload for ExecuteChassisTrajectory.
+message ExecuteChassisTrajectoryResult {
+  // Number of fully completed points.
+  uint32 completed_points = 1;
 }

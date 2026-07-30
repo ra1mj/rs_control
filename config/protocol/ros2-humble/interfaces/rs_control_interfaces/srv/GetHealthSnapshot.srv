@@ -1,0 +1,8 @@
+# Bounded idempotent health snapshot query.
+string[] component_ids
+uint32 max_components
+---
+bool truncated
+string[] component_ids
+uint8[] lifecycle
+uint32[] active_fault_count

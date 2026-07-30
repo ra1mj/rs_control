@@ -3,6 +3,14 @@
 //! These types are independent of Protobuf-generated DTOs and avoid heap
 //! allocation for stable identifiers used by local realtime channels.
 
+mod action;
+mod messages;
+mod numeric;
+
+pub use action::*;
+pub use messages::*;
+pub use numeric::*;
+
 use std::{fmt, str};
 use thiserror::Error;
 
@@ -175,6 +183,26 @@ pub struct ClockStatus {
     pub uncertainty_ns: u64,
 }
 
+/// Explicit clock domain for a source acquisition timestamp.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum TimestampDomain {
+    /// Unix/system time.
+    Unix,
+    /// ROS time, which may pause or jump.
+    Ros,
+}
+
+/// Source acquisition time, distinct from monotonic freshness and publication time.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct AcquisitionTimestamp {
+    /// Time in the selected domain, in nanoseconds.
+    pub timestamp_ns: u64,
+    /// Explicit clock domain.
+    pub domain: TimestampDomain,
+    /// Estimated timestamp uncertainty in nanoseconds.
+    pub uncertainty_ns: u64,
+}
+
 /// Semantic quality exposed through protocol-module contracts.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum DataQuality {
@@ -198,6 +226,7 @@ pub struct Header {
     sequence: u64,
     source_monotonic_ns: u64,
     publish_unix_ns: Option<u64>,
+    acquisition_timestamp: Option<AcquisitionTimestamp>,
     valid_for_ns: u64,
     frame_id: Option<FrameId>,
     clock_status: ClockStatus,
@@ -217,6 +246,8 @@ pub struct HeaderFields {
     pub source_monotonic_ns: u64,
     /// Optional Unix timestamp for correlation only.
     pub publish_unix_ns: Option<u64>,
+    /// Optional source acquisition timestamp for external observation stamps.
+    pub acquisition_timestamp: Option<AcquisitionTimestamp>,
     /// Maximum validity duration in nanoseconds.
     pub valid_for_ns: u64,
     /// Optional coordinate frame.
@@ -245,6 +276,7 @@ impl Header {
             sequence: fields.sequence,
             source_monotonic_ns: fields.source_monotonic_ns,
             publish_unix_ns: fields.publish_unix_ns,
+            acquisition_timestamp: fields.acquisition_timestamp,
             valid_for_ns: fields.valid_for_ns,
             frame_id: fields.frame_id,
             clock_status: fields.clock_status,
@@ -280,6 +312,12 @@ impl Header {
     #[must_use]
     pub const fn publish_unix_ns(self) -> Option<u64> {
         self.publish_unix_ns
+    }
+
+    /// Returns source acquisition time for an external observation stamp.
+    #[must_use]
+    pub const fn acquisition_timestamp(self) -> Option<AcquisitionTimestamp> {
+        self.acquisition_timestamp
     }
 
     /// Returns the maximum validity duration.
@@ -456,6 +494,41 @@ impl CommandEnvelope {
         })
     }
 
+    /// Constructs an ingress command from an existing local lease and bounded TTL.
+    ///
+    /// The resulting deadline is never later than the lease expiration. No
+    /// external timestamp is used for local enforcement.
+    pub fn from_bridge_ingress(
+        header: Header,
+        lease: ResourceLease,
+        command_id: Id128,
+        received_monotonic_ns: u64,
+        requested_ttl_ns: u64,
+        maximum_ttl_ns: u64,
+    ) -> Result<Self, SemanticError> {
+        lease.validate_at(received_monotonic_ns)?;
+        if requested_ttl_ns == 0 || maximum_ttl_ns == 0 || requested_ttl_ns > maximum_ttl_ns {
+            return Err(SemanticError::InvalidDuration {
+                field: "command.ttl_ns",
+                maximum_ns: maximum_ttl_ns,
+            });
+        }
+        let requested_deadline = received_monotonic_ns.checked_add(requested_ttl_ns).ok_or(
+            SemanticError::TimeOverflow {
+                field: "command.deadline_monotonic_ns",
+            },
+        )?;
+        Self::new(CommandEnvelopeFields {
+            header,
+            resource_id: lease.resource_id(),
+            owner_id: lease.owner_id(),
+            lease_id: lease.lease_id(),
+            session_epoch: lease.session_epoch(),
+            command_id,
+            deadline_monotonic_ns: requested_deadline.min(lease.expires_monotonic_ns()),
+        })
+    }
+
     /// Returns common message metadata.
     #[must_use]
     pub const fn header(self) -> Header {
@@ -539,12 +612,115 @@ pub enum SemanticError {
         /// Enforcement time.
         now_ns: u64,
     },
+    /// A numeric field contained NaN or infinity.
+    #[error("field {field} must be finite")]
+    NonFinite {
+        /// Rejected field path.
+        field: &'static str,
+    },
+    /// Quaternion norm was outside the accepted tolerance.
+    #[error("quaternion must be unit length within the configured tolerance")]
+    InvalidQuaternion,
+    /// Covariance diagonal was negative.
+    #[error("covariance diagonal at index {index} must be nonnegative")]
+    NegativeCovarianceDiagonal {
+        /// Rejected diagonal index.
+        index: usize,
+    },
+    /// Covariance matrix was not symmetric.
+    #[error("covariance entries ({row}, {column}) and ({column}, {row}) are not symmetric")]
+    AsymmetricCovariance {
+        /// Row index.
+        row: usize,
+        /// Column index.
+        column: usize,
+    },
+    /// A frame-bearing sample omitted its frame.
+    #[error("required frame field {field} is missing")]
+    MissingFrame {
+        /// Rejected field path.
+        field: &'static str,
+    },
+    /// Header frame did not match the explicit parent frame.
+    #[error("header frame does not match {field} parent frame")]
+    FrameMismatch {
+        /// Rejected message class.
+        field: &'static str,
+    },
+    /// Parent and child frame were identical.
+    #[error("parent and child frame must differ")]
+    SelfFrame,
+    /// A required bounded collection was empty.
+    #[error("collection {field} cannot be empty")]
+    EmptyCollection {
+        /// Rejected collection.
+        field: &'static str,
+    },
+    /// A collection contained a duplicate stable identifier.
+    #[error("collection {field} contains a duplicate identifier")]
+    DuplicateIdentifier {
+        /// Rejected collection.
+        field: &'static str,
+    },
+    /// A supplied bound was zero or exceeded the supported maximum.
+    #[error("field {field} must be nonzero and no greater than {maximum}")]
+    InvalidBound {
+        /// Rejected field.
+        field: &'static str,
+        /// Maximum supported value.
+        maximum: usize,
+    },
+    /// A requested duration was zero or exceeded policy.
+    #[error("field {field} must be nonzero and no greater than {maximum_ns} ns")]
+    InvalidDuration {
+        /// Rejected field.
+        field: &'static str,
+        /// Maximum accepted duration.
+        maximum_ns: u64,
+    },
+    /// Monotonic time arithmetic overflowed.
+    #[error("field {field} overflowed monotonic time")]
+    TimeOverflow {
+        /// Rejected field.
+        field: &'static str,
+    },
+    /// Static and dynamic transforms appeared in one route batch.
+    #[error("transform batch cannot mix static and dynamic authority")]
+    MixedTransformAuthority,
+    /// A count that must describe an occurrence was zero.
+    #[error("field {field} must be greater than zero")]
+    ZeroCount {
+        /// Rejected field.
+        field: &'static str,
+    },
+    /// Ordered timestamps were reversed or duplicated.
+    #[error("field {field} must be strictly time ordered")]
+    InvalidTimeOrder {
+        /// Rejected field.
+        field: &'static str,
+    },
+    /// Action message used an invalid status for its lifecycle context.
+    #[error("action status is invalid for {context}")]
+    InvalidActionStatus {
+        /// Lifecycle message context.
+        context: &'static str,
+    },
+    /// Action lifecycle event was invalid in the current state.
+    #[error("action lifecycle transition is invalid")]
+    InvalidActionTransition,
+    /// Numeric field was outside [0, 1].
+    #[error("field {field} must be in the closed interval [0, 1]")]
+    OutsideClosedUnitInterval {
+        /// Rejected field.
+        field: &'static str,
+    },
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        AsciiId, ClockState, ClockStatus, DataQuality, Header, HeaderFields, Id128, IdError,
+        AcquisitionTimestamp, AsciiId, ClockState, ClockStatus, CommandEnvelope, DataQuality,
+        Header, HeaderFields, Id128, IdError, ResourceLease, ResourceLeaseFields, TimestampDomain,
     };
 
     fn header_fields() -> HeaderFields {
@@ -554,6 +730,7 @@ mod tests {
             sequence: 7,
             source_monotonic_ns: 1_000,
             publish_unix_ns: None,
+            acquisition_timestamp: None,
             valid_for_ns: 10_000,
             frame_id: Some(AsciiId::parse("base_link").unwrap()),
             clock_status: ClockStatus {
@@ -590,5 +767,56 @@ mod tests {
         fields.source_monotonic_ns = u64::MAX;
         let value = Header::new(fields).unwrap();
         assert_eq!(value.source_expiration_ns(), None);
+    }
+
+    #[test]
+    fn bridge_ingress_requires_current_lease_and_local_bounded_deadline() {
+        let lease = ResourceLease::new(ResourceLeaseFields {
+            resource_id: AsciiId::parse("chassis").unwrap(),
+            owner_id: AsciiId::parse("ros2-adapter").unwrap(),
+            lease_id: Id128::new([2; 16]).unwrap(),
+            session_epoch: 3,
+            expires_monotonic_ns: 1_150,
+        })
+        .unwrap();
+        let mut fields = header_fields();
+        fields.acquisition_timestamp = Some(AcquisitionTimestamp {
+            timestamp_ns: u64::MAX,
+            domain: TimestampDomain::Ros,
+            uncertainty_ns: 0,
+        });
+        let envelope = CommandEnvelope::from_bridge_ingress(
+            Header::new(fields).unwrap(),
+            lease,
+            Id128::new([3; 16]).unwrap(),
+            1_000,
+            200,
+            250,
+        )
+        .unwrap();
+        assert_eq!(envelope.deadline_monotonic_ns(), 1_150);
+
+        assert!(
+            CommandEnvelope::from_bridge_ingress(
+                Header::new(fields).unwrap(),
+                lease,
+                Id128::new([3; 16]).unwrap(),
+                1_150,
+                10,
+                250,
+            )
+            .is_err()
+        );
+        assert!(
+            CommandEnvelope::from_bridge_ingress(
+                Header::new(fields).unwrap(),
+                lease,
+                Id128::new([3; 16]).unwrap(),
+                1_000,
+                251,
+                250,
+            )
+            .is_err()
+        );
     }
 }

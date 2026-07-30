@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package robot.v1;
+
+import "robot/v1/common.proto";
+
+// Canonical 3D odometry estimate with explicit frame ownership.
+message OdometryState {
+  // Common sample metadata; frame_id must equal parent_frame_id.
+  Header header = 1;
+  // Parent frame, normally odom.
+  string parent_frame_id = 2;
+  // Child body frame, normally base_link.
+  string child_frame_id = 3;
+  // Child pose expressed in the parent frame.
+  Pose3 pose = 4;
+  // Child velocity with the route's documented expression frame.
+  Twist3 twist = 5;
+  // Row-major 6x6 covariance over x, y, z, roll, pitch and yaw.
+  repeated double pose_covariance = 6;
+  // Row-major 6x6 covariance over linear and angular velocity.
+  repeated double twist_covariance = 7;
+}
+
+// One stamped transform with explicit static/dynamic authority.
+message StampedTransform {
+  // Common timestamp/provenance; frame_id must equal parent_frame_id.
+  Header header = 1;
+  // Parent coordinate frame.
+  string parent_frame_id = 2;
+  // Child coordinate frame with exactly one configured authority.
+  string child_frame_id = 3;
+  // Child origin in the parent frame, in metres.
+  Vector3 translation_m = 4;
+  // Child orientation in the parent frame.
+  Quaternion rotation = 5;
+  // Static transforms use transient-local ROS delivery.
+  bool is_static = 6;
+}
+
+// Bounded transform aggregation for /tf or /tf_static publication.
+message TransformBatch {
+  // Transforms with one common static/dynamic route class.
+  repeated StampedTransform transforms = 1;
+}

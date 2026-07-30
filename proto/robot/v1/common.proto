@@ -10,6 +10,13 @@ enum ClockState {
   CLOCK_STATE_UNSYNCHRONIZED = 3;
 }
 
+// Clock domain used by a source acquisition timestamp.
+enum TimestampDomain {
+  TIMESTAMP_DOMAIN_UNSPECIFIED = 0;
+  TIMESTAMP_DOMAIN_UNIX = 1;
+  TIMESTAMP_DOMAIN_ROS = 2;
+}
+
 // Describes whether a sample may be used and how much it has degraded.
 enum DataQuality {
   DATA_QUALITY_UNSPECIFIED = 0;
@@ -26,6 +33,16 @@ message ClockStatus {
   ClockState state = 1;
   // Estimated clock relationship uncertainty in nanoseconds.
   uint64 uncertainty_ns = 2;
+}
+
+// Time at which a physical or algorithmic sample was acquired.
+message AcquisitionTimestamp {
+  // Timestamp in the selected clock domain, in nanoseconds.
+  uint64 timestamp_ns = 1;
+  // Explicit source clock domain; monotonic time is intentionally excluded.
+  TimestampDomain domain = 2;
+  // Estimated timestamp uncertainty in nanoseconds.
+  uint64 uncertainty_ns = 3;
 }
 
 // Metadata carried by every externally visible sample or command.
@@ -48,6 +65,8 @@ message Header {
   ClockStatus clock_status = 8;
   // Semantic sample quality.
   DataQuality quality = 9;
+  // Optional source acquisition time for external observation stamps.
+  AcquisitionTimestamp acquisition_timestamp = 10;
 }
 
 // Three-dimensional vector with units defined by the owning field.
@@ -70,6 +89,22 @@ message Quaternion {
   double z = 3;
   // Quaternion w component.
   double w = 4;
+}
+
+// Three-dimensional pose using SI units and a unit quaternion.
+message Pose3 {
+  // Position in metres.
+  Vector3 position_m = 1;
+  // Orientation of the child frame in the parent frame.
+  Quaternion orientation = 2;
+}
+
+// Three-dimensional linear and angular velocity in SI units.
+message Twist3 {
+  // Linear velocity in metres per second.
+  Vector3 linear_mps = 1;
+  // Angular velocity in radians per second.
+  Vector3 angular_radps = 2;
 }
 
 // Planar pose using x forward, y left and positive yaw counter-clockwise.

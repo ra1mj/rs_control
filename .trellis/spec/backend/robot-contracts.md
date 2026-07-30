@@ -41,7 +41,7 @@ imu: { transport: uart|usb, baud_rate: <1200..4000000> }
 
 It never contains frame layouts, checksums, controller gains, device paths, Zenoh settings or executable expressions.
 
-Every external `Header` contains source ID, 16-byte non-zero boot ID, boot-local sequence, source monotonic timestamp, optional Unix correlation timestamp, non-zero validity, optional frame ID, clock state/uncertainty and quality. Commands additionally carry resource ID, owner ID, 16-byte lease/command IDs, non-zero session epoch and deadline.
+Every external `Header` contains source ID, 16-byte non-zero boot ID, boot-local sequence, source monotonic timestamp, optional Unix correlation timestamp, optional acquisition timestamp with an explicit Unix/ROS domain, non-zero validity, optional frame ID, clock state/uncertainty and quality. Commands additionally carry resource ID, owner ID, 16-byte lease/command IDs, non-zero session epoch and deadline. Acquisition/ROS time is observation metadata and never substitutes for the local monotonic enforcement clock.
 
 Protobuf package and key-space major version are `robot.v1`. Enums reserve zero as `<ENUM>_UNSPECIFIED`; removed field numbers are reserved and never reused. SI units appear in field names/comments. Coordinates are right-handed: x forward, y left, z up, radians for angles.
 
@@ -132,4 +132,133 @@ fn control(input: proto_generated::robot::v1::Header) { /* ... */ }
 // The protocol_module boundary owns fallible conversion; application_module code receives a valid semantic type.
 let header = contract_codec::decode_header(bytes)?;
 controller.step(TimedInput { header, value })?;
+```
+
+## Scenario: Add a native Protobuf-to-ROS mapping contract
+
+### 1. Scope / Trigger
+
+Use this contract when adding a ROS projection, changing a bridged semantic
+message, adding a route, or changing QoS, clock, frame, action, service or DDS
+island policy. The mapping is an `integration` concern; ROS IDL/CDR and
+bridge-private Zenoh keys never become a second `protocol_module` wire format.
+
+### 2. Signatures
+
+The backend-neutral entry points are:
+
+```rust
+RouteRegistry::load(profile_root) -> Result<RouteRegistry, RegistryError>
+contract_codec::decode_imu_state(bytes) -> Result<ImuState, CodecError>
+project_imu(value, route, aliases, reception_ns) -> Result<RosImuProjection, ProjectionError>
+project_twist_ingress(input, route, aliases, context) -> Result<ChassisSetpoint, ProjectionError>
+CommandEnvelope::from_bridge_ingress(header, lease, command_id,
+                                     received_mono_ns, ttl_ns, max_ttl_ns)
+    -> Result<CommandEnvelope, SemanticError>
+```
+
+The checked-in profile lives at
+`config/protocol/ros2-humble/routes.toml`; it is not part of
+`config/robots/*.yaml`.
+
+### 3. Contracts
+
+- `robot.v1` Protobuf remains canonical. Wire DTOs are decoded only by
+  `contract-codec` into validated semantic values before a ROS projection.
+- A route declares exact native key/direction/class/type, generated descriptor
+  SHA-256, pre-decode byte limit, rate/freshness/queue bounds, ROS name/type and
+  interface-source SHA-256, explicit QoS, clock/frame policy, authorization and
+  loop-suppression origin.
+- The runtime descriptor identity is SHA-256 over
+  `proto_generated::FILE_DESCRIPTOR_SET`. The Buf-produced
+  `proto/golden/robot-v1.binpb` is the breaking-change baseline; the two
+  descriptor encodings are not interchangeable fingerprints.
+- Standard ROS messages are explicitly lossy and name a companion protocol
+  metadata endpoint. IMU absent measurements map to covariance `[0] == -1`;
+  present/unknown covariance maps to all zeros; known covariance is validated
+  for length, finiteness, symmetry and nonnegative diagonal.
+- Canonical frame IDs are slash-free. ROS namespaces are introduced only by a
+  checked alias table. TF has one configured authority per child and a cycle-
+  free static/dynamic graph.
+- A ROS command needs an existing local lease. ROS time checks observation age
+  only; local monotonic reception constructs a deadline capped by both route
+  TTL and lease expiration.
+- Actions register exact goal/feedback/result Protobuf type names, preserve the
+  16-byte command ID as the ROS UUID, distinguish cancel acceptance from
+  terminal cancellation, and declare bounded feedback/result retention.
+- ROS, DDS, Zenoh and ros2dds runtime dependencies stay out of
+  `protocol_module`; `ros2-mapping` remains an `integration` crate.
+
+### 4. Validation & Error Matrix
+
+| Condition | Owner | Required result |
+|---|---|---|
+| Descriptor or interface-source SHA mismatch | `RouteRegistry` | reject profile startup |
+| Missing/unknown Protobuf type | `RouteRegistry` descriptor catalog | reject route |
+| Duplicate route/key/ROS endpoint | `RouteRegistry` | reject duplicate ownership |
+| Zero byte/rate/queue/freshness bound | `RouteRegistry` | reject unbounded route |
+| Native and ros2dds prefix overlap | deployment validator | reject profile |
+| Same host uses direct DDS and ros2dds | deployment validator | reject duplicate path |
+| TF self edge, duplicate child or cycle | TF authority validator | reject profile |
+| NaN/infinity, invalid quaternion/covariance | semantic constructor / `contract-codec` | typed error before projection |
+| Missing trusted acquisition time on required route | projection | drop with `UntrustedAcquisitionTime` |
+| Reception-time fallback route lacks time | projection | reject; never relabel silently |
+| Stale/future ROS command stamp | ingress projection | reject observation |
+| Missing/expired lease or excessive TTL | `CommandEnvelope::from_bridge_ingress` | reject command |
+| Unknown action/cancel/status enum | `contract-codec` | `CodecError::UnknownEnum` |
+
+### 5. Good / Base / Bad Cases
+
+- Good: a Humble IMU route matches the generated descriptor and checked-in
+  `sensor_msgs/msg/Imu` source, uses bounded best-effort/volatile QoS, maps
+  `imu_link` through an explicit alias and preserves acquisition time.
+- Base: a static transform has reliable/transient-local QoS, a single child
+  authority and an explicit reception-time-degraded fallback.
+- Bad: infer ROS names from Zenoh keys, put route/QoS fields in robot YAML,
+  accept `KEEP_ALL`, copy source monotonic time into a ROS stamp, mint a lease
+  from a ROS publisher, load ros2dds into the native router, or emulate
+  `rmw_zenoh` private keys.
+
+### 6. Tests Required
+
+- Run `tools/bufw breaking --against proto/golden/robot-v1.binpb` before
+  replacing the golden baseline; then run Buf format/lint and C++/Python
+  generation.
+- Add semantic/codec good and bad vectors for each routed type: missing fields,
+  unknown enums, non-finite values, bounds, covariance/quaternion/frame rules
+  and both conversion directions.
+- Load the checked-in profile against `proto_generated::FILE_DESCRIPTOR_SET`,
+  assert every source/hash/type and pin the deterministic manifest fingerprint.
+- Mutate valid fixtures to assert duplicate ownership, zero bounds, QoS/class
+  mismatch, path traversal, prefix/DDS collision and TF cycle rejection.
+- Assert IMU unavailable/unknown sentinels, required acquisition/drop behavior,
+  frame aliases, UUID correlation, cancel lifecycle/result retention and local
+  lease/deadline capping.
+- Run `tools/ci.sh`; target-board/network/ROS runtime qualification is additive
+  and belongs to the later adapter task.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+// Remote ROS time and publisher identity manufacture local authority.
+let deadline = twist.header.stamp_ns + ttl_ns;
+let lease = ResourceLease::from_ros_publisher(&publisher_gid);
+publish_proto(wire::ChassisSetpoint { deadline, lease, .. });
+```
+
+#### Correct
+
+```rust
+// ROS time establishes observation age; local authority/time enforce safety.
+let input = project_twist_ingress(&twist, route, aliases, TwistIngressContext {
+    adapter_header,
+    lease: existing_local_lease,
+    command_id,
+    current_ros_time_ns,
+    received_monotonic_ns,
+    requested_ttl_ns,
+})?;
+native_command_port.try_send(input)?;
 ```

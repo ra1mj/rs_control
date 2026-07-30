@@ -1,0 +1,10 @@
+# Bounded chassis trajectory goal.
+builtin_interfaces/Duration[] time_from_start
+geometry_msgs/Twist[] target
+---
+uint32 completed_points
+uint32 result_code
+string detail
+---
+uint32 active_point
+float64 progress

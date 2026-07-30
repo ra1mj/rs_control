@@ -1,0 +1,404 @@
+schema_version = 1
+
+[profile]
+id = "rk3588-ubuntu22.04-ros2-humble-cyclonedds"
+architecture = "arm64-rk3588"
+operating_system = "ubuntu-22.04"
+ros_distribution = "humble"
+rmw = "rmw_cyclonedds_cpp"
+native_encoding = "application/protobuf"
+protobuf_descriptor_sha256 = "f8b0b9f5510a3e1fdef8ac2f6aa00ae7728cfba257e09ccb7649e3d49e6e01c0"
+ros_interface_revision = "ros2-humble-reviewed-snapshot-2026-07-30"
+ros2dds_version = "1.9.0"
+adapter_outside_realtime = true
+adapter_can_issue_leases = false
+
+[deployment]
+native_key_prefix = "rs/robot/v1"
+ros2dds_key_prefix = "ros2dds/robot"
+direct_dds_hosts = ["rk3588-local"]
+ros2dds_hosts = ["operator-station"]
+
+[[frame_alias]]
+canonical = "map"
+ros = "robot_1/map"
+
+[[frame_alias]]
+canonical = "odom"
+ros = "robot_1/odom"
+
+[[frame_alias]]
+canonical = "base_link"
+ros = "robot_1/base_link"
+
+[[frame_alias]]
+canonical = "imu_link"
+ros = "robot_1/imu_link"
+
+[[tf_authority]]
+parent = "map"
+child = "odom"
+kind = "dynamic"
+route_id = "tf_dynamic"
+
+[[tf_authority]]
+parent = "odom"
+child = "base_link"
+kind = "dynamic"
+route_id = "tf_dynamic"
+
+[[tf_authority]]
+parent = "base_link"
+child = "imu_link"
+kind = "static"
+route_id = "tf_static"
+
+[[route]]
+id = "imu_state"
+native_key = "rs/robot/v1/device/imu/state"
+direction = "egress"
+interaction = "sensor_stream"
+native_encoding = "application/protobuf"
+protobuf_type = "robot.v1.ImuState"
+protobuf_descriptor_sha256 = "f8b0b9f5510a3e1fdef8ac2f6aa00ae7728cfba257e09ccb7649e3d49e6e01c0"
+maximum_encoded_bytes = 1024
+maximum_rate_hz = 1000.0
+queue_depth = 5
+freshness_ns = 20000000
+ros_name = "/robot_1/imu/data"
+ros_type = "sensor_msgs/msg/Imu"
+ros_distribution = "humble"
+ros_interface_source = "interfaces/sensor_msgs/msg/Imu.msg"
+ros_interface_sha256 = "10c740ad3dab7d4473e66455244c67154f11eb56db0e9498cd1d036407353a23"
+lossy_projection = true
+metadata_ros_name = "/robot_1/protocol_metadata/imu"
+origin_id = "ros2-adapter-humble"
+authorization = "read_only"
+
+[route.qos]
+reliability = "best_effort"
+durability = "volatile"
+history = "keep_last"
+depth = 5
+deadline_ns = 0
+lifespan_ns = 20000000
+liveliness = "automatic"
+liveliness_lease_ns = 0
+
+[route.clock]
+mode = "require_acquisition"
+maximum_uncertainty_ns = 5000000
+command_maximum_age_ns = 0
+construct_local_deadline = false
+
+[route.frame]
+mode = "preserve"
+use_alias_table = true
+
+[[route]]
+id = "joint_state"
+native_key = "rs/robot/v1/device/joints/state"
+direction = "egress"
+interaction = "sensor_stream"
+native_encoding = "application/protobuf"
+protobuf_type = "robot.v1.JointStateAggregate"
+protobuf_descriptor_sha256 = "f8b0b9f5510a3e1fdef8ac2f6aa00ae7728cfba257e09ccb7649e3d49e6e01c0"
+maximum_encoded_bytes = 8192
+maximum_rate_hz = 500.0
+queue_depth = 5
+freshness_ns = 50000000
+ros_name = "/robot_1/joint_states"
+ros_type = "sensor_msgs/msg/JointState"
+ros_distribution = "humble"
+ros_interface_source = "interfaces/sensor_msgs/msg/JointState.msg"
+ros_interface_sha256 = "15911c493e21ac0f446c50cfb689f794d7a6800ffc83e5c7ceb1421caaabbe2a"
+lossy_projection = true
+metadata_ros_name = "/robot_1/protocol_metadata/joints"
+origin_id = "ros2-adapter-humble"
+authorization = "read_only"
+
+[route.qos]
+reliability = "best_effort"
+durability = "volatile"
+history = "keep_last"
+depth = 5
+deadline_ns = 0
+lifespan_ns = 50000000
+liveliness = "automatic"
+liveliness_lease_ns = 0
+
+[route.clock]
+mode = "require_acquisition"
+maximum_uncertainty_ns = 5000000
+command_maximum_age_ns = 0
+construct_local_deadline = false
+
+[route.frame]
+mode = "preserve"
+use_alias_table = false
+
+[[route]]
+id = "odometry"
+native_key = "rs/robot/v1/navigation/odometry"
+direction = "egress"
+interaction = "state_stream"
+native_encoding = "application/protobuf"
+protobuf_type = "robot.v1.OdometryState"
+protobuf_descriptor_sha256 = "f8b0b9f5510a3e1fdef8ac2f6aa00ae7728cfba257e09ccb7649e3d49e6e01c0"
+maximum_encoded_bytes = 4096
+maximum_rate_hz = 200.0
+queue_depth = 5
+freshness_ns = 100000000
+ros_name = "/robot_1/odom"
+ros_type = "nav_msgs/msg/Odometry"
+ros_distribution = "humble"
+ros_interface_source = "interfaces/nav_msgs/msg/Odometry.msg"
+ros_interface_sha256 = "7c017c2191d71c559a70a4fe80b9eee7e11fe6f0e6a73a42d55676934f622fc3"
+lossy_projection = true
+metadata_ros_name = "/robot_1/protocol_metadata/odometry"
+origin_id = "ros2-adapter-humble"
+authorization = "read_only"
+
+[route.qos]
+reliability = "best_effort"
+durability = "volatile"
+history = "keep_last"
+depth = 5
+deadline_ns = 0
+lifespan_ns = 100000000
+liveliness = "automatic"
+liveliness_lease_ns = 0
+
+[route.clock]
+mode = "require_acquisition"
+maximum_uncertainty_ns = 5000000
+command_maximum_age_ns = 0
+construct_local_deadline = false
+
+[route.frame]
+mode = "preserve"
+use_alias_table = true
+
+[[route]]
+id = "tf_dynamic"
+native_key = "rs/robot/v1/navigation/tf/dynamic"
+direction = "egress"
+interaction = "transform_dynamic"
+native_encoding = "application/protobuf"
+protobuf_type = "robot.v1.TransformBatch"
+protobuf_descriptor_sha256 = "f8b0b9f5510a3e1fdef8ac2f6aa00ae7728cfba257e09ccb7649e3d49e6e01c0"
+maximum_encoded_bytes = 8192
+maximum_rate_hz = 200.0
+queue_depth = 100
+freshness_ns = 100000000
+ros_name = "/tf"
+ros_type = "tf2_msgs/msg/TFMessage"
+ros_distribution = "humble"
+ros_interface_source = "interfaces/tf2_msgs/msg/TFMessage.msg"
+ros_interface_sha256 = "ee8b52c79bbdd7dbb640780736811451910f9f90615ebaa4b50b01458a7edea7"
+lossy_projection = true
+metadata_ros_name = "/robot_1/protocol_metadata/tf_dynamic"
+origin_id = "ros2-adapter-humble"
+authorization = "read_only"
+
+[route.qos]
+reliability = "best_effort"
+durability = "volatile"
+history = "keep_last"
+depth = 100
+deadline_ns = 0
+lifespan_ns = 100000000
+liveliness = "automatic"
+liveliness_lease_ns = 0
+
+[route.clock]
+mode = "require_acquisition"
+maximum_uncertainty_ns = 5000000
+command_maximum_age_ns = 0
+construct_local_deadline = false
+
+[route.frame]
+mode = "tf_dynamic"
+use_alias_table = true
+
+[[route]]
+id = "tf_static"
+native_key = "rs/robot/v1/navigation/tf/static"
+direction = "egress"
+interaction = "transform_static"
+native_encoding = "application/protobuf"
+protobuf_type = "robot.v1.TransformBatch"
+protobuf_descriptor_sha256 = "f8b0b9f5510a3e1fdef8ac2f6aa00ae7728cfba257e09ccb7649e3d49e6e01c0"
+maximum_encoded_bytes = 8192
+maximum_rate_hz = 1.0
+queue_depth = 1
+freshness_ns = 86400000000000
+ros_name = "/tf_static"
+ros_type = "tf2_msgs/msg/TFMessage"
+ros_distribution = "humble"
+ros_interface_source = "interfaces/tf2_msgs/msg/TFMessage.msg"
+ros_interface_sha256 = "ee8b52c79bbdd7dbb640780736811451910f9f90615ebaa4b50b01458a7edea7"
+lossy_projection = true
+metadata_ros_name = "/robot_1/protocol_metadata/tf_static"
+origin_id = "ros2-adapter-humble"
+authorization = "read_only"
+
+[route.qos]
+reliability = "reliable"
+durability = "transient_local"
+history = "keep_last"
+depth = 1
+deadline_ns = 0
+lifespan_ns = 0
+liveliness = "automatic"
+liveliness_lease_ns = 0
+
+[route.clock]
+mode = "reception_time_degraded"
+maximum_uncertainty_ns = 0
+command_maximum_age_ns = 0
+construct_local_deadline = false
+
+[route.frame]
+mode = "tf_static"
+use_alias_table = true
+
+[[route]]
+id = "chassis_twist_command"
+native_key = "rs/robot/v1/control/chassis/setpoint"
+direction = "ingress"
+interaction = "command"
+native_encoding = "application/protobuf"
+protobuf_type = "robot.v1.ChassisSetpoint"
+protobuf_descriptor_sha256 = "f8b0b9f5510a3e1fdef8ac2f6aa00ae7728cfba257e09ccb7649e3d49e6e01c0"
+maximum_encoded_bytes = 1024
+maximum_rate_hz = 100.0
+queue_depth = 1
+freshness_ns = 100000000
+ros_name = "/robot_1/cmd_vel_stamped"
+ros_type = "geometry_msgs/msg/TwistStamped"
+ros_distribution = "humble"
+ros_interface_source = "interfaces/geometry_msgs/msg/TwistStamped.msg"
+ros_interface_sha256 = "90d59e2b000257430838016e8a2d3d3c1d83c91a634f36e27a9c7715191cdb77"
+lossy_projection = true
+metadata_ros_name = "/robot_1/protocol_metadata/chassis_command"
+origin_id = "ros2-adapter-humble"
+authorization = "local_lease_required"
+
+[route.qos]
+reliability = "reliable"
+durability = "volatile"
+history = "keep_last"
+depth = 1
+deadline_ns = 50000000
+lifespan_ns = 100000000
+liveliness = "automatic"
+liveliness_lease_ns = 0
+
+[route.clock]
+mode = "observe_ros_ingress"
+maximum_uncertainty_ns = 0
+command_maximum_age_ns = 100000000
+construct_local_deadline = true
+
+[route.frame]
+mode = "body_command"
+use_alias_table = true
+
+[[route]]
+id = "health_snapshot"
+native_key = "rs/robot/v1/health/snapshot/query"
+direction = "request_reply"
+interaction = "service"
+native_encoding = "application/protobuf"
+protobuf_type = "robot.v1.HealthSnapshotRequest"
+response_protobuf_type = "robot.v1.HealthSnapshotResponse"
+protobuf_descriptor_sha256 = "f8b0b9f5510a3e1fdef8ac2f6aa00ae7728cfba257e09ccb7649e3d49e6e01c0"
+maximum_encoded_bytes = 4096
+maximum_rate_hz = 10.0
+queue_depth = 8
+freshness_ns = 500000000
+ros_name = "/robot_1/get_health_snapshot"
+ros_type = "rs_control_interfaces/srv/GetHealthSnapshot"
+ros_distribution = "humble"
+ros_interface_source = "interfaces/rs_control_interfaces/srv/GetHealthSnapshot.srv"
+ros_interface_sha256 = "30ae2b27aeb58e76823a702d2a1cf4cf4db58d720b92f0c28c5125d761ad87ab"
+lossy_projection = false
+metadata_ros_name = ""
+origin_id = "ros2-adapter-humble"
+authorization = "read_only"
+
+[route.qos]
+reliability = "reliable"
+durability = "volatile"
+history = "keep_last"
+depth = 8
+deadline_ns = 500000000
+lifespan_ns = 0
+liveliness = "automatic"
+liveliness_lease_ns = 0
+
+[route.clock]
+mode = "observe_ros_ingress"
+maximum_uncertainty_ns = 0
+command_maximum_age_ns = 500000000
+construct_local_deadline = false
+
+[route.frame]
+mode = "none"
+use_alias_table = false
+
+[route.service]
+timeout_ns = 500000000
+idempotent = true
+
+[[route]]
+id = "execute_chassis_trajectory"
+native_key = "rs/robot/v1/control/chassis/trajectory/action"
+direction = "action_lifecycle"
+interaction = "action"
+native_encoding = "application/protobuf"
+protobuf_type = "robot.v1.ActionGoal"
+protobuf_descriptor_sha256 = "f8b0b9f5510a3e1fdef8ac2f6aa00ae7728cfba257e09ccb7649e3d49e6e01c0"
+maximum_encoded_bytes = 65536
+maximum_rate_hz = 20.0
+queue_depth = 8
+freshness_ns = 100000000
+ros_name = "/robot_1/execute_chassis_trajectory"
+ros_type = "rs_control_interfaces/action/ExecuteChassisTrajectory"
+ros_distribution = "humble"
+ros_interface_source = "interfaces/rs_control_interfaces/action/ExecuteChassisTrajectory.action"
+ros_interface_sha256 = "40ed312b08cfcc65875b416eafdc7d11ca708bedc439ab2f5d18ad546345e613"
+lossy_projection = false
+metadata_ros_name = ""
+origin_id = "ros2-adapter-humble"
+authorization = "local_lease_required"
+
+[route.qos]
+reliability = "reliable"
+durability = "volatile"
+history = "keep_last"
+depth = 8
+deadline_ns = 100000000
+lifespan_ns = 0
+liveliness = "automatic"
+liveliness_lease_ns = 0
+
+[route.clock]
+mode = "observe_ros_ingress"
+maximum_uncertainty_ns = 0
+command_maximum_age_ns = 100000000
+construct_local_deadline = true
+
+[route.frame]
+mode = "body_command"
+use_alias_table = true
+
+[route.action]
+goal_protobuf_type = "robot.v1.ExecuteChassisTrajectoryGoal"
+feedback_protobuf_type = "robot.v1.ExecuteChassisTrajectoryFeedback"
+result_protobuf_type = "robot.v1.ExecuteChassisTrajectoryResult"
+result_cache_depth = 32
+result_retention_ns = 60000000000
+feedback_depth = 8
+status_transient_local = true

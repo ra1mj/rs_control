@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+arrayvec.workspace = true
 message-model.workspace = true
 prost.workspace = true
 proto-generated.workspace = true

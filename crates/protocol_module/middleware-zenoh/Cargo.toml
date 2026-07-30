@@ -1,0 +1,20 @@
+[package]
+name = "middleware-zenoh"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+arrayvec.workspace = true
+contract-codec.workspace = true
+message-model.workspace = true
+middleware-api.workspace = true
+thiserror.workspace = true
+zenoh.workspace = true
+
+[dev-dependencies]
+middleware-local.workspace = true
+
+[lints]
+workspace = true

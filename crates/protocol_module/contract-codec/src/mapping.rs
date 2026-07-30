@@ -3,7 +3,8 @@
 use arrayvec::ArrayVec;
 use message_model::{
     ActionCancelDecision, ActionCancelRequest, ActionCancelResponse, ActionFeedback, ActionGoal,
-    ActionName, ActionResult, ActionStatus, AsciiId, ChassisSetpoint, ChassisTrajectoryPoint,
+    ActionGoalIntent, ActionName, ActionResult, ActionStatus, AsciiId, ChassisSetpoint,
+    ChassisSetpointIntent, ChassisTrajectoryPoint, CommandIntent, CommandIntentFields,
     ComponentHealth, Covariance3, Covariance6, CovarianceStatus, ExecuteChassisTrajectoryFeedback,
     ExecuteChassisTrajectoryGoal, ExecuteChassisTrajectoryResult, Fault, FaultRecoverability,
     FaultSeverity, HealthSnapshotRequest, HealthSnapshotResponse, Id128, ImuMeasurement, ImuState,
@@ -266,6 +267,69 @@ pub fn chassis_setpoint_from_wire(
         )?,
         target: twist2_from_wire(value.target.ok_or(CodecError::MissingField("target"))?)?,
     })
+}
+
+/// Encodes a cross-host chassis command intent without creating a deadline.
+pub fn encode_chassis_setpoint_intent(value: &ChassisSetpointIntent) -> Vec<u8> {
+    chassis_setpoint_intent_to_wire(value).encode_to_vec()
+}
+
+/// Decodes and structurally validates a cross-host chassis command intent.
+pub fn decode_chassis_setpoint_intent(bytes: &[u8]) -> Result<ChassisSetpointIntent, CodecError> {
+    chassis_setpoint_intent_from_wire(wire::ChassisSetpointIntent::decode(bytes)?)
+}
+
+/// Converts a chassis intent to its wire DTO.
+#[must_use]
+pub fn chassis_setpoint_intent_to_wire(
+    value: &ChassisSetpointIntent,
+) -> wire::ChassisSetpointIntent {
+    wire::ChassisSetpointIntent {
+        intent: Some(command_intent_to_wire(&value.intent())),
+        target: Some(twist2_to_wire(value.target())),
+    }
+}
+
+/// Converts and validates a chassis-intent DTO.
+pub fn chassis_setpoint_intent_from_wire(
+    value: wire::ChassisSetpointIntent,
+) -> Result<ChassisSetpointIntent, CodecError> {
+    Ok(ChassisSetpointIntent::new(
+        command_intent_from_wire(value.intent.ok_or(CodecError::MissingField("intent"))?)?,
+        twist2_from_wire(value.target.ok_or(CodecError::MissingField("target"))?)?,
+    ))
+}
+
+/// Converts a command intent to its wire DTO.
+#[must_use]
+pub fn command_intent_to_wire(value: &CommandIntent) -> wire::CommandIntent {
+    wire::CommandIntent {
+        header: Some(header_to_wire(&value.header())),
+        resource_id: value.resource_id().as_str().to_owned(),
+        owner_id: value.owner_id().as_str().to_owned(),
+        lease_id: value.lease_id().as_bytes().to_vec(),
+        session_epoch: value.session_epoch(),
+        command_id: value.command_id().as_bytes().to_vec(),
+        requested_ttl_ns: value.requested_ttl_ns(),
+    }
+}
+
+/// Converts and validates a command-intent DTO.
+pub fn command_intent_from_wire(value: wire::CommandIntent) -> Result<CommandIntent, CodecError> {
+    CommandIntent::new(CommandIntentFields {
+        header: header_from_wire(
+            value
+                .header
+                .ok_or(CodecError::MissingField("intent.header"))?,
+        )?,
+        resource_id: AsciiId::parse(&value.resource_id)?,
+        owner_id: AsciiId::parse(&value.owner_id)?,
+        lease_id: Id128::from_slice(&value.lease_id)?,
+        session_epoch: value.session_epoch,
+        command_id: Id128::from_slice(&value.command_id)?,
+        requested_ttl_ns: value.requested_ttl_ns,
+    })
+    .map_err(CodecError::from)
 }
 
 fn orientation_measurement_to_wire(
@@ -722,6 +786,37 @@ pub fn action_goal_from_wire(
     })
 }
 
+/// Encodes a cross-host action goal intent without creating a deadline.
+pub fn encode_action_goal_intent(value: &ActionGoalIntent) -> Vec<u8> {
+    action_goal_intent_to_wire(value).encode_to_vec()
+}
+
+/// Decodes and structurally validates a cross-host action goal intent.
+pub fn decode_action_goal_intent(bytes: &[u8]) -> Result<ActionGoalIntent, CodecError> {
+    action_goal_intent_from_wire(wire::ActionGoalIntent::decode(bytes)?)
+}
+
+/// Converts an action goal intent to its wire DTO.
+#[must_use]
+pub fn action_goal_intent_to_wire(value: &ActionGoalIntent) -> wire::ActionGoalIntent {
+    wire::ActionGoalIntent {
+        intent: Some(command_intent_to_wire(&value.intent())),
+        action_name: value.action_name().as_str().to_owned(),
+        goal: Some(payload_to_wire(value.goal())),
+    }
+}
+
+/// Converts and validates an action-goal-intent DTO.
+pub fn action_goal_intent_from_wire(
+    value: wire::ActionGoalIntent,
+) -> Result<ActionGoalIntent, CodecError> {
+    Ok(ActionGoalIntent::new(
+        command_intent_from_wire(value.intent.ok_or(CodecError::MissingField("intent"))?)?,
+        ActionName::parse(&value.action_name)?,
+        payload_from_wire(value.goal.ok_or(CodecError::MissingField("goal"))?)?,
+    ))
+}
+
 /// Converts a semantic action feedback to its wire DTO.
 pub fn encode_action_feedback(value: &ActionFeedback) -> Result<Vec<u8>, CodecError> {
     value.clone().validate()?;
@@ -1046,9 +1141,10 @@ fn action_status_from_wire(value: i32) -> Result<ActionStatus, CodecError> {
 mod tests {
     use message_model::{
         AcquisitionTimestamp, ActionCancelDecision, ActionCancelResponse, ActionGoal, AsciiId,
-        ClockState, ClockStatus, CommandEnvelope, CommandEnvelopeFields, Covariance3, Covariance6,
-        CovarianceStatus, DataQuality, Header, HeaderFields, Id128, ImuMeasurement, ImuState,
-        OdometryState, OdometryStateFields, Pose3, RegisteredPayload, TimestampDomain, Twist3,
+        ChassisSetpointIntent, ClockState, ClockStatus, CommandEnvelope, CommandEnvelopeFields,
+        CommandIntent, CommandIntentFields, Covariance3, Covariance6, CovarianceStatus,
+        DataQuality, Header, HeaderFields, Id128, ImuMeasurement, ImuState, OdometryState,
+        OdometryStateFields, Pose3, RegisteredPayload, TimestampDomain, Twist2, Twist3,
         UnitQuaternion, Vector3,
     };
     use prost::Message;
@@ -1056,7 +1152,8 @@ mod tests {
 
     use super::{
         action_goal_from_wire, action_goal_to_wire, decode_action_cancel_response,
-        decode_imu_state, decode_odometry_state, encode_action_cancel_response, encode_imu_state,
+        decode_chassis_setpoint_intent, decode_imu_state, decode_odometry_state,
+        encode_action_cancel_response, encode_chassis_setpoint_intent, encode_imu_state,
         encode_odometry_state, imu_state_to_wire, trajectory_goal_from_wire,
     };
 
@@ -1197,6 +1294,58 @@ mod tests {
         let wire = action_goal_to_wire(&goal);
         assert_eq!(wire.envelope.as_ref().unwrap().command_id, [7; 16]);
         assert_eq!(action_goal_from_wire(wire, 2_000).unwrap(), goal);
+    }
+
+    #[test]
+    fn command_intent_round_trip_has_ttl_but_no_remote_deadline() {
+        let intent = CommandIntent::new(CommandIntentFields {
+            header: header(Some("base_link")),
+            resource_id: AsciiId::parse("chassis").unwrap(),
+            owner_id: AsciiId::parse("remote-planner").unwrap(),
+            lease_id: Id128::new([8; 16]).unwrap(),
+            session_epoch: 2,
+            command_id: Id128::new([7; 16]).unwrap(),
+            requested_ttl_ns: 50_000,
+        })
+        .unwrap();
+        let value = ChassisSetpointIntent::new(
+            intent,
+            Twist2::new(0.5, 0.0, 0.1).expect("test twist is finite"),
+        );
+        assert_eq!(
+            decode_chassis_setpoint_intent(&encode_chassis_setpoint_intent(&value)).unwrap(),
+            value
+        );
+
+        let decoded =
+            wire::ChassisSetpointIntent::decode(encode_chassis_setpoint_intent(&value).as_slice())
+                .unwrap();
+        assert_eq!(decoded.intent.unwrap().requested_ttl_ns, 50_000);
+    }
+
+    #[test]
+    fn command_intent_rejects_missing_header_and_zero_ttl() {
+        let mut value = wire::ChassisSetpointIntent {
+            intent: Some(wire::CommandIntent {
+                header: None,
+                resource_id: "chassis".to_owned(),
+                owner_id: "remote-planner".to_owned(),
+                lease_id: vec![8; 16],
+                session_epoch: 2,
+                command_id: vec![7; 16],
+                requested_ttl_ns: 50_000,
+            }),
+            target: Some(wire::Twist2 {
+                vx_mps: 0.0,
+                vy_mps: 0.0,
+                yaw_rate_radps: 0.0,
+            }),
+        };
+        assert!(decode_chassis_setpoint_intent(&value.encode_to_vec()).is_err());
+
+        value.intent.as_mut().unwrap().header = Some(super::header_to_wire(&header(None)));
+        value.intent.as_mut().unwrap().requested_ttl_ns = 0;
+        assert!(decode_chassis_setpoint_intent(&value.encode_to_vec()).is_err());
     }
 
     #[test]

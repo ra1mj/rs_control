@@ -20,7 +20,12 @@
   "subtasks": [],
   "children": [
     "07-29-core-workspace-contracts",
-    "07-29-orangepi-rt-platform"
+    "07-29-orangepi-rt-platform",
+    "07-29-socketcan-damiao",
+    "07-29-module-layer-naming",
+    "07-30-zenoh-ros2-contract",
+    "07-30-zenoh-protobuf-middleware",
+    "07-30-local-shm-rk3588-qualification"
   ],
   "parent": null,
   "relatedFiles": [],

@@ -9,6 +9,9 @@ members = [
     "crates/hardware_module/transport-socketcan",
     "crates/protocol_module/contract-codec",
     "crates/protocol_module/message-model",
+    "crates/protocol_module/middleware-api",
+    "crates/protocol_module/middleware-local",
+    "crates/protocol_module/middleware-zenoh",
     "crates/protocol_module/proto-generated",
     "crates/application_module/control-core",
     "tools/architecture-check",
@@ -23,12 +26,17 @@ rust-version = "1.97.0"
 license = "Apache-2.0"
 
 [workspace.dependencies]
+allocation-counter = "=0.8.1"
 arrayvec = "0.7.8"
 cargo_metadata = "0.23.1"
 clap = { version = "4.6.4", features = ["derive"] }
 config-model = { version = "0.1.0", path = "crates/integration/config-model" }
+contract-codec = { version = "0.1.0", path = "crates/protocol_module/contract-codec" }
 hardware-module-core = { version = "0.1.0", path = "crates/hardware_module/hardware-module-core" }
 message-model = { version = "0.1.0", path = "crates/protocol_module/message-model" }
+middleware-api = { version = "0.1.0", path = "crates/protocol_module/middleware-api" }
+middleware-local = { version = "0.1.0", path = "crates/protocol_module/middleware-local" }
+middleware-zenoh = { version = "0.1.0", path = "crates/protocol_module/middleware-zenoh" }
 motor-damiao = { version = "0.1.0", path = "crates/hardware_module/motor-damiao" }
 prost = "0.14.4"
 prost-build = "0.14.4"
@@ -36,6 +44,7 @@ prost-types = "0.14.4"
 proto-generated = { version = "0.1.0", path = "crates/protocol_module/proto-generated" }
 ros2-mapping = { version = "0.1.0", path = "crates/integration/ros2-mapping" }
 protoc-bin-vendored = "3.2.0"
+rtrb = "=0.3.4"
 serde = { version = "1.0.229", features = ["derive"] }
 serde-saphyr = { version = "0.0.29", default-features = false, features = ["deserialize"] }
 sha2 = "0.11.0"
@@ -43,6 +52,8 @@ socketcan = { version = "=3.6.2", default-features = false }
 tempfile = "3.27.0"
 thiserror = "2.0.19"
 toml = "1.1.4"
+waitfree-sync = "=0.3.3"
+zenoh = { version = "=1.9.0", default-features = false, features = ["transport_tcp"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

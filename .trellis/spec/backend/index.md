@@ -15,7 +15,7 @@ This directory defines the executable Rust architecture, robot contract, error, 
 | Guide | Description | Status |
 |-------|-------------|--------|
 | [Directory Structure](./directory-structure.md) | Rust layer and composition-root layout | Active |
-| [Robot Contracts](./robot-contracts.md) | Layer, YAML and Protobuf executable contracts | Active |
+| [Robot Contracts](./robot-contracts.md) | Layer, YAML, Protobuf and middleware delivery contracts | Active |
 | [Error Handling](./error-handling.md) | Typed boundary and safety-error conventions | Active |
 | [Quality Guidelines](./quality-guidelines.md) | Required checks and forbidden patterns | Active |
 | [Realtime Platform](./realtime-platform.md) | Kernel, affinity, CAN and qualification contracts | Active |
@@ -29,7 +29,7 @@ This directory defines the executable Rust architecture, robot contract, error, 
 Before changing Rust code or a cross-layer contract:
 
 1. Read `directory-structure.md` and preserve the dependency class of every changed crate.
-2. Read `robot-contracts.md` when changing YAML, Protobuf, device traits, command authority or a composition root.
+2. Read `robot-contracts.md` when changing YAML, Protobuf, middleware ports/routes, device traits, command authority or a composition root.
 3. Read `error-handling.md` when adding a fallible boundary.
 4. Read `quality-guidelines.md` and run the applicable commands before review.
 5. Read `realtime-platform.md` before changing `platform/`, RT placement, privileged preparation or hardware evidence.

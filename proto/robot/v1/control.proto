@@ -56,6 +56,44 @@ message CommandEnvelope {
   uint64 deadline_monotonic_ns = 7;
 }
 
+// Cross-host command authority assertion and requested lifetime.
+// The receiver must match this assertion to an existing local lease and create
+// its own local-monotonic CommandEnvelope; no absolute deadline crosses hosts.
+message CommandIntent {
+  // Common source, boot, sequence and validity metadata.
+  Header header = 1;
+  // Resource asserted by the remote command source.
+  string resource_id = 2;
+  // Owner asserted by the remote command source.
+  string owner_id = 3;
+  // Exactly 16 bytes and required to match the active local lease.
+  bytes lease_id = 4;
+  // Required to match the active local authority-service session.
+  uint64 session_epoch = 5;
+  // Exactly 16 bytes and unique for correlation/idempotency.
+  bytes command_id = 6;
+  // Requested lifetime after local receipt; bounded by route and lease policy.
+  uint64 requested_ttl_ns = 7;
+}
+
+// Cross-host chassis command that becomes executable only after local authority checks.
+message ChassisSetpointIntent {
+  // Remote authority assertion and requested lifetime.
+  CommandIntent intent = 1;
+  // Requested body velocity in SI units.
+  Twist2 target = 2;
+}
+
+// Cross-host typed action goal that becomes executable only after local authority checks.
+message ActionGoalIntent {
+  // Remote authority assertion and requested lifetime.
+  CommandIntent intent = 1;
+  // Versioned action identifier allowlisted by the endpoint contract.
+  string action_name = 2;
+  // Registered goal payload.
+  ActionPayload goal = 3;
+}
+
 // Chassis velocity command in the body frame.
 message ChassisSetpoint {
   // Authority and correlation metadata.

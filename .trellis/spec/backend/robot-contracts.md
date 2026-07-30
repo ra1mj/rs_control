@@ -134,6 +134,135 @@ let header = contract_codec::decode_header(bytes)?;
 controller.step(TimedInput { header, value })?;
 ```
 
+## Scenario: Add or change local/Zenoh middleware delivery
+
+### 1. Scope / Trigger
+
+Use this contract when adding a middleware key, endpoint, local channel,
+network command intent, Zenoh route, ingress guard, query or liveliness path.
+This is an infra/cross-layer boundary: RT-facing code must remain independent
+of generated DTOs, a channel implementation and the Zenoh runtime.
+
+### 2. Signatures
+
+```rust
+ConcreteKey::new(robot_id, domain, resource, channel) -> ConcreteKey
+str::parse::<ConcreteKey>() -> Result<ConcreteKey, KeyError>
+EndpointDescriptor::new(fields: EndpointFields)
+    -> Result<EndpointDescriptor, EndpointError>
+latest_channel<T: Copy + Send + 'static>()
+    -> (LocalLatestPublisher<T>, LocalLatestSubscriber<T>)
+ordered_channel<T: Send + 'static>(capacity: usize)
+    -> Result<(LocalEventPublisher<T>, LocalEventSubscriber<T>), ChannelError>
+ZenohBridge::spawn(config: ZenohBridgeConfig, routes: BridgeRoutes)
+    -> Result<ZenohBridge, BridgeError>
+ZenohBridge::query(endpoint: EndpointId, payload: Vec<u8>)
+    -> Result<Vec<u8>, BridgeError>
+SourceGuard::accept(header, value, received_mono_ns, policy, evidence)
+    -> Result<ReceivedSample<T>, IngressError>
+CommandIntent::materialize(local_lease, received_mono_ns, route_max_ttl_ns)
+    -> Result<CommandEnvelope, SemanticError>
+```
+
+### 3. Contracts
+
+- Concrete keys are exactly
+  `robot/<robot_id>/v1/<domain>/<resource>/<channel>`. Concrete APIs reject
+  wildcards; only named `KeySelector` constructors create selectors.
+- Every endpoint declares direction, interaction class, exact Protobuf type,
+  semantic QoS, nonzero payload/queue bounds, freshness or timeout where
+  applicable, source ownership and fallback behavior.
+- Latest-value and ordered-event ports are nonclonable SPSC capabilities.
+  Steady-state producer calls never block: latest replaces an unread value;
+  ordered full/disconnected errors return ownership of `T`. Dependency types
+  remain private to `middleware-local`.
+- Cross-host commands use `CommandIntent` with asserted resource/owner/lease/
+  session/command IDs and a nonzero requested TTL. The receiver matches an
+  existing local lease, uses local reception time, and caps TTL by both the
+  route maximum and local lease expiration. Sender monotonic/Unix/ROS time
+  never creates or extends authority.
+- `SourceGuard` requires an expected source and explicitly authorized boot,
+  rejects duplicates/reorder/retired boots, records sequence gaps, and keeps
+  anti-replay state across disconnect. Liveliness changes availability only;
+  it does not authorize a boot or grant a lease.
+- `ZenohBridge` owns the only session, callbacks, encoding allocation, waits,
+  retries and shutdown join on a named non-RT worker. Callback inboxes and
+  commands are bounded and use nonblocking sends. QoS maps only to stable
+  priority plus `CongestionControl::Drop`.
+- Zenoh is exact-pinned with default features disabled and only
+  `transport_tcp`; compression, unstable and shared-memory features stay off.
+  The exact dependency-policy exceptions and their removal condition live in
+  `deny.toml` and the task research record.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+|---|---|
+| Wrong key root/version/segment count or wildcard concrete segment | `KeyError`; never pass to Zenoh |
+| Zero payload/queue/age/timeout bound or incompatible direction/QoS | `EndpointError` at startup |
+| Duplicate endpoint ID or same key/direction owner | reject route set before session open |
+| Stalled latest consumer | publish newest generation and increment overwrite count |
+| Full ordered queue | `EventPublishError::Full(T)` with exact value ownership |
+| Dropped local consumer / stopped bridge | typed `Disconnected(T)` or `LatestPublish::Disconnected` |
+| Oversized Zenoh payload | reject before decode and increment `oversized` |
+| Unexpected source, unavailable route or unapproved/retired boot | typed `IngressError` plus saturating counter |
+| Duplicate/reordered sequence | reject; do not refresh local expiry |
+| Accepted sequence gap | accept newer value and add exact missing count |
+| Expired/untrusted/poor-quality sample | typed rejection; cached value is not refreshed |
+| Resource/owner/lease/session mismatch | `SemanticError::AuthorityMismatch`; no executable command |
+| Zero TTL or expired local lease | reject; requested TTL above route maximum is capped |
+| Zero/multiple/error/late query replies | `NoReply`/`MultipleReplies`/`RemoteError`/`Timeout` |
+| Full callback/command queue | drop or typed `CommandQueueFull`; no callback blocking |
+
+### 5. Good/Base/Bad Cases
+
+- Good: an IMU semantic value is encoded by `contract-codec` on the bridge
+  thread, published on a checked state route, size-checked, decoded and exposed
+  with local reception/expiry metadata.
+- Base: a latest producer keeps publishing while the bridge consumer is
+  stalled; generations and overwrite counters advance without a Zenoh call.
+- Bad: pass a `zenoh::Session` or generated DTO to application/RT code, use an
+  unbounded channel, accept a payload boot change as authorization, or execute
+  a remote absolute monotonic deadline.
+
+### 6. Tests Required
+
+- Key/endpoint unit tests cover all domains, round trips, wildcard/version/
+  bound/direction/QoS/source/duplicate failures.
+- Local tests warm up then assert zero steady-state allocations, exact
+  overwrite/full/disconnect counters, rejected-value ownership, stalled
+  consumers and independent-thread progress.
+- Codec tests prove intents contain TTL but no remote executable deadline and
+  reject missing/malformed/unknown/zero inputs.
+- Fault tests script loss, delay/stale, duplicate, reorder, source/quality,
+  boot restart, disconnect/reconnect and prior-lease rejection with exact
+  counters.
+- A serialized explicit-TCP loopback test covers semantic -> Protobuf -> real
+  Zenoh -> semantic, command materialization, query/queryable timeout,
+  liveliness put/delete and local disconnection after bridge stop.
+- Run warnings-denied Clippy, architecture policy, Buf compatibility,
+  cross-language generation, dependency policy and `./tools/ci.sh`.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+// RT path allocates, waits on Zenoh and trusts the sender's clock/authority.
+session.put(remote_key, encode(remote_command)).wait()?;
+execute(CommandEnvelope::new(remote_fields)?);
+```
+
+#### Correct
+
+```rust
+// RT path only publishes a typed local value; the non-RT bridge owns Zenoh.
+local_command_port.try_publish(intent)?;
+let intent = contract_codec::decode_chassis_setpoint_intent(bytes)?;
+let command = intent.materialize(active_local_lease, received_mono_ns, route_max_ttl_ns)?;
+validated_command_port.try_publish(command)?;
+```
+
 ## Scenario: Add a native Protobuf-to-ROS mapping contract
 
 ### 1. Scope / Trigger
@@ -204,7 +333,7 @@ The checked-in profile lives at
 | Missing trusted acquisition time on required route | projection | drop with `UntrustedAcquisitionTime` |
 | Reception-time fallback route lacks time | projection | reject; never relabel silently |
 | Stale/future ROS command stamp | ingress projection | reject observation |
-| Missing/expired lease or excessive TTL | `CommandEnvelope::from_bridge_ingress` | reject command |
+| Missing/expired lease or zero TTL bound | `CommandEnvelope::from_bridge_ingress` | reject; cap nonzero requested TTL to route maximum |
 | Unknown action/cancel/status enum | `contract-codec` | `CodecError::UnknownEnum` |
 
 ### 5. Good / Base / Bad Cases

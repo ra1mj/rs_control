@@ -1,0 +1,18 @@
+[package]
+name = "middleware-local"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+middleware-api.workspace = true
+rtrb.workspace = true
+thiserror.workspace = true
+waitfree-sync.workspace = true
+
+[dev-dependencies]
+allocation-counter.workspace = true
+
+[lints]
+workspace = true

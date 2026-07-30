@@ -27,6 +27,240 @@ pub struct ChassisSetpoint {
     pub target: Twist2,
 }
 
+/// Cross-host authority assertion that is not yet an executable command.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CommandIntent {
+    header: Header,
+    resource_id: crate::ResourceId,
+    owner_id: crate::OwnerId,
+    lease_id: Id128,
+    session_epoch: u64,
+    command_id: Id128,
+    requested_ttl_ns: u64,
+}
+
+/// Fields supplied to [`CommandIntent::new`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CommandIntentFields {
+    /// Common source, boot, sequence and validity metadata.
+    pub header: Header,
+    /// Resource asserted by the remote command source.
+    pub resource_id: crate::ResourceId,
+    /// Owner asserted by the remote command source.
+    pub owner_id: crate::OwnerId,
+    /// Lease identity asserted by the remote command source.
+    pub lease_id: Id128,
+    /// Authority-service session asserted by the remote source.
+    pub session_epoch: u64,
+    /// Command identity used for correlation/idempotency.
+    pub command_id: Id128,
+    /// Requested lifetime after local receipt.
+    pub requested_ttl_ns: u64,
+}
+
+impl CommandIntent {
+    /// Constructs a structurally valid network command intent.
+    pub fn new(fields: CommandIntentFields) -> Result<Self, SemanticError> {
+        if fields.session_epoch == 0 {
+            return Err(SemanticError::ZeroSessionEpoch);
+        }
+        if fields.requested_ttl_ns == 0 {
+            return Err(SemanticError::InvalidDuration {
+                field: "command_intent.requested_ttl_ns",
+                maximum_ns: u64::MAX,
+            });
+        }
+        Ok(Self {
+            header: fields.header,
+            resource_id: fields.resource_id,
+            owner_id: fields.owner_id,
+            lease_id: fields.lease_id,
+            session_epoch: fields.session_epoch,
+            command_id: fields.command_id,
+            requested_ttl_ns: fields.requested_ttl_ns,
+        })
+    }
+
+    /// Returns common source metadata.
+    #[must_use]
+    pub const fn header(self) -> Header {
+        self.header
+    }
+
+    /// Returns the asserted resource.
+    #[must_use]
+    pub const fn resource_id(self) -> crate::ResourceId {
+        self.resource_id
+    }
+
+    /// Returns the asserted owner.
+    #[must_use]
+    pub const fn owner_id(self) -> crate::OwnerId {
+        self.owner_id
+    }
+
+    /// Returns the asserted lease identity.
+    #[must_use]
+    pub const fn lease_id(self) -> Id128 {
+        self.lease_id
+    }
+
+    /// Returns the asserted authority session.
+    #[must_use]
+    pub const fn session_epoch(self) -> u64 {
+        self.session_epoch
+    }
+
+    /// Returns the command correlation identity.
+    #[must_use]
+    pub const fn command_id(self) -> Id128 {
+        self.command_id
+    }
+
+    /// Returns the requested lifetime after local receipt.
+    #[must_use]
+    pub const fn requested_ttl_ns(self) -> u64 {
+        self.requested_ttl_ns
+    }
+
+    /// Matches local authority and creates an executable local envelope.
+    pub fn materialize(
+        self,
+        active_lease: crate::ResourceLease,
+        received_monotonic_ns: u64,
+        maximum_ttl_ns: u64,
+    ) -> Result<CommandEnvelope, SemanticError> {
+        if self.resource_id != active_lease.resource_id() {
+            return Err(SemanticError::AuthorityMismatch {
+                field: "resource_id",
+            });
+        }
+        if self.owner_id != active_lease.owner_id() {
+            return Err(SemanticError::AuthorityMismatch { field: "owner_id" });
+        }
+        if self.lease_id != active_lease.lease_id() {
+            return Err(SemanticError::AuthorityMismatch { field: "lease_id" });
+        }
+        if self.session_epoch != active_lease.session_epoch() {
+            return Err(SemanticError::AuthorityMismatch {
+                field: "session_epoch",
+            });
+        }
+        CommandEnvelope::from_bridge_ingress(
+            self.header,
+            active_lease,
+            self.command_id,
+            received_monotonic_ns,
+            self.requested_ttl_ns,
+            maximum_ttl_ns,
+        )
+    }
+}
+
+/// Cross-host chassis command awaiting local authority materialization.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ChassisSetpointIntent {
+    intent: CommandIntent,
+    target: Twist2,
+}
+
+impl ChassisSetpointIntent {
+    /// Constructs a typed chassis intent.
+    #[must_use]
+    pub const fn new(intent: CommandIntent, target: Twist2) -> Self {
+        Self { intent, target }
+    }
+
+    /// Returns the authority assertion.
+    #[must_use]
+    pub const fn intent(self) -> CommandIntent {
+        self.intent
+    }
+
+    /// Returns the requested body velocity.
+    #[must_use]
+    pub const fn target(self) -> Twist2 {
+        self.target
+    }
+
+    /// Creates a locally enforceable setpoint after authority checks.
+    pub fn materialize(
+        self,
+        active_lease: crate::ResourceLease,
+        received_monotonic_ns: u64,
+        maximum_ttl_ns: u64,
+    ) -> Result<ChassisSetpoint, SemanticError> {
+        Ok(ChassisSetpoint {
+            envelope: self.intent.materialize(
+                active_lease,
+                received_monotonic_ns,
+                maximum_ttl_ns,
+            )?,
+            target: self.target,
+        })
+    }
+}
+
+/// Cross-host action goal awaiting local authority materialization.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ActionGoalIntent {
+    intent: CommandIntent,
+    action_name: ActionName,
+    goal: RegisteredPayload,
+}
+
+impl ActionGoalIntent {
+    /// Constructs a typed action intent.
+    #[must_use]
+    pub const fn new(
+        intent: CommandIntent,
+        action_name: ActionName,
+        goal: RegisteredPayload,
+    ) -> Self {
+        Self {
+            intent,
+            action_name,
+            goal,
+        }
+    }
+
+    /// Returns the authority assertion.
+    #[must_use]
+    pub const fn intent(&self) -> CommandIntent {
+        self.intent
+    }
+
+    /// Returns the versioned action name.
+    #[must_use]
+    pub const fn action_name(&self) -> ActionName {
+        self.action_name
+    }
+
+    /// Returns the registered goal payload.
+    #[must_use]
+    pub const fn goal(&self) -> &RegisteredPayload {
+        &self.goal
+    }
+
+    /// Creates a locally enforceable action goal after authority checks.
+    pub fn materialize(
+        self,
+        active_lease: crate::ResourceLease,
+        received_monotonic_ns: u64,
+        maximum_ttl_ns: u64,
+    ) -> Result<ActionGoal, SemanticError> {
+        Ok(ActionGoal {
+            envelope: self.intent.materialize(
+                active_lease,
+                received_monotonic_ns,
+                maximum_ttl_ns,
+            )?,
+            action_name: self.action_name,
+            goal: self.goal,
+        })
+    }
+}
+
 /// Registered, bounded serialized Protobuf payload.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RegisteredPayload {

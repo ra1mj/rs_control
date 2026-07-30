@@ -507,13 +507,14 @@ impl CommandEnvelope {
         maximum_ttl_ns: u64,
     ) -> Result<Self, SemanticError> {
         lease.validate_at(received_monotonic_ns)?;
-        if requested_ttl_ns == 0 || maximum_ttl_ns == 0 || requested_ttl_ns > maximum_ttl_ns {
+        if requested_ttl_ns == 0 || maximum_ttl_ns == 0 {
             return Err(SemanticError::InvalidDuration {
                 field: "command.ttl_ns",
                 maximum_ns: maximum_ttl_ns,
             });
         }
-        let requested_deadline = received_monotonic_ns.checked_add(requested_ttl_ns).ok_or(
+        let effective_ttl_ns = requested_ttl_ns.min(maximum_ttl_ns);
+        let requested_deadline = received_monotonic_ns.checked_add(effective_ttl_ns).ok_or(
             SemanticError::TimeOverflow {
                 field: "command.deadline_monotonic_ns",
             },
@@ -678,6 +679,12 @@ pub enum SemanticError {
         /// Maximum accepted duration.
         maximum_ns: u64,
     },
+    /// A network command assertion did not match the active local authority.
+    #[error("command intent {field} does not match the active local lease")]
+    AuthorityMismatch {
+        /// Mismatched authority field.
+        field: &'static str,
+    },
     /// Monotonic time arithmetic overflowed.
     #[error("field {field} overflowed monotonic time")]
     TimeOverflow {
@@ -719,8 +726,9 @@ pub enum SemanticError {
 #[cfg(test)]
 mod tests {
     use super::{
-        AcquisitionTimestamp, AsciiId, ClockState, ClockStatus, CommandEnvelope, DataQuality,
-        Header, HeaderFields, Id128, IdError, ResourceLease, ResourceLeaseFields, TimestampDomain,
+        AcquisitionTimestamp, AsciiId, ClockState, ClockStatus, CommandEnvelope, CommandIntent,
+        CommandIntentFields, DataQuality, Header, HeaderFields, Id128, IdError, ResourceLease,
+        ResourceLeaseFields, SemanticError, TimestampDomain,
     };
 
     fn header_fields() -> HeaderFields {
@@ -807,16 +815,92 @@ mod tests {
             )
             .is_err()
         );
-        assert!(
-            CommandEnvelope::from_bridge_ingress(
-                Header::new(fields).unwrap(),
-                lease,
-                Id128::new([3; 16]).unwrap(),
-                1_000,
-                251,
-                250,
-            )
-            .is_err()
+        let later_lease = ResourceLease::new(ResourceLeaseFields {
+            expires_monotonic_ns: 2_000,
+            ..ResourceLeaseFields {
+                resource_id: lease.resource_id(),
+                owner_id: lease.owner_id(),
+                lease_id: lease.lease_id(),
+                session_epoch: lease.session_epoch(),
+                expires_monotonic_ns: lease.expires_monotonic_ns(),
+            }
+        })
+        .unwrap();
+        let capped = CommandEnvelope::from_bridge_ingress(
+            Header::new(fields).unwrap(),
+            later_lease,
+            Id128::new([3; 16]).unwrap(),
+            1_000,
+            251,
+            250,
+        )
+        .unwrap();
+        assert_eq!(capped.deadline_monotonic_ns(), 1_250);
+    }
+
+    #[test]
+    fn network_intent_matches_local_authority_and_uses_local_time() {
+        let lease = ResourceLease::new(ResourceLeaseFields {
+            resource_id: AsciiId::parse("chassis").unwrap(),
+            owner_id: AsciiId::parse("remote-planner").unwrap(),
+            lease_id: Id128::new([2; 16]).unwrap(),
+            session_epoch: 3,
+            expires_monotonic_ns: 1_150,
+        })
+        .unwrap();
+        let intent = CommandIntent::new(CommandIntentFields {
+            header: Header::new(header_fields()).unwrap(),
+            resource_id: lease.resource_id(),
+            owner_id: lease.owner_id(),
+            lease_id: lease.lease_id(),
+            session_epoch: lease.session_epoch(),
+            command_id: Id128::new([3; 16]).unwrap(),
+            requested_ttl_ns: 100,
+        })
+        .unwrap();
+        let envelope = intent.materialize(lease, 1_100, 100).unwrap();
+        assert_eq!(envelope.deadline_monotonic_ns(), 1_150);
+
+        let mismatched = CommandIntent::new(CommandIntentFields {
+            owner_id: AsciiId::parse("other-owner").unwrap(),
+            ..CommandIntentFields {
+                header: intent.header(),
+                resource_id: intent.resource_id(),
+                owner_id: intent.owner_id(),
+                lease_id: intent.lease_id(),
+                session_epoch: intent.session_epoch(),
+                command_id: intent.command_id(),
+                requested_ttl_ns: intent.requested_ttl_ns(),
+            }
+        })
+        .unwrap();
+        assert_eq!(
+            mismatched.materialize(lease, 1_100, 100),
+            Err(SemanticError::AuthorityMismatch { field: "owner_id" })
+        );
+        let prior_lease = CommandIntent::new(CommandIntentFields {
+            lease_id: Id128::new([9; 16]).unwrap(),
+            ..CommandIntentFields {
+                header: intent.header(),
+                resource_id: intent.resource_id(),
+                owner_id: intent.owner_id(),
+                lease_id: intent.lease_id(),
+                session_epoch: intent.session_epoch(),
+                command_id: intent.command_id(),
+                requested_ttl_ns: intent.requested_ttl_ns(),
+            }
+        })
+        .unwrap();
+        assert_eq!(
+            prior_lease.materialize(lease, 1_100, 100),
+            Err(SemanticError::AuthorityMismatch { field: "lease_id" })
+        );
+        assert_eq!(
+            intent
+                .materialize(lease, 1_100, 99)
+                .unwrap()
+                .deadline_monotonic_ns(),
+            1_150
         );
     }
 }

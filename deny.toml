@@ -1,5 +1,12 @@
 [advisories]
 unmaintained = "workspace"
+# Zenoh 1.9.0 declares lz4_flex unconditionally, but every call site is
+# compiled only by its disabled `transport_compression` feature. The adapter
+# enables only `transport_tcp`; keep this narrow exception until Zenoh updates
+# the dependency, and remove it before compression can ever be enabled.
+ignore = [
+    { id = "RUSTSEC-2026-0041", reason = "Zenoh transport_compression is disabled; vulnerable block decompression call sites are not compiled" },
+]
 
 [bans]
 multiple-versions = "warn"
@@ -11,9 +18,15 @@ allow = [
     "Apache-2.0",
     "BSD-2-Clause",
     "BSD-3-Clause",
+    "ISC",
     "MIT",
     "Unicode-3.0",
     "Zlib",
+]
+exceptions = [
+    # Indirect through zenoh-util -> shellexpand -> dirs. Keep MPL scoped to
+    # this utility crate instead of allowing it for future direct backends.
+    { allow = ["MPL-2.0"], crate = "option-ext@0.2.0" },
 ]
 
 [sources]

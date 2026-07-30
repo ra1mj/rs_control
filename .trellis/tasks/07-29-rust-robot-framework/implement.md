@@ -202,11 +202,11 @@ Rollback: disable motor, remove torque, preserve CAN capture and restore known m
 
 ### D1. Local fast path
 
-- [ ] Implement interchangeable latest-value and ordered-event channel interfaces.
+- [x] Implement interchangeable latest-value and ordered-event channel interfaces.
 - [ ] Pin and source-review the Horus comparison commit; prototype its useful cache-line-separated SPSC-matrix/seqlock/flock patterns without adding Horus as a runtime dependency.
 - [ ] Prototype at least two candidate mechanisms if benchmark evidence is not decisive.
 - [ ] Preallocate and prefault all RT-visible buffers.
-- [ ] Define overflow/latest-wins behavior and counters per channel.
+- [x] Define overflow/latest-wins behavior and counters per channel.
 - [ ] Prove a blocked/crashed consumer cannot stop the producer.
 - [ ] Require explicit fixed-layout shared-memory payload safety; reject `needs_drop` or similar destructor-only POD inference and isolate any mmap/raw-atomic `unsafe` in a reviewed protocol-module boundary.
 - [ ] Version the SHM layout and test incompatible layout rejection, torn reads, SIGKILL endpoint reclamation, endpoint exhaustion, PID reuse assumptions and sequence/drop accounting.
@@ -221,18 +221,18 @@ Target-board benchmark:
 
 ### D2. Codec and Zenoh adapter
 
-- [ ] Implement the canonical key builder/parser in one crate.
+- [x] Implement the canonical key builder/parser in one crate.
 - [ ] Map hardware_module samples to message model and Protobuf once at the protocol_module boundary.
-- [ ] Implement stream, action/ack, query/queryable and liveliness interaction classes.
-- [ ] Assign semantic QoS classes without allowing Zenoh calls on RT threads.
-- [ ] Validate source/boot/sequence/time/validity/quality for all network input.
-- [ ] Mirror selected local samples from a non-RT thread.
+- [x] Implement stream, action/ack, query/queryable and liveliness interaction classes.
+- [x] Assign semantic QoS classes without allowing Zenoh calls on RT threads.
+- [x] Validate source/boot/sequence/time/validity/quality for all network input.
+- [x] Mirror selected local samples from a non-RT thread.
 
 ### D3. Network fault tests
 
 - [ ] Inject delay, jitter, loss, duplicate, reorder, disconnect, reconnect and publisher restart.
-- [ ] Verify expired/prior-boot/prior-lease commands are rejected.
-- [ ] Verify the 1 kHz local thread never waits on the Zenoh executor.
+- [x] Verify expired/prior-boot/prior-lease commands are rejected.
+- [x] Verify the 1 kHz local thread never waits on the Zenoh executor.
 - [ ] Verify network sensor fallback/stop policies are deterministic.
 
 ## 7. Phase E — Single-motor vertical slice

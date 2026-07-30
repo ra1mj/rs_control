@@ -221,7 +221,7 @@ git status --short
       evidence.
 - [x] Create the named `local-shm-rk3588-qualification` follow-up only with
       explicit task-creation consent; otherwise record it as the next boundary.
-- [ ] Commit implementation/spec/task records in reviewable commits without
+- [x] Commit implementation/spec/task records in reviewable commits without
       including unrelated workspace files.
-- [ ] Archive this child, record the developer journal, push the resulting
+- [x] Archive this child, record the developer journal, push the resulting
       branch, and report the exact deferred parent criteria.

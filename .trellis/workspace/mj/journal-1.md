@@ -173,3 +173,37 @@ Added bounded backend-neutral middleware ports, a nonblocking local backend, add
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: Shared-memory middleware backend
+
+**Date**: 2026-07-30
+**Task**: Shared-memory middleware backend
+**Branch**: `main`
+
+### Summary
+
+Delivered Linux layout-v1 SPSC SHM latest/ordered ports with explicit Pod schema contracts, contained mmap unsafe, flock-authoritative SIGKILL recovery, zero-allocation hot paths, real process fault tests, and a bounded host_research qualification runner. Full tools/ci.sh passed; RK3588 physical qualification remains in the planning sibling.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1f0948e` | (see git log) |
+| `3f09fcd` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

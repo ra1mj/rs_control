@@ -7,16 +7,16 @@ Build a Rust-owned robot foundation that can drive a real DM-J4310-2EC motor on 
 The core invariant is compile-time dependency direction:
 
 ```text
-upper applications / algorithms / FSM
+application_module applications / algorithms / FSM
                  |
                  v
-middle typed API / in-process fast path / Zenoh / Protobuf
+protocol_module typed API / in-process fast path / Zenoh / Protobuf
                  |
                  v
-lower transport / device protocol / device lifecycle
+hardware_module transport / device protocol / device lifecycle
 ```
 
-No lower crate imports a middle or upper crate. No middle crate imports an upper crate. Upper crates do not import lower crates. Executable composition roots may construct objects from all three layers, but contain wiring only and no business logic.
+No hardware_module crate imports a protocol_module or application_module crate. No protocol_module crate imports an application_module crate. application_module crates do not import hardware_module crates. Executable composition roots may construct objects from all three layers, but contain wiring only and no business logic.
 
 Runtime process boundaries are deliberately different from compile-time layer boundaries. A process may vertically compose all three layers while the source dependency graph remains one-way.
 
@@ -28,9 +28,9 @@ Runtime process boundaries are deliberately different from compile-time layer bo
 | OS | Ubuntu 22.04 Server |
 | Kernel | Orange Pi/Rockchip 5.10 BSP with a pinned matching PREEMPT_RT patch |
 | First actuator | DM-J4310-2EC, classic CAN 1 Mbps, MIT mode |
-| Lower and middle language | Rust only; unavoidable kernel/vendor FFI is wrapped and reviewed |
+| hardware_module and protocol_module language | Rust only; unavoidable kernel/vendor FFI is wrapped and reviewed |
 | Middleware | Zenoh between processes/nodes; Protocol Buffers as the external message contract |
-| Realtime local path | Middle-owned, preallocated latest-value mailboxes/bounded queues; no Protobuf encoding inside the 1 kHz hot path |
+| Realtime local path | protocol_module-owned, preallocated latest-value mailboxes/bounded queues; no Protobuf encoding inside the 1 kHz hot path |
 | Network realtime | Ethernet inputs may affect control, but are soft realtime in v1 and must pass freshness/lease checks |
 | Runtime isolation | `motion-rt`, `perception`, `robot-fsm`, `telemetry-recorder`, optional `ros2-bridge`, and `zenohd` |
 | Control period | Prefer 1 kHz; explicitly qualified 500 Hz fallback; no silent runtime rate change |
@@ -52,25 +52,25 @@ rust-toolchain.toml                # pinned stable toolchain
 deny.toml                          # license/advisory/source policy
 
 crates/
-  lower/
-    lower-core/                    # Transport, Device, lifecycle, time, lower errors
+  hardware_module/
+    hardware-module-core/                    # Transport, Device, lifecycle, time, hardware_module errors
     transport-socketcan/           # Linux SocketCAN implementation
     transport-serial/              # UART/USB-serial transport
     camera-v4l2/                   # USB/MIPI capture boundary; later milestone
-    motor-damiao/                  # DM protocol and static motor profiles
+    motor-damiao/                  # DM protocol, register verification and lifecycle
     imu-drivers/                   # concrete IMU protocols; selected later
     lidar-drivers/                 # concrete lidar protocols; selected later
 
-  middle/
-    message-model/                 # upper-facing typed messages and validation
+  protocol_module/
+    message-model/                 # application_module-facing typed messages and validation
     observability-contract/        # externally visible health/fault vocabulary
     proto-generated/               # generated Prost code; never hand-edited
-    middleware-api/                # ports used by upper crates
+    middleware-api/                # ports used by application_module crates
     middleware-local/              # preallocated local snapshots/queues
     middleware-zenoh/              # Zenoh pub/sub/query/liveliness adapter
-    contract-codec/                # lower <-> message model <-> Protobuf mapping
+    contract-codec/                # hardware_module <-> message model <-> Protobuf mapping
 
-  upper/
+  application_module/
     control-core/                  # controller lifecycle and generic control traits
     chassis-model/                 # body/wheel types, constraints, morphology registry
     chassis-mecanum/
@@ -119,28 +119,28 @@ platform/orangepi5plus/
 
 ### 3.1 Contract ownership
 
-- Lower owns physical units, raw device status, transport failures, device lifecycle, and protocol encoding.
-- Middle owns all upper-facing message types, freshness validation, command envelopes, leases, serialization, key expressions, and local/Zenoh delivery semantics.
-- Upper owns robot-level algorithms, resource arbitration policy, mission semantics, and FSM transitions.
-- Protobuf is generated from `proto/` and must not become the lower driver API.
+- hardware_module owns physical units, raw device status, transport failures, device lifecycle, and protocol encoding.
+- protocol_module owns all application_module-facing message types, freshness validation, command envelopes, leases, serialization, key expressions, and local/Zenoh delivery semantics.
+- application_module owns robot-level algorithms, resource arbitration policy, mission semantics, and FSM transitions.
+- Protobuf is generated from `proto/` and must not become the hardware_module driver API.
 - MCAP records the already-serialized Protobuf payload and the matching descriptor set; the recorder does not redefine messages.
-- ROS 2 mapping consumes the middle contract and never becomes a second source of truth.
+- ROS 2 mapping consumes the protocol_module contract and never becomes a second source of truth.
 
 ### 3.2 Enforced dependency classes
 
 | Crate class | Allowed internal dependencies |
 |---|---|
-| `lower` | other `lower` crates only |
-| `middle` | `middle` and `lower` |
-| `upper` | `upper` and `middle`, never `lower` |
+| `hardware_module` | other `hardware_module` crates only |
+| `protocol_module` | `protocol_module` and `hardware_module` |
+| `application_module` | `application_module` and `protocol_module`, never `hardware_module` |
 | `integration/config-model` | no production layer crate; it is converted by composition roots into layer-owned startup settings |
-| other `integration` services | `integration` and `middle`; a documented adapter may consume an upper output only through a middle port |
+| other `integration` services | `integration` and `protocol_module`; a documented adapter may consume an application_module output only through a protocol_module port |
 | `apps` | any required layer for construction only; architecture tests reject business algorithms in these crates |
 | `test-support` | development dependencies only and absent from release binaries |
 
-This prevents “support” or monitoring crates from becoming a hidden reverse-dependency channel. Lower crates expose lower-owned health/error values; middle maps those values into the externally visible observability contract. The full robot YAML is parsed only during startup by a composition root, which passes each layer a narrowed immutable configuration rather than the whole document.
+This prevents “support” or monitoring crates from becoming a hidden reverse-dependency channel. hardware_module crates expose hardware_module-owned health/error values; protocol_module maps those values into the externally visible observability contract. The full robot YAML is parsed only during startup by a composition root, which passes each layer a narrowed immutable configuration rather than the whole document.
 
-## 4. Lower layer
+## 4. hardware_module layer
 
 ### 4.1 Transport boundary
 
@@ -187,35 +187,47 @@ The application does not receive raw file descriptors. Bringing the link up/down
 
 ### 4.3 DM-J4310-2EC driver
 
-The first profile is a static Rust constant containing the official position, velocity, torque, stiffness, damping and temperature limits. Commands outside the profile are rejected or explicitly saturated according to the field contract; saturation is never implicit.
+The driver statically defines the MIT frame layout and the protocol-wide
+stiffness/damping ranges. Position, velocity and torque scaling are runtime
+motor registers (`PMAX`, `VMAX` and `TMAX`): startup reads them while disarmed,
+requires finite positive values accepted by a typed deployment safety policy,
+and refuses to arm when their identity is unknown. Pinned SDK model presets are
+host-test vectors only, not universal product truth. The wire codec rejects
+out-of-range commands; any higher-level feasibility projection or saturation
+must be explicit before encoding.
 
 Driver lifecycle:
 
 ```text
-Unconfigured -> Disabled -> Enabling -> Enabled -> Faulted
-                      ^          |          |
-                      |          v          v
-                      +------ Disabling <- SafeStop
+Unconfigured -> Configuring -> Disabled -> Enabling -> Enabled
+Enabled/Enabling -> SafeStop -> Disabling -> Disabled
+any configuration/active state -> Faulted
+Faulted --explicit recovery authorization--> Configuring
 ```
 
 Required operations:
 
-- validate unique ESC_ID and MST_ID before arming;
+- read and verify `ESC_ID`, `MST_ID`, `CTRL_MODE`, `TIMEOUT`, `PMAX`, `VMAX`
+  and `TMAX` while disarmed, then validate bus-wide ID uniqueness and reserved-ID
+  collisions before arming;
 - encode/decode MIT frames;
 - enable, disable, zero-command and explicit fault reset;
 - decode position, velocity, torque, MOS temperature, rotor temperature and error state;
-- configure/read back the motor CAN timeout where protocol support is confirmed;
+- require a verified nonzero motor CAN timeout within the typed safety policy;
 - reject feedback from the wrong ID/profile;
 - treat missing or implausible feedback as stale, not as zero;
 - expose a monotonically increasing sample sequence and source timestamp.
 
-Writing persistent motor registers is a maintenance operation and is never performed automatically during normal startup. The system first reads/verifies critical settings and requires an explicit maintenance command to change them.
+Writing runtime or persistent motor registers is a disarmed maintenance
+operation and is never performed automatically during normal startup. The
+system first reads/verifies critical settings and requires an explicit
+maintenance command to change them.
 
 ### 4.4 Other devices
 
-- IMU transport supports UART and USB-serial behind the same lower interface. A concrete IMU protocol is selected in a later hardware task.
+- IMU transport supports UART and USB-serial behind the same hardware_module interface. A concrete IMU protocol is selected in a later hardware task.
 - Camera capture converges on a buffer-handle abstraction. V4L2/DMABUF is preferred when available; remote messages carry metadata or compressed frames, not local raw-frame copies in the realtime path.
-- Lidar and extra sensors extend lower drivers without changing middle or upper dependencies.
+- Lidar and extra sensors extend hardware_module drivers without changing protocol_module or application_module dependencies.
 
 ## 5. Minimal robot YAML
 
@@ -255,7 +267,7 @@ Rules:
 
 The logical-role binding pattern follows the useful part of `rm-controls/rm_control`, while intentionally omitting its controller and realtime tuning fields from the robot topology document.
 
-## 6. Middle layer
+## 6. protocol_module layer
 
 ### 6.1 Message model
 
@@ -327,7 +339,7 @@ Streaming setpoints never block an RT producer. Discrete actions do not report s
 
 ### 6.5 In-process fast path
 
-The public upper-facing API is independent of its delivery backend. In one process, middle selects a local backend:
+The public application_module-facing API is independent of its delivery backend. In one process, protocol_module selects a local backend:
 
 - latest-value double buffer/mailbox for sensor state and setpoints;
 - bounded SPSC ring for ordered discrete events;
@@ -350,7 +362,7 @@ Ethernet Zenoh nodes may publish commands, sensor samples and algorithm results.
 - link latency, jitter, loss and clock uncertainty are monitored separately;
 - PTP, hardware timestamps and TSN are future capability profiles, already represented by clock/link-quality fields.
 
-## 7. Upper control layer
+## 7. application_module control layer
 
 ### 7.1 Realtime scheduling model
 
@@ -387,7 +399,7 @@ RX remains event-driven. Control calculations and command emission have independ
 
 ### 7.3 Chassis modules
 
-Unified upper-facing types:
+Unified application_module-facing types:
 
 - `BodyTwist2 { vx, vy, yaw_rate }`;
 - `BodyPose2 { x, y, yaw }`;
@@ -411,14 +423,14 @@ wheel feedback + IMU + optional external pose correction
         -> trajectory / body velocity / heading controller
         -> morphology feasibility projection
         -> per-motor setpoints
-        -> middle command port
+        -> protocol_module command port
 ```
 
-SLAM, map management and global planning are external upper applications. They may send pose corrections, trajectories or goals through middle contracts.
+SLAM, map management and global planning are external application_module applications. They may send pose corrections, trajectories or goals through protocol_module contracts.
 
 ### 7.4 Arm and vision
 
-- Rust arm realtime coordination can run as isolated threads in `motion-rt` and only uses middle ports.
+- Rust arm realtime coordination can run as isolated threads in `motion-rt` and only uses protocol_module ports.
 - Non-Rust planners or vision algorithms run in separate processes and use Zenoh/Protobuf.
 - Camera capture and inference are isolated in `perception`; inference faults cannot terminate motion control.
 - Vision publishes observations/targets, not raw motor-driver commands. A control module with a valid resource lease converts targets into robot commands.
@@ -493,7 +505,7 @@ Mission validation rejects:
 - actions without a timeout or cancellation contract;
 - paths that can retain a lease after terminal completion.
 
-Leaf actions send a middle-layer command and await a correlated acknowledgement/event. They never call a lower driver. The executor is a single-thread serialized state reducer; external work runs elsewhere and returns events.
+Leaf actions send a protocol-module command and await a correlated acknowledgement/event. They never call a hardware_module driver. The executor is a single-thread serialized state reducer; external work runs elsewhere and returns events.
 
 Future visual/YAML tooling must compile to this same IR and run the same validator. It does not get a separate interpreter or safety model.
 
@@ -608,13 +620,13 @@ Use a standalone `zenoh-bridge-ros2dds` process rather than dynamically loading 
 
 ## 14. Compatibility and evolution
 
-- New device protocols add lower crates and contract mappings; they do not change upper dependencies.
-- New chassis morphologies implement a registered upper plugin/profile and declare required YAML roles.
+- New device protocols add hardware_module crates and contract mappings; they do not change application_module dependencies.
+- New chassis morphologies implement a registered application_module plugin/profile and declare required YAML roles.
 - New Protobuf fields are additive and compatibility-checked; breaking semantics use a new version.
 - RDK X5 adds a platform directory and a new performance qualification record, not `cfg` branches scattered through algorithms.
 - Network security later adds mTLS/ACL deployment policy and identity provisioning without changing command payload semantics.
 - Deterministic Ethernet later supplies a validated clock/link profile without changing consumers' freshness API.
-- Simulation later implements the same lower/middle interfaces and uses the same acceptance suites.
+- Simulation later implements the same hardware_module/protocol_module interfaces and uses the same acceptance suites.
 
 ## 15. Rollout and rollback
 

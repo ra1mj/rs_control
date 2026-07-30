@@ -10,8 +10,8 @@ Proposed child task map:
 |---|---|---|---|
 | 1 | `core-workspace-contracts` | Cargo workspace, layer APIs, YAML schema, Protobuf rules, dependency gate | approved parent design |
 | 2 | `orangepi-rt-platform` | Ubuntu/BSP/PREEMPT_RT image, CAN overlay, IRQ/CPU/thermal qualification | approved parent design |
-| 3 | `damiao-socketcan-driver` | SocketCAN lower adapter and DM-J4310-2EC driver | 1; hardware setup from 2 |
-| 4 | `zenoh-protobuf-middleware` | middle API, local fast path, codec, Zenoh key/QoS semantics | 1 |
+| 3 | `socketcan-damiao` | SocketCAN hardware adapter and DM-J4310-2EC driver | 1; hardware setup from 2 |
+| 4 | `zenoh-protobuf-middleware` | protocol_module API, local fast path, codec, Zenoh key/QoS semantics | 1 |
 | 5 | `single-motor-vertical-slice` | `motion-rt`, safe enable/control/feedback, leases, timing | 2, 3, 4 |
 | 6 | `observability-recording` | typed health/faults, tracing drain, metrics, MCAP/rolling buffer | 4, 5 |
 | 7 | `fsm-mission-orchestration` | lifecycle HSM, authority leases, mission DSL/runtime, replay tests | 4, 5, 6 |
@@ -25,7 +25,7 @@ Dependencies above must be copied into each child `prd.md`/`implement.md`; tree 
 
 Every child must satisfy applicable gates before the next dependent child starts:
 
-1. Layer dependency direction remains `upper -> middle -> lower`.
+1. Layer dependency direction remains `application_module -> protocol_module -> hardware_module`.
 2. No production code in `motion-rt` uses unbounded queues or blocks an RT thread.
 3. All external payloads have a single decoder/validator owner.
 4. All hardware-changing tests start disabled and require an explicit fixture/operator opt-in.
@@ -52,21 +52,21 @@ Use project-owned wrappers for target-board tests so they record board revision,
 ### A1. Scaffold the workspace
 
 - [ ] Add pinned Rust toolchain, workspace dependency policy and reproducible build metadata.
-- [ ] Create lower, middle, upper, integration and app directories from `design.md`.
+- [ ] Create hardware_module, protocol_module, application_module, integration and app directories from `design.md`.
 - [ ] Define allowed internal dependency edges in a machine-readable policy.
 - [ ] Add a CI/script check based on `cargo metadata` that rejects reverse or skipped-layer edges.
 - [ ] Configure formatting, Clippy, tests, dependency advisories/licenses and minimal supported Rust policy.
 
 Validation:
 
-- [ ] Deliberately injected `upper -> lower`, `lower -> middle`, `middle -> upper` and production-layer -> `test-support` dependencies are rejected by the architecture test.
+- [ ] Deliberately injected `application_module -> hardware_module`, `hardware_module -> protocol_module`, `protocol_module -> application_module` and production-layer -> `test-support` dependencies are rejected by the architecture test.
 - [ ] Composition-root exceptions are limited to named `apps/*` crates and checked to contain wiring only.
 
 Rollback: remove only newly scaffolded crates; do not weaken the dependency policy to make a bad edge compile.
 
-### A2. Define lower contracts
+### A2. Define hardware_module contracts
 
-- [ ] Define transport frame/batch, device lifecycle, monotonic time, sample quality and typed lower errors.
+- [ ] Define transport frame/batch, device lifecycle, monotonic time, sample quality and typed hardware_module errors.
 - [ ] Keep interfaces synchronous/allocation-free for realtime implementations.
 - [ ] Document ownership, thread-safety and blocking guarantees for every trait method.
 - [ ] Add compile-fail or trait-contract tests where useful.
@@ -78,7 +78,7 @@ Rollback: remove only newly scaffolded crates; do not weaken the dependency poli
 - [ ] Hash the normalized configuration and expose the hash in runtime metadata.
 - [ ] Add `robotctl config validate` and `robotctl config print-normalized`.
 - [ ] Keep deployment and protocol details out of this YAML.
-- [ ] Parse the full YAML only in a composition root, then pass lower/middle/upper narrowly typed immutable startup settings; no production layer imports `config-model`.
+- [ ] Parse the full YAML only in a composition root, then pass hardware_module/protocol_module/application_module narrowly typed immutable startup settings; no production layer imports `config-model`.
 
 Validation:
 
@@ -87,7 +87,7 @@ cargo test -p config-model
 cargo run -p robotctl -- config validate config/robots/example.yaml
 ```
 
-### A4. Define Protobuf and middle contracts
+### A4. Define Protobuf and protocol_module contracts
 
 - [ ] Create `robot.v1` schemas and the common header.
 - [ ] Define device state, control setpoint/action/ack, health/fault, lease, FSM and perception messages.
@@ -167,10 +167,13 @@ Rollback: restore the last qualified affinity/governor/kernel bundle as a unit.
 ### C2. DM protocol codec
 
 - [ ] Encode/decode MIT mode from official documentation/captured reference frames.
-- [ ] Implement static DM-J4310-2EC limits and explicit saturation/rejection.
+- [ ] Define the MIT frame layout and gain ranges statically; discover and
+      verify runtime `PMAX`, `VMAX` and `TMAX` while disarmed, bounded by a typed
+      safety policy. Reject out-of-range wire commands without implicit clamp.
 - [ ] Decode status, position, velocity, torque, MOS/rotor temperature and error codes.
 - [ ] Implement enable, disable, zero command and fault reset.
-- [ ] Implement read/verify of ESC_ID, MST_ID, mode and timeout; keep persistent writes maintenance-only.
+- [ ] Implement read/verify of ESC_ID, MST_ID, mode, timeout and runtime scaling;
+      keep runtime and persistent writes maintenance-only.
 - [ ] Use exhaustive boundary/property tests for float-to-integer mappings.
 
 Validation:
@@ -192,7 +195,7 @@ cargo test -p transport-socketcan -p motor-damiao
 
 Rollback: disable motor, remove torque, preserve CAN capture and restore known motor parameters; never bulk-write flash registers during rollback.
 
-## 6. Phase D — Middle local path and Zenoh
+## 6. Phase D — protocol_module local path and Zenoh
 
 ### D1. Local fast path
 
@@ -202,7 +205,7 @@ Rollback: disable motor, remove torque, preserve CAN capture and restore known m
 - [ ] Preallocate and prefault all RT-visible buffers.
 - [ ] Define overflow/latest-wins behavior and counters per channel.
 - [ ] Prove a blocked/crashed consumer cannot stop the producer.
-- [ ] Require explicit fixed-layout shared-memory payload safety; reject `needs_drop` or similar destructor-only POD inference and isolate any mmap/raw-atomic `unsafe` in a reviewed middle-layer boundary.
+- [ ] Require explicit fixed-layout shared-memory payload safety; reject `needs_drop` or similar destructor-only POD inference and isolate any mmap/raw-atomic `unsafe` in a reviewed protocol-module boundary.
 - [ ] Version the SHM layout and test incompatible layout rejection, torn reads, SIGKILL endpoint reclamation, endpoint exhaustion, PID reuse assumptions and sequence/drop accounting.
 
 Target-board benchmark:
@@ -216,7 +219,7 @@ Target-board benchmark:
 ### D2. Codec and Zenoh adapter
 
 - [ ] Implement the canonical key builder/parser in one crate.
-- [ ] Map lower samples to message model and Protobuf once at the middle boundary.
+- [ ] Map hardware_module samples to message model and Protobuf once at the protocol_module boundary.
 - [ ] Implement stream, action/ack, query/queryable and liveliness interaction classes.
 - [ ] Assign semantic QoS classes without allowing Zenoh calls on RT threads.
 - [ ] Validate source/boot/sequence/time/validity/quality for all network input.
@@ -278,7 +281,7 @@ Rollback: deploy the last known motor-disabled build and revoke all control leas
 - [ ] Add chunking, index, rotation, quota and crash recovery.
 - [ ] Implement data priority/drop policy and explicit gap records.
 - [ ] Implement rolling bulk-data buffers and fault/manual freeze triggers.
-- [ ] Build deterministic replay into middle test inputs without claiming a virtual device implementation.
+- [ ] Build deterministic replay into protocol_module test inputs without claiming a virtual device implementation.
 
 Validation:
 
@@ -384,14 +387,14 @@ Hardware gate:
 - [ ] Verify minimal YAML examples for all three chassis morphologies and an arm profile.
 - [ ] Produce wiring, operator safety, bring-up, configuration, deployment, monitoring and rollback documentation.
 - [ ] Capture software bill of materials, toolchain, dependency locks, kernel/firmware/config hashes and benchmark evidence.
-- [ ] Perform final cross-layer review: source sample -> lower -> middle -> upper -> command -> lower -> acknowledgement -> record/replay.
+- [ ] Perform final cross-layer review: source sample -> hardware_module -> protocol_module -> application_module -> command -> hardware_module -> acknowledgement -> record/replay.
 
 Final acceptance is against the parent PRD, not merely the last child task.
 
 ## 13. Deferred work
 
 - RDK X5 platform qualification.
-- Generic lower TCP/UDP device transports.
+- Generic hardware_module TCP/UDP device transports.
 - PTP/hardware timestamp/TSN deterministic Ethernet profile.
 - Production mTLS, identity provisioning and Zenoh ACLs.
 - Virtual devices, `vcan` simulation loop and Gazebo integration.

@@ -39,7 +39,7 @@
 - [x] Run `tools/ci.sh`.
 - [x] Review `git diff --check`, `git status --short` and the final rename-aware
       diff for accidental semantic edits.
-- [ ] Commit and push the naming migration independently before adding the new
+- [x] Commit and push the naming migration independently before adding the new
       SocketCAN or Damiao crates.
 
 ## 5. Rollback point

@@ -20,8 +20,10 @@ mw_expect() {
 mw_contains() { grep -F -- "$3" "$2" >/dev/null 2>&1 && mw_pass "$1" || { printf 'missing: %s in %s\n' "$3" "$2" >> "$mw_log"; mw_fail "$1"; }; }
 
 mw_run 'middleware qualification shell parses' sh -n "$mw_root/scripts/qualify-middleware.sh"
+mw_run 'middleware evidence common module compiles' env PYTHONPYCACHEPREFIX="$mw_tmp/pycache" python3 -m py_compile "$mw_root/scripts/middleware_evidence.py"
 mw_run 'middleware evaluator compiles' env PYTHONPYCACHEPREFIX="$mw_tmp/pycache" python3 -m py_compile "$mw_root/scripts/evaluate-middleware.py"
 mw_run 'Horus preflight validator compiles' env PYTHONPYCACHEPREFIX="$mw_tmp/pycache" python3 -m py_compile "$mw_root/scripts/validate-horus-preflight.py"
+mw_run 'middleware evidence verifier compiles' env PYTHONPYCACHEPREFIX="$mw_tmp/pycache" python3 -m py_compile "$mw_root/scripts/verify-middleware-evidence.py"
 mw_horus_commit=fac3cfb8704e275bde9daec6d554a17c59dd8532
 mw_preflight=$mw_tmp/horus-preflight.json
 printf '%s\n' "{\"schema_version\":1,\"candidate\":\"horus\",\"source_commit\":\"$mw_horus_commit\",\"target_os\":\"linux\",\"target_arch\":\"aarch64\",\"capacity\":64,\"payload_bytes\":[64,256,1024],\"kinds\":[\"latest\",\"ordered\"],\"latency_clock\":\"CLOCK_MONOTONIC\",\"operation_semantics\":\"try_publish_call\",\"memory_policy\":\"lock-required\",\"memory_lock_mechanism\":\"mlockall_current_future\",\"memory_lock_verified\":true,\"payload_contract\":\"repr_c_bytemuck_pod\",\"horus_generic_pod_detection\":\"needs_drop_heuristic_not_payload_proof\",\"hot_path_api\":\"try_send_try_recv\",\"fault_suite_ready\":true}" > "$mw_preflight"
@@ -158,5 +160,141 @@ mw_expect 1 'torn-value fault result fails' python3 -B "$mw_root/scripts/evaluat
     --results "$mw_fault" --output "$mw_tmp/fault.json" --capacity 64 --warmup 2 --samples 4 \
     --expected-arch aarch64 --horus-commit "$mw_horus_commit"
 mw_contains 'fault failure is retained' "$mw_tmp/fault.json" 'horus_fault_no_torn_values_failed'
+
+mw_bundle=$mw_tmp/evidence-bundle
+mw_app_commit=0000000000000000000000000000000000000000
+mkdir "$mw_bundle" "$mw_bundle/platform"
+cp -R "$mw_results" "$mw_bundle/results"
+cp "$mw_report" "$mw_bundle/comparison.json"
+cp "$mw_preflight" "$mw_bundle/horus-preflight.json"
+cp "$mw_root/sources.lock" "$mw_bundle/sources.lock"
+printf 'PROFILE_FORMAT_VERSION=1\nPROFILE_NAME=fixture\n' > "$mw_bundle/rt-profile.env"
+cat > "$mw_bundle/hardware-evidence.env" <<'EOF'
+HARDWARE_EVIDENCE_FORMAT_VERSION=1
+BOARD_MODEL=OrangePi5Plus
+BOARD_REVISION=v1.0
+POWER_SUPPLY=fixture-5v
+ACTIVE_COOLER=fixture-fan
+CAN_TRANSCEIVER=fixture-can
+CAN_ISOLATION_RATING=fixture-rated
+CAN_TERMINATION=fixture-120ohm
+SERIAL_CONSOLE_VERIFIED=1
+VENDOR_KERNEL_FALLBACK=fixture-recorded
+EOF
+mw_sources_sha=$(sha256sum "$mw_bundle/sources.lock" | awk '{print $1}')
+mw_profile_sha=$(sha256sum "$mw_bundle/rt-profile.env" | awk '{print $1}')
+cat > "$mw_bundle/inputs.env" <<EOF
+FORMAT_VERSION=1
+PROFILE=1khz
+MODE=baseline
+DURATION=1s
+APP_COMMIT=$mw_app_commit
+APP_BUILD_ID=fixture
+MEASUREMENT_CPU=7
+RT_PRIORITY=80
+CAPACITY=64
+WARMUP=2
+SAMPLES=4
+HORUS_COMMIT=$mw_horus_commit
+RUNNER_SHA256=1111111111111111111111111111111111111111111111111111111111111111
+HORUS_RUNNER_SHA256=2222222222222222222222222222222222222222222222222222222222222222
+SOURCES_LOCK_SHA256=$mw_sources_sha
+RT_PROFILE_SHA256=$mw_profile_sha
+EOF
+cat > "$mw_bundle/platform/verdict.env" <<'EOF'
+QUALIFICATION_STATUS=pass
+QUALIFICATION_REASON=within_threshold
+QUALIFICATION_SCOPE=kernel_platform
+PROFILE=1khz
+MODE=baseline
+DURATION_SECONDS=1
+INTERVAL_US=1000
+THRESHOLD_NS=100000
+MINIMUM_CYCLES=1
+APPLICATION_DEADLINE_EVIDENCE=pending_motion_rt
+EOF
+cat > "$mw_bundle/verdict.env" <<'EOF'
+QUALIFICATION_STATUS=pass
+QUALIFICATION_REASON=all_safety_gates_passed
+QUALIFICATION_SCOPE=rk3588_middleware_candidates
+PLATFORM_STATUS=pass
+PLATFORM_EXIT_CODE=0
+EVALUATOR_EXIT_CODE=0
+MATRIX_EXECUTION_FAILED=0
+PLATFORM_ENVELOPE_LOST=0
+PROFILE_MUTATED=0
+EOF
+(
+    cd "$mw_bundle/platform"
+    find . -type f ! -path './SHA256SUMS' -print | LC_ALL=C sort | while IFS= read -r mw_file; do sha256sum "$mw_file"; done > SHA256SUMS
+)
+(
+    cd "$mw_bundle"
+    find . -type f ! -path './SHA256SUMS' -print | LC_ALL=C sort | while IFS= read -r mw_file; do sha256sum "$mw_file"; done > SHA256SUMS
+)
+mw_contains 'top-level evidence digest anchors the platform manifest' "$mw_bundle/SHA256SUMS" './platform/SHA256SUMS'
+mw_bundle_sha=$(sha256sum "$mw_bundle/SHA256SUMS" | awk '{print $1}')
+mw_run 'sealed middleware evidence independently verifies' python3 -B "$mw_root/scripts/verify-middleware-evidence.py" \
+    --evidence "$mw_bundle" --expected-app-commit "$mw_app_commit" --expected-sha256 "$mw_bundle_sha"
+mw_contains 'evidence verifier reports qualification and aggregate digest' "$mw_log" 'verified qualification_status=pass evidence_sha256='
+mw_expect 1 'evidence verifier refuses relative bundle paths' sh -c \
+    'cd "$1" && python3 -B "$2/scripts/verify-middleware-evidence.py" --evidence evidence-bundle --expected-app-commit "$3"' sh "$mw_tmp" "$mw_root" "$mw_app_commit"
+mw_expect 1 'evidence verifier rejects caller app-commit mismatch' python3 -B "$mw_root/scripts/verify-middleware-evidence.py" \
+    --evidence "$mw_bundle" --expected-app-commit 1111111111111111111111111111111111111111
+mw_expect 1 'evidence verifier rejects caller aggregate-digest mismatch' python3 -B "$mw_root/scripts/verify-middleware-evidence.py" \
+    --evidence "$mw_bundle" --expected-app-commit "$mw_app_commit" \
+    --expected-sha256 0000000000000000000000000000000000000000000000000000000000000000
+
+mw_tampered=$mw_tmp/tampered-bundle
+cp -R "$mw_bundle" "$mw_tampered"
+printf 'tampered\n' >> "$mw_tampered/results/horus-latest-64.json"
+mw_expect 1 'evidence verifier rejects checksum tampering' python3 -B "$mw_root/scripts/verify-middleware-evidence.py" \
+    --evidence "$mw_tampered" --expected-app-commit "$mw_app_commit"
+
+mw_nested_tampered=$mw_tmp/nested-tampered-bundle
+cp -R "$mw_bundle" "$mw_nested_tampered"
+sed 's/^[0-9a-f]\{64\}/0000000000000000000000000000000000000000000000000000000000000000/' \
+    "$mw_nested_tampered/platform/SHA256SUMS" > "$mw_nested_tampered/platform/SHA256SUMS.rewrite"
+mv "$mw_nested_tampered/platform/SHA256SUMS.rewrite" "$mw_nested_tampered/platform/SHA256SUMS"
+(
+    cd "$mw_nested_tampered"
+    find . -type f ! -path './SHA256SUMS' -print | LC_ALL=C sort | while IFS= read -r mw_file; do sha256sum "$mw_file"; done > SHA256SUMS
+)
+mw_expect 1 'evidence verifier rejects a re-anchored invalid nested manifest' python3 -B "$mw_root/scripts/verify-middleware-evidence.py" \
+    --evidence "$mw_nested_tampered" --expected-app-commit "$mw_app_commit"
+
+mw_inconsistent=$mw_tmp/inconsistent-bundle
+cp -R "$mw_bundle" "$mw_inconsistent"
+sed 's/^QUALIFICATION_STATUS=pass$/QUALIFICATION_STATUS=incomplete/' \
+    "$mw_inconsistent/verdict.env" > "$mw_inconsistent/verdict.rewrite"
+mv "$mw_inconsistent/verdict.rewrite" "$mw_inconsistent/verdict.env"
+(
+    cd "$mw_inconsistent"
+    find . -type f ! -path './SHA256SUMS' -print | LC_ALL=C sort | while IFS= read -r mw_file; do sha256sum "$mw_file"; done > SHA256SUMS
+)
+mw_expect 1 'evidence verifier rejects sealed verdict inconsistency' python3 -B "$mw_root/scripts/verify-middleware-evidence.py" \
+    --evidence "$mw_inconsistent" --expected-app-commit "$mw_app_commit"
+
+mw_failed_bundle=$mw_tmp/failed-bundle
+cp -R "$mw_bundle" "$mw_failed_bundle"
+sed 's/"no_torn_values":true/"no_torn_values":false/' \
+    "$mw_failed_bundle/results/horus-faults.json" > "$mw_failed_bundle/results/horus-faults.rewrite"
+mv "$mw_failed_bundle/results/horus-faults.rewrite" "$mw_failed_bundle/results/horus-faults.json"
+mw_expect 1 'failed sealed-bundle fixture re-evaluates as fail' python3 -B "$mw_root/scripts/evaluate-middleware.py" \
+    --results "$mw_failed_bundle/results" --output "$mw_failed_bundle/comparison.rewrite" \
+    --capacity 64 --warmup 2 --samples 4 --expected-arch aarch64 --horus-commit "$mw_horus_commit"
+mv "$mw_failed_bundle/comparison.rewrite" "$mw_failed_bundle/comparison.json"
+sed -e 's/^QUALIFICATION_STATUS=pass$/QUALIFICATION_STATUS=fail/' \
+    -e 's/^QUALIFICATION_REASON=all_safety_gates_passed$/QUALIFICATION_REASON=safety_or_execution_gate_failed/' \
+    -e 's/^EVALUATOR_EXIT_CODE=0$/EVALUATOR_EXIT_CODE=1/' \
+    "$mw_failed_bundle/verdict.env" > "$mw_failed_bundle/verdict.rewrite"
+mv "$mw_failed_bundle/verdict.rewrite" "$mw_failed_bundle/verdict.env"
+(
+    cd "$mw_failed_bundle"
+    find . -type f ! -path './SHA256SUMS' -print | LC_ALL=C sort | while IFS= read -r mw_file; do sha256sum "$mw_file"; done > SHA256SUMS
+)
+mw_run 'internally valid failed evidence verifies without becoming eligible' python3 -B "$mw_root/scripts/verify-middleware-evidence.py" \
+    --evidence "$mw_failed_bundle" --expected-app-commit "$mw_app_commit"
+mw_contains 'failed evidence retains its qualification status' "$mw_log" 'verified qualification_status=fail'
 
 printf '1..%s\n' "$mw_count"

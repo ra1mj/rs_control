@@ -34,6 +34,8 @@ reviewed-horus-adapter preflight|benchmark|fault-suite \
   --payload-bytes <64|256|1024|64,256,1024> \
   --memory-policy lock-required --payload-contract repr_c_bytemuck_pod \
   --output <absent-file> [row-specific inputs]
+verify-middleware-evidence.py --evidence <absolute-sealed-directory> \
+  --expected-app-commit <reviewed-sha> [--expected-sha256 <external-digest>]
 evaluate-cyclictest.py <json> --threshold-ns <n> \
   [--expected-cpu <id>] [--minimum-cycles <n>]
 ```
@@ -104,6 +106,18 @@ REQUIRE_CONTROL_MAX_CAPACITY, REQUIRE_IO_MAX_CAPACITY
   `try_send`/`try_recv` hot path. The generic Horus `needs_drop` POD heuristic
   remains a recorded semantic difference, never layout proof. The envelope
   never edits a runtime profile.
+- Every evidence generator hashes all regular files below its output except
+  only its own `./SHA256SUMS`; parent manifests therefore anchor nested
+  manifests. `verify-middleware-evidence.py` rejects missing/extra/reordered or
+  changed files, symlinks and special files, verifies every nested manifest,
+  requires the bundle source lock to equal the reviewed verifier checkout,
+  revalidates exact input/hardware/Horus contracts, regenerates
+  `comparison.json` from raw results and re-derives the wrapper verdict. A
+  valid sealed `fail`/`incomplete` bundle verifies successfully but remains
+  ineligible; only its printed status describes qualification. The printed
+  aggregate digest is the SHA-256 of the top-level manifest. Review supplies
+  the expected app commit and may supply a previously stored aggregate digest;
+  neither trust anchor is taken from the bundle under review.
 - A 1 kHz failure may only lead to a separate explicit `--profile 500hz` run in
   a new output directory. No script performs rate fallback or candidate
   promotion automatically.
@@ -128,6 +142,7 @@ REQUIRE_CONTROL_MAX_CAPACITY, REQUIRE_IO_MAX_CAPACITY
 | Missing target `perf` cycles, lock/FIFO gate or valid Horus preflight | Refuse before evidence creation |
 | Missing candidate JSON/`perf` pair or pinned Horus fault evidence | `incomplete` |
 | Torn value, unaccounted loss, producer fault, hot allocation or invalid counted evidence | `fail` |
+| Missing/changed/reordered evidence file, unanchored nested manifest or verdict mismatch | Offline verification failure |
 
 ### 5. Good/Base/Bad Cases
 
@@ -147,7 +162,8 @@ REQUIRE_CONTROL_MAX_CAPACITY, REQUIRE_IO_MAX_CAPACITY
   concurrent partial-run behavior.
 - `platform/orangepi5plus/tests/middleware-host-test.sh` asserts target dry-run
   identity/lock/matrix policy, host refusal, complete/missing/bad evidence,
-  deterministic comparison bytes, semantic mismatch and torn-fault rejection.
+  deterministic comparison bytes, semantic mismatch, torn-fault rejection,
+  nested-manifest anchoring, raw-result re-evaluation and tamper rejection.
 - Cyclictest fixtures assert `100000 ns` pass, `100001 ns` fail, integer/unit
   strictness, expected CPU and minimum cycle coverage.
 - `tools/ci.sh` includes the host test but performs no fetch, kernel build, root
@@ -171,4 +187,8 @@ PROFILE_QUALIFIED=1  # set after a host fixture pass
 set_affinity(exact_cpu_set)
 read_back_affinity() == exact_cpu_set or refuse startup
 PROFILE_QUALIFIED=1 only with reviewed immutable target evidence SHA-256
+
+# In a nested evidence directory, exclude only the manifest being written.
+find . -type f ! -path './SHA256SUMS' ... > SHA256SUMS
+verify every child SHA256SUMS before accepting the top-level manifest digest
 ```

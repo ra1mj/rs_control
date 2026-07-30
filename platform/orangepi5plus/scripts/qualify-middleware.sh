@@ -341,7 +341,7 @@ fi
 } > "$mw_output/verdict.env"
 (
     cd "$mw_output"
-    find . -type f ! -name SHA256SUMS -print | LC_ALL=C sort | while IFS= read -r mw_file; do sha256sum "$mw_file"; done > SHA256SUMS
+    find . -type f ! -path './SHA256SUMS' -print | LC_ALL=C sort | while IFS= read -r mw_file; do sha256sum "$mw_file"; done > SHA256SUMS
 )
 trap - EXIT INT TERM HUP
 case "$mw_status" in pass) exit 0 ;; fail) exit 1 ;; incomplete) exit 2 ;; esac

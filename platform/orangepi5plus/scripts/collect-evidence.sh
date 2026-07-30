@@ -285,7 +285,7 @@ if command -v iperf3 >/dev/null 2>&1; then evidence_capture_command iperf3_versi
 
 (
     cd "$evidence_output"
-    find . -type f ! -name SHA256SUMS -print | LC_ALL=C sort | while IFS= read -r evidence_file; do
+    find . -type f ! -path './SHA256SUMS' -print | LC_ALL=C sort | while IFS= read -r evidence_file; do
         sha256sum "$evidence_file"
     done > SHA256SUMS
 )

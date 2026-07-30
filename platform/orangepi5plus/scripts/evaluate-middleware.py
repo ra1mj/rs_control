@@ -10,14 +10,19 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
+from middleware_evidence import (
+    KINDS,
+    PAYLOADS,
+    is_comparison_capacity,
+    read_json_object,
+    require_exact,
+)
 
 PROJECT_CANDIDATES = (
     ("local", "thread"),
     ("shm", "thread"),
     ("shm", "process"),
 )
-KINDS = ("latest", "ordered")
-PAYLOADS = (64, 256, 1024)
 PERF_EVENTS = (
     "cycles",
     "instructions",
@@ -40,23 +45,10 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def read_json(path: Path) -> dict[str, Any]:
-    with path.open("rb") as source:
-        value = json.load(source)
-    if not isinstance(value, dict):
-        raise ValueError("root must be an object")
-    return value
-
-
 def exact_int(value: Any, name: str, minimum: int = 0) -> int:
     if type(value) is not int or value < minimum:
         raise ValueError(f"{name} must be an integer >= {minimum}")
     return value
-
-
-def require_exact(value: Any, expected: Any, name: str) -> None:
-    if type(value) is not type(expected) or value != expected:
-        raise ValueError(f"{name} mismatch")
 
 
 def validate_histogram(value: Any, samples: int, name: str) -> list[int]:
@@ -310,7 +302,7 @@ def validate_faults(
         incomplete.append("horus_fault_evidence_missing")
     else:
         try:
-            value = read_json(horus_path)
+            value = read_json_object(horus_path)
             if (
                 type(value.get("schema_version")) is not int
                 or value.get("schema_version") != 1
@@ -371,7 +363,7 @@ def evaluate(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
                     continue
                 try:
                     observations[key] = validate_project(
-                        read_json(path),
+                        read_json_object(path),
                         backend=backend,
                         peer=peer,
                         kind=kind,
@@ -395,7 +387,7 @@ def evaluate(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
                 continue
             try:
                 observations[key] = validate_horus(
-                    read_json(path),
+                    read_json_object(path),
                     kind=kind,
                     payload=payload,
                     perf_path=perf_path,
@@ -444,9 +436,7 @@ def main() -> int:
         print(f"error: output already exists: {args.output}", file=sys.stderr)
         return 2
     if (
-        args.capacity < 16
-        or args.capacity > 1024
-        or args.capacity & (args.capacity - 1)
+        not is_comparison_capacity(args.capacity)
         or args.warmup < 0
         or args.samples < 1
     ):

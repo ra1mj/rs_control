@@ -363,6 +363,7 @@ test_run 'baseline qualification closes the fixture evidence loop' env PATH="$te
     --output "$test_baseline" --rt-profile "$test_profile" --sys-root "$test_sys" --proc-root "$test_proc" \
     --hardware-manifest "$test_hardware" --overlay-file "$test_overlay" --app-build-id host-test
 test_assert_contains 'baseline fixture receives a kernel-platform pass' "$test_baseline/verdict.env" 'QUALIFICATION_STATUS=pass'
+test_assert_contains 'qualification digest anchors its collected evidence manifest' "$test_baseline/SHA256SUMS" './platform/SHA256SUMS'
 test_missing_physical=$test_root/qualification-missing-physical-evidence
 test_expect_status 2 'baseline without physical identity remains incomplete' env PATH="$test_bin:$PATH" RS_TEST_MARKER_DIR="$test_markers" \
     "$test_platform_root/scripts/qualify-rt.sh" --profile 1khz --mode baseline --duration 1s \

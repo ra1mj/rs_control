@@ -43,6 +43,8 @@
       incomplete fixture evidence.
 - [x] Test evaluator good/base/bad bundles, semantic mismatch, nonzero
       allocation, missing Horus, torn/fault failure and deterministic output.
+- [x] Add offline sealed-bundle verification that anchors nested manifests,
+      replays raw evaluation/verdict logic and rejects tampering.
 - [x] Run `./tools/ci.sh`, task validation and `git diff --check`.
 
 ## 5. Physical execution gate

@@ -183,6 +183,28 @@ failure is preserved. Testing 500 Hz requires a separate explicit run with
 `--profile 500hz` and a different absent output directory; no fallback or
 profile promotion is automatic.
 
+From a clean checkout of the reviewed application commit, review a sealed
+bundle independently before using its digest:
+
+```bash
+platform/orangepi5plus/scripts/verify-middleware-evidence.py \
+  --evidence /var/lib/rs-control/qualification/<unique-middleware-id> \
+  --expected-app-commit <reviewed-full-clean-git-sha>
+```
+
+The path must be absolute. The verifier checks the exact file set and hashes at
+every nested `SHA256SUMS`, requires each parent manifest to anchor child
+manifests, requires the bundle source lock to match the reviewed checkout,
+validates profile/hardware identities and the Horus preflight,
+re-runs `evaluate-middleware.py` against the raw results, and derives the
+wrapper status/reason again. It exits zero when a sealed bundle is internally
+valid even if its reported qualification is `fail` or `incomplete`; selection
+still requires the printed `qualification_status=pass`. The printed
+`evidence_sha256` is the SHA-256 of the top-level `SHA256SUMS` and must be
+recorded outside the bundle before any profile promotion. Subsequent reviews
+add `--expected-sha256 <externally-recorded-digest>` so a fully re-sealed but
+different bundle is also rejected.
+
 The project `thread` rows use a real separate consumer thread with an atomic
 per-sample acknowledgement outside the timed producer call; they are not
 single-thread loopback measurements. The process row and Horus adapter declare

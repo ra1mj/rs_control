@@ -20,6 +20,10 @@ platform/orangepi5plus/scripts/rt-affinity.sh plan
 platform/orangepi5plus/scripts/can-link.sh plan
 platform/orangepi5plus/tests/host-test.sh
 platform/orangepi5plus/tests/middleware-host-test.sh
+# After a target run, with an absolute bundle path:
+platform/orangepi5plus/scripts/verify-middleware-evidence.py \
+  --evidence /absolute/path/to/sealed-middleware-evidence \
+  --expected-app-commit <reviewed-full-git-sha>
 ```
 
 These commands do not fetch source, build a kernel, write `/sys` or `/proc`,
@@ -79,4 +83,8 @@ the candidate profile itself. A reviewed adapter `preflight` must prove the
 explicit payload layout, `CLOCK_MONOTONIC`, `try_send`/`try_recv`, process-wide
 `mlockall` and fault-suite readiness before that directory is created. See the
 middleware section of the realtime qualification runbook for adapter and
-evidence contracts.
+evidence contracts. The offline verifier checks every nested and top-level
+checksum manifest, re-evaluates raw middleware results, revalidates the Horus
+preflight and derives the wrapper verdict again. It reports the SHA-256 of the
+top-level manifest for external review; it never turns failed or incomplete
+evidence into a pass.

@@ -457,7 +457,7 @@ fi
 
 (
     cd "$qualify_output"
-    find . -type f ! -name SHA256SUMS -print | LC_ALL=C sort | while IFS= read -r qualify_file; do
+    find . -type f ! -path './SHA256SUMS' -print | LC_ALL=C sort | while IFS= read -r qualify_file; do
         sha256sum "$qualify_file"
     done > SHA256SUMS
 )

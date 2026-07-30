@@ -109,7 +109,14 @@ thermal/frequency failure or identity mismatch is disqualifying.
 
 Every raw input/result is written once under a new output directory. The
 evaluator writes a deterministic comparison report and the envelope hashes all
-files into `SHA256SUMS`. Failed/incomplete bundles are preserved. Rollback is
+files into `SHA256SUMS`; each parent manifest includes child manifests so the
+top digest anchors the complete tree. The offline verifier checks every
+manifest and exact file set, rejects symlinks/special files, revalidates input,
+hardware and Horus contracts, regenerates the comparison from raw results and
+re-derives the wrapper verdict. Its printed aggregate digest is the SHA-256 of
+the top manifest and is recorded outside the bundle. A valid sealed
+failed/incomplete bundle verifies as internally consistent but is never
+selection evidence. Failed/incomplete bundles are preserved. Rollback is
 to discard a candidate output directory and rerun into a different absent
 directory; profiles remain candidate/unqualified until a separately reviewed
 passing digest is installed.

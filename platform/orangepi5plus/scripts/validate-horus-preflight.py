@@ -7,11 +7,14 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any
 
-
-PAYLOADS = [64, 256, 1024]
-KINDS = ["latest", "ordered"]
+from middleware_evidence import (
+    KINDS,
+    PAYLOADS,
+    is_comparison_capacity,
+    read_json_object,
+    require_exact,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -23,14 +26,6 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def read_object(path: Path) -> dict[str, Any]:
-    with path.open("rb") as source:
-        value = json.load(source)
-    if not isinstance(value, dict):
-        raise ValueError("root must be an object")
-    return value
-
-
 def main() -> int:
     args = parse_args()
     expected = {
@@ -40,8 +35,8 @@ def main() -> int:
         "target_os": "linux",
         "target_arch": args.expected_arch,
         "capacity": args.capacity,
-        "payload_bytes": PAYLOADS,
-        "kinds": KINDS,
+        "payload_bytes": list(PAYLOADS),
+        "kinds": list(KINDS),
         "latency_clock": "CLOCK_MONOTONIC",
         "operation_semantics": "try_publish_call",
         "memory_policy": "lock-required",
@@ -52,15 +47,13 @@ def main() -> int:
         "hot_path_api": "try_send_try_recv",
         "fault_suite_ready": True,
     }
-    if args.capacity < 16 or args.capacity > 1024 or args.capacity & (args.capacity - 1):
+    if not is_comparison_capacity(args.capacity):
         print("error: capacity must be a power of two in 16..=1024", file=sys.stderr)
         return 2
     try:
-        value = read_object(args.input)
+        value = read_json_object(args.input)
         for key, expected_value in expected.items():
-            actual = value.get(key)
-            if type(actual) is not type(expected_value) or actual != expected_value:
-                raise ValueError(f"{key} mismatch")
+            require_exact(value.get(key), expected_value, key)
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as error:
         print(f"error: invalid Horus preflight: {error}", file=sys.stderr)
         return 1

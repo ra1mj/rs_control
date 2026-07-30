@@ -140,3 +140,36 @@ Added additive robot.v1 time/navigation/action/health contracts, validated seman
 ### Next Steps
 
 - None - task complete
+
+
+## Session 5: Zenoh Protobuf middleware
+
+**Date**: 2026-07-30
+**Task**: Zenoh Protobuf middleware
+**Branch**: `main`
+
+### Summary
+
+Added bounded backend-neutral middleware ports, a nonblocking local backend, additive command intents, guarded non-RT Zenoh TCP bridging, real loopback/fault coverage, dependency policy, and durable middleware contracts; full CI passed. Created the deferred local SHM/RK3588 qualification task.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4105340` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

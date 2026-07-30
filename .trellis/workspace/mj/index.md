@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 4
+- **Total Sessions**: 5
 - **Last Active**: 2026-07-30
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~142 | Active |
+| `journal-1.md` | ~175 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 5 | 2026-07-30 | Zenoh Protobuf middleware | `4105340` | `main` |
 | 4 | 2026-07-30 | Zenoh ROS 2 protocol contract | `c2b0924` | `main` |
 | 3 | 2026-07-30 | SocketCAN and Damiao host implementation | `8d30559` | `main` |
 | 2 | 2026-07-30 | Rename architecture modules and finalize SocketCAN plan | `4aa33e9`, `2a4d836` | `main` |

@@ -107,3 +107,36 @@ Added backend-neutral classic CAN contracts, exact socketcan 3.6.2 bounded trans
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: Zenoh ROS 2 protocol contract
+
+**Date**: 2026-07-30
+**Task**: Zenoh ROS 2 protocol contract
+**Branch**: `main`
+
+### Summary
+
+Added additive robot.v1 time/navigation/action/health contracts, validated semantic codecs, a strict Humble route registry with hashed interface sources, pure ROS projections, lease/deadline ingress enforcement, tests, and executable specs; full host CI passed.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c2b0924` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

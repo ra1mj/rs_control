@@ -1,0 +1,33 @@
+{
+  "id": "rk3588-middleware-qualification",
+  "name": "rk3588-middleware-qualification",
+  "title": "RK3588 middleware qualification",
+  "description": "Run and preserve Orange Pi 5 Plus/RK3588 latency, maximum jitter, CPU, allocation, contention, slow-consumer, overflow and crash evidence for local middleware candidates and the pinned Horus comparison.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": "Orange Pi 5 Plus/RK3588 local middleware performance, stress, allocation and crash evidence",
+  "package": null,
+  "priority": "P2",
+  "creator": "mj",
+  "assignee": "mj",
+  "createdAt": "2026-07-30",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "07-30-local-shm-rk3588-qualification",
+  "relatedFiles": [
+    "crates/integration/middleware-qualification",
+    "crates/protocol_module/middleware-local",
+    "crates/protocol_module/middleware-shm",
+    "platform/orangepi5plus",
+    "platform/orangepi5plus/sources.lock",
+    ".trellis/spec/backend/realtime-platform.md"
+  ],
+  "notes": "Depends on archived host child 07-30-shm-middleware-backend. Host fixtures and short target runs remain incomplete; no hardware qualification without immutable physical evidence.",
+  "meta": {}
+}

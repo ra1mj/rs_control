@@ -1,0 +1,18 @@
+[package]
+name = "middleware-qualification"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+allocation-counter.workspace = true
+bytemuck.workspace = true
+clap.workspace = true
+middleware-api.workspace = true
+middleware-local.workspace = true
+middleware-shm.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

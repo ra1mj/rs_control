@@ -154,6 +154,10 @@ latest_channel<T: Copy + Send + 'static>()
     -> (LocalLatestPublisher<T>, LocalLatestSubscriber<T>)
 ordered_channel<T: Send + 'static>(capacity: usize)
     -> Result<(LocalEventPublisher<T>, LocalEventSubscriber<T>), ChannelError>
+ShmNamespace::create_latest<R: ShmPayload>(name, config) -> Result<(), ShmError>
+ShmNamespace::create_ordered<R: ShmPayload>(name, config) -> Result<(), ShmError>
+ShmNamespace::attach_{latest,event}_{publisher,subscriber}<T, C: ShmCodec<T>>(...)
+    -> Result<nonclonable typed endpoint, ShmError>
 ZenohBridge::spawn(config: ZenohBridgeConfig, routes: BridgeRoutes)
     -> Result<ZenohBridge, BridgeError>
 ZenohBridge::query(endpoint: EndpointId, payload: Vec<u8>)
@@ -176,6 +180,26 @@ CommandIntent::materialize(local_lease, received_mono_ns, route_max_ttl_ns)
   Steady-state producer calls never block: latest replaces an unread value;
   ordered full/disconnected errors return ownership of `T`. Dependency types
   remain private to `middleware-local`.
+- Linux cross-process ports use layout-v1 `middleware-shm` behind those same
+  traits. A shared representation must explicitly implement
+  `ShmPayload: bytemuck::Pod` and carry a nonzero stable 16-byte schema ID plus
+  schema version; matching size, Rust type name or `needs_drop == false` is not
+  eligibility. A bounded `ShmCodec` keeps semantic `T` separate and may reject
+  a complete representation without exposing it to application code.
+- SHM creation/attach/cleanup are startup/admin operations in an absolute,
+  exact-mode-0700 private namespace. Creation is `create_new`; mapped files are
+  never resized. Every mapping holds a shared region lock, while init/removal
+  require its exclusive lock. Publisher/subscriber authority is a distinct
+  nonblocking lifetime `flock`; PID/epoch/active fields are diagnostics only.
+  Cleanup is explicit and endpoint destructors never unlink.
+- Layout v1 is Linux, little-endian SPSC with lock-free 8/64-bit atomics. It
+  validates ready magic, layout/endian/atomic/kind/capacity, payload schema/
+  version/size/alignment, offsets/stride and exact file length before exposing
+  an endpoint. Producer and consumer header lines are cache separated; payload
+  bytes are atomic and slots use position-tagged odd/even versions. Latest
+  reads retry at most 16 times; ordered full and both disconnected producer
+  outcomes return immediately. Hot methods allocate zero bytes and perform no
+  file operation, sleep, mapping change or lock acquisition.
 - Cross-host commands use `CommandIntent` with asserted resource/owner/lease/
   session/command IDs and a nonzero requested TTL. The receiver matches an
   existing local lease, uses local reception time, and caps TTL by both the
@@ -204,6 +228,10 @@ CommandIntent::materialize(local_lease, received_mono_ns, route_max_ttl_ns)
 | Stalled latest consumer | publish newest generation and increment overwrite count |
 | Full ordered queue | `EventPublishError::Full(T)` with exact value ownership |
 | Dropped local consumer / stopped bridge | typed `Disconnected(T)` or `LatestPublish::Disconnected` |
+| Live SHM endpoint lock | `EndpointOccupied`; PID metadata never overrides the lock |
+| Wrong SHM ready/layout/schema/file length | typed startup rejection; no port is returned |
+| SHM writer killed under odd slot stamp | bounded empty/race result; never decode partial bytes |
+| SHM consumer killed with ordered backlog | producer remains nonblocking; proven replacement skips and counts backlog |
 | Oversized Zenoh payload | reject before decode and increment `oversized` |
 | Unexpected source, unavailable route or unapproved/retired boot | typed `IngressError` plus saturating counter |
 | Duplicate/reordered sequence | reject; do not refresh local expiry |
@@ -232,6 +260,10 @@ CommandIntent::materialize(local_lease, received_mono_ns, route_max_ttl_ns)
 - Local tests warm up then assert zero steady-state allocations, exact
   overwrite/full/disconnect counters, rejected-value ownership, stalled
   consumers and independent-thread progress.
+- SHM tests additionally use real subprocesses and `SIGKILL` for lock
+  reclamation, corrupt diagnostic PID metadata, a writer stopped under an odd
+  stamp, slow/crashed consumers, exact abandoned-backlog accounting, live/
+  same-process endpoint refusal, schema/length mismatch and explicit cleanup.
 - Codec tests prove intents contain TTL but no remote executable deadline and
   reject missing/malformed/unknown/zero inputs.
 - Fault tests script loss, delay/stale, duplicate, reorder, source/quality,

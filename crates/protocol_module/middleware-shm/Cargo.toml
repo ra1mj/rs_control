@@ -1,0 +1,32 @@
+[package]
+name = "middleware-shm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+fault-injection = []
+
+[dependencies]
+bytemuck.workspace = true
+memmap2.workspace = true
+middleware-api.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+allocation-counter.workspace = true
+tempfile.workspace = true
+
+# This crate is the one reviewed exception to the workspace-wide unsafe forbid.
+# Unsafe stays denied by default and is allowed only inside `src/mapping.rs`.
+[lints.rust]
+unsafe_code = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+unused_must_use = "deny"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"

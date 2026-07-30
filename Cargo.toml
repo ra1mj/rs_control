@@ -4,6 +4,7 @@ members = [
     "crates/integration/config-model",
     "crates/integration/ros2-mapping",
     "crates/integration/test-support",
+    "crates/integration/middleware-qualification",
     "crates/hardware_module/hardware-module-core",
     "crates/hardware_module/motor-damiao",
     "crates/hardware_module/transport-socketcan",
@@ -11,6 +12,7 @@ members = [
     "crates/protocol_module/message-model",
     "crates/protocol_module/middleware-api",
     "crates/protocol_module/middleware-local",
+    "crates/protocol_module/middleware-shm",
     "crates/protocol_module/middleware-zenoh",
     "crates/protocol_module/proto-generated",
     "crates/application_module/control-core",
@@ -28,6 +30,7 @@ license = "Apache-2.0"
 [workspace.dependencies]
 allocation-counter = "=0.8.1"
 arrayvec = "0.7.8"
+bytemuck = { version = "=1.25.2", features = ["derive"] }
 cargo_metadata = "0.23.1"
 clap = { version = "4.6.4", features = ["derive"] }
 config-model = { version = "0.1.0", path = "crates/integration/config-model" }
@@ -36,11 +39,13 @@ hardware-module-core = { version = "0.1.0", path = "crates/hardware_module/hardw
 message-model = { version = "0.1.0", path = "crates/protocol_module/message-model" }
 middleware-api = { version = "0.1.0", path = "crates/protocol_module/middleware-api" }
 middleware-local = { version = "0.1.0", path = "crates/protocol_module/middleware-local" }
+middleware-shm = { version = "0.1.0", path = "crates/protocol_module/middleware-shm" }
 middleware-zenoh = { version = "0.1.0", path = "crates/protocol_module/middleware-zenoh" }
 motor-damiao = { version = "0.1.0", path = "crates/hardware_module/motor-damiao" }
 prost = "0.14.4"
 prost-build = "0.14.4"
 prost-types = "0.14.4"
+memmap2 = "=0.9.11"
 proto-generated = { version = "0.1.0", path = "crates/protocol_module/proto-generated" }
 ros2-mapping = { version = "0.1.0", path = "crates/integration/ros2-mapping" }
 protoc-bin-vendored = "3.2.0"
@@ -49,7 +54,7 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde-saphyr = { version = "0.0.29", default-features = false, features = ["deserialize"] }
 sha2 = "0.11.0"
 socketcan = { version = "=3.6.2", default-features = false }
-tempfile = "3.27.0"
+tempfile = "=3.27.0"
 thiserror = "2.0.19"
 toml = "1.1.4"
 waitfree-sync = "=0.3.3"

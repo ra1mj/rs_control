@@ -20,6 +20,9 @@ can-link.sh plan|check|up|status|recover|down
 collect-evidence.sh --output <absolute-new-directory> [evidence inputs]
 qualify-rt.sh --profile 1khz|500hz --mode baseline|concurrent \
   --duration <time> --output <absolute-new-directory> [stress/evidence inputs]
+middleware-qualification --backend local|shm --kind latest|ordered \
+  --peer thread|process --payload-bytes 64|256|1024 \
+  --capacity <n> --warmup <n> --samples <n> [--output <absent-file>]
 evaluate-cyclictest.py <json> --threshold-ns <n> \
   [--expected-cpu <id>] [--minimum-cycles <n>]
 ```
@@ -69,6 +72,14 @@ REQUIRE_CONTROL_MAX_CAPACITY, REQUIRE_IO_MAX_CAPACITY
   target storage, real bidirectional Ethernet with identified interface, driver,
   carrier and peer route, and a representative accelerator workload plus
   thermal/frequency monitoring.
+- `middleware-qualification` is a bounded evidence producer, not a profile
+  mutator. It emits schema-versioned deterministic JSON labeled
+  `qualification=host_research`, includes raw settings, logarithmic latency
+  buckets/max, operation max, wall/process CPU time, allocation totals and
+  delivery counters, and creates an optional output file exclusively. Its host
+  runs and short target runs cannot set `PROFILE_QUALIFIED` or close RK3588
+  acceptance; the target task must add immutable board/kernel/affinity/stress/
+  thermal identity and the pinned Horus comparison.
 
 ### 4. Validation & Error Matrix
 
@@ -84,6 +95,9 @@ REQUIRE_CONTROL_MAX_CAPACITY, REQUIRE_IO_MAX_CAPACITY
 | Maximum cyclic latency above threshold | `fail` |
 | Frequency drop, passive/hot/critical trip or operator thermal event | `fail` |
 | 1 kHz failure | Preserve evidence; never switch rate automatically |
+| Zero/excessive middleware samples/capacity or unsupported payload size | Refuse before creating channels |
+| Local backend requested with process peer | Refuse; only SHM is cross-process |
+| Existing middleware evidence output | Refuse overwrite |
 
 ### 5. Good/Base/Bad Cases
 

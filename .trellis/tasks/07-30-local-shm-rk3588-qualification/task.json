@@ -5,7 +5,7 @@
   "description": "Implement and explicitly review the cross-process local shared-memory backend, crash recovery, prefault/memory-lock behavior, and RK3588 latency/load qualification while preserving the bounded middleware ports delivered by the Zenoh child.",
   "status": "planning",
   "dev_type": null,
-  "scope": null,
+  "scope": "cross-process protocol middleware plus Orange Pi 5 Plus/RK3588 qualification evidence",
   "package": null,
   "priority": "P2",
   "creator": "mj",
@@ -18,9 +18,18 @@
   "commit": null,
   "pr_url": null,
   "subtasks": [],
-  "children": [],
+  "children": [
+    "07-30-shm-middleware-backend",
+    "07-30-rk3588-middleware-qualification"
+  ],
   "parent": "07-29-rust-robot-framework",
-  "relatedFiles": [],
-  "notes": "",
+  "relatedFiles": [
+    "crates/protocol_module/middleware-api",
+    "crates/protocol_module/middleware-local",
+    "platform/orangepi5plus",
+    ".trellis/spec/backend/robot-contracts.md",
+    ".trellis/spec/backend/realtime-platform.md"
+  ],
+  "notes": "Planning parent only. Host SHM implementation and physical RK3588 qualification are separate children so host work can complete without weakening the target evidence gate.",
   "meta": {}
 }

@@ -76,7 +76,7 @@ reconciled with parent requirements R22, R26-R32, R48, R100, R104, and R105.
 
 ## Acceptance criteria
 
-- [ ] The SHM backend child is archived with its full host gate passing and a
+- [x] The SHM backend child is archived with its full host gate passing and a
       reviewed contained-`unsafe` inventory.
 - [x] Real subprocess tests prove clean-exit and `SIGKILL` endpoint recovery,
       bounded torn-read behavior, and producer independence from consumers.

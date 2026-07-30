@@ -180,6 +180,6 @@ git status --short
 - [x] Mark PRD/checklists complete only with command and fault-test evidence.
 - [x] Commit only task-scoped code/spec/planning files; preserve unrelated
       workspace bootstrap files.
-- [ ] Archive this host child, record the journal and push.
+- [x] Archive this host child, record the journal and push.
 - [x] Leave the RK3588 child planning/in-progress with exact commands and
       evidence requirements; do not mark target performance criteria complete.

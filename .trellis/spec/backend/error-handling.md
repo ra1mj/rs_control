@@ -25,7 +25,7 @@ Preserve the error source with `#[source]`/`#[from]`. Validation constructors re
 ## Safety Rules
 
 - Missing/stale feedback is never converted to numeric zero.
-- Unknown/`UNSPECIFIED` wire enum values are errors at the middle boundary.
+- Unknown/`UNSPECIFIED` wire enum values are errors at the `protocol_module` boundary.
 - Safety logic consumes numeric/typed fault codes, never formatted log text.
 - Expired commands and leases are rejected, not clamped or refreshed implicitly.
 - Directory and schema discovery propagates entry errors; `filter_map(Result::ok)` is forbidden at contract/build boundaries.

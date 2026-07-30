@@ -1,4 +1,4 @@
-//! Semantic messages exposed by the middle layer.
+//! Semantic messages exposed by the `protocol_module`.
 //!
 //! These types are independent of Protobuf-generated DTOs and avoid heap
 //! allocation for stable identifiers used by local realtime channels.
@@ -175,7 +175,7 @@ pub struct ClockStatus {
     pub uncertainty_ns: u64,
 }
 
-/// Semantic quality exposed through middle-layer contracts.
+/// Semantic quality exposed through protocol-module contracts.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum DataQuality {
     /// Data is valid for its documented use.
@@ -510,7 +510,7 @@ impl CommandEnvelope {
     }
 }
 
-/// Semantic validation failure at the middle boundary.
+/// Semantic validation failure at the protocol-module boundary.
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 pub enum SemanticError {
     /// A zero validity window would make freshness semantics ambiguous.

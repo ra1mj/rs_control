@@ -1,0 +1,12 @@
+[[packages]]
+name = "control-core"
+path = "crates/application_module/control-core"
+
+[[packages]]
+name = "hardware-module-core"
+path = "crates/hardware_module/hardware-module-core"
+
+[[dependencies]]
+source = "control-core"
+target = "hardware-module-core"
+kind = "normal"

@@ -8,7 +8,7 @@ This child task turns the parent architecture's realtime assumptions into a boar
 2. **Target observation truth** — what the actual Orange Pi reports after boot, including topology, IRQ routing, thermal behavior and CAN state.
 3. **Qualification truth** — raw timing/stress evidence plus a machine-readable verdict. A candidate configuration is not qualified merely because it looks reasonable.
 
-The platform directory contains OS integration code only. It does not become a lower-layer device API and it does not relax the dependency rule `upper -> middle -> lower`.
+The platform directory contains OS integration code only. It does not become a hardware-module device API and it does not relax the dependency rule `application_module -> protocol_module -> hardware_module`.
 
 ## 2. Deliverable layout
 
@@ -192,7 +192,7 @@ recover    require an explicit disarmed confirmation, then cycle the link
 down       require an explicit disarmed confirmation
 ```
 
-The effective link contract is classic CAN, bitrate 1,000,000, bus-error reporting enabled and `restart-ms 0`. Automatic bus-off recovery is deliberately disabled so a later motor lifecycle can revoke authority before recovery. The Rust lower driver will own frame parsing and operational bus-off policy in its own child task.
+The effective link contract is classic CAN, bitrate 1,000,000, bus-error reporting enabled and `restart-ms 0`. Automatic bus-off recovery is deliberately disabled so a later motor lifecycle can revoke authority before recovery. The Rust hardware_module driver will own frame parsing and operational bus-off policy in its own child task.
 
 ## 6. Qualification and evidence
 
@@ -246,7 +246,7 @@ rt-affinity-check.txt / verdict.env / SHA256SUMS
 
 The verdict is one of `pass`, `fail` or `incomplete` with reason codes. Tools never overwrite the raw inputs when calculating a verdict.
 
-## 7. Horus-derived middle-layer follow-up
+## 7. Horus-derived protocol-module follow-up
 
 The reviewed Horus commit provides useful patterns for the future `zenoh-protobuf-middleware` child:
 
@@ -266,7 +266,7 @@ The project will not copy these aspects unchanged:
 - shared-memory layout needs project magic/version/schema identity, architecture/endianness policy and clean incompatibility rejection.
 - file-lock ownership is a cold-path lifecycle mechanism, never a hot-path queue lock.
 
-The eventual implementation stays in the middle layer. Upper algorithms, including chassis/arm/vision, continue to consume middle interfaces and never open shared-memory files directly.
+The eventual implementation stays in the protocol_module layer. application_module algorithms, including chassis/arm/vision, continue to consume protocol_module interfaces and never open shared-memory files directly.
 
 ## 8. Rollout and rollback
 

@@ -2,7 +2,7 @@
   "id": "core-workspace-contracts",
   "name": "core-workspace-contracts",
   "title": "Core workspace and contracts",
-  "description": "Phase A: scaffold the Rust workspace, enforce layer dependencies, define lower contracts, implement the minimal robot YAML and establish Protobuf v1 contracts. Depends on the approved rust-robot-framework parent design.",
+  "description": "Phase A: scaffold the Rust workspace, enforce layer dependencies, define hardware_module contracts, implement the minimal robot YAML and establish Protobuf v1 contracts. Depends on the approved rust-robot-framework parent design.",
   "status": "completed",
   "dev_type": null,
   "scope": null,

@@ -1,0 +1,12 @@
+[[packages]]
+name = "hardware-module-core"
+path = "crates/hardware_module/hardware-module-core"
+
+[[packages]]
+name = "message-model"
+path = "crates/protocol_module/message-model"
+
+[[dependencies]]
+source = "hardware-module-core"
+target = "message-model"
+kind = "normal"

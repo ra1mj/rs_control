@@ -445,32 +445,38 @@ mod tests {
     }
 
     #[test]
-    fn rejects_upper_to_lower_fixture() {
-        let graph = fixture(include_str!("../tests/fixtures/upper_to_lower.toml"));
+    fn rejects_application_module_to_hardware_module_fixture() {
+        let graph = fixture(include_str!(
+            "../tests/fixtures/application_module_to_hardware_module.toml"
+        ));
         assert!(contains_forbidden(
             &validate(&policy(), &graph),
-            "upper",
-            "lower"
+            "application_module",
+            "hardware_module"
         ));
     }
 
     #[test]
-    fn rejects_lower_to_middle_fixture() {
-        let graph = fixture(include_str!("../tests/fixtures/lower_to_middle.toml"));
+    fn rejects_hardware_module_to_protocol_module_fixture() {
+        let graph = fixture(include_str!(
+            "../tests/fixtures/hardware_module_to_protocol_module.toml"
+        ));
         assert!(contains_forbidden(
             &validate(&policy(), &graph),
-            "lower",
-            "middle"
+            "hardware_module",
+            "protocol_module"
         ));
     }
 
     #[test]
-    fn rejects_middle_to_upper_fixture() {
-        let graph = fixture(include_str!("../tests/fixtures/middle_to_upper.toml"));
+    fn rejects_protocol_module_to_application_module_fixture() {
+        let graph = fixture(include_str!(
+            "../tests/fixtures/protocol_module_to_application_module.toml"
+        ));
         assert!(contains_forbidden(
             &validate(&policy(), &graph),
-            "middle",
-            "upper"
+            "protocol_module",
+            "application_module"
         ));
     }
 

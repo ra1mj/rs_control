@@ -15,7 +15,7 @@
 
 ### Summary
 
-Delivered the pinned Rust workspace, compile-time layer policy, allocation-conscious lower contracts, minimal validated robot YAML/CLI, and Protobuf v1 semantic/compatibility baseline; the full host quality gate passed.
+Delivered the pinned Rust workspace, compile-time layer policy, allocation-conscious hardware_module contracts, minimal validated robot YAML/CLI, and Protobuf v1 semantic/compatibility baseline; the full host quality gate passed.
 
 ### Main Changes
 

@@ -49,7 +49,7 @@ The production systemd preparation service uses `--require-qualified`; it
 therefore refuses the checked-in candidate profile. Candidate affinity testing
 is a separate, manual, disarmed operation. Only the preparation units receive
 the privileges needed to change scheduler parameters, CPU governors, IRQ
-affinity or SocketCAN state. Middle, upper, FSM, recorder and bridge processes
+affinity or SocketCAN state. protocol_module, application_module, FSM, recorder and bridge processes
 must not receive those privileges.
 
 The target kernel reports `5.10.160-rt89` from its source Makefile. The vendor
@@ -61,7 +61,7 @@ as upstream `5.10.180-rt89`.
 
 Horus is pinned only as an Apache-2.0 research input, not a runtime dependency.
 This platform adopts exact logical-CPU semantics and mandatory affinity
-readback. The future middle-layer IPC task carries forward the useful
+readback. The future protocol-module IPC task carries forward the useful
 publisher-by-subscriber SPSC layout, cache-line separation, per-slot sequence
 validation and crash-reclaim ideas. It must use an explicit fixed-layout shared
 memory contract; Rust `needs_drop::<T>() == false` is not accepted as proof that

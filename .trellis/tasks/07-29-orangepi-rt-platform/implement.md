@@ -4,7 +4,7 @@
 
 - [x] Persist the approved scope, host gate, target-board gate and standing implementation authorization.
 - [x] Record official Orange Pi, kernel.org, Arm toolchain, Ubuntu container, `rt-tests` and Horus source identities in `research/platform-baseline.md`.
-- [x] Update the parent PRD/design/implementation plan so the Horus-inspired affinity/SHM/queue requirements survive into the middle-layer child.
+- [x] Update the parent PRD/design/implementation plan so the Horus-inspired affinity/SHM/queue requirements survive into the protocol-module child.
 - [x] Activate this child task only after `prd.md`, `design.md` and this plan are complete.
 
 Review gate: planning artifacts must have no unresolved design choice that changes host implementation. Unknown physical transceiver/board evidence is an explicit target gate, not a reason to invent a model.

@@ -3,13 +3,13 @@
 Rust-owned robot control framework with compile-time layer boundaries:
 
 ```text
-upper algorithms / FSM
-          |
-          v
-middle ports / Zenoh / Protobuf
-          |
-          v
-lower transports / device protocols
+application_module algorithms / FSM
+                  |
+                  v
+protocol_module ports / Zenoh / Protobuf
+                  |
+                  v
+hardware_module transports / device protocols
 ```
 
 The implementation contains the Phase A contracts plus a host-verified Orange Pi

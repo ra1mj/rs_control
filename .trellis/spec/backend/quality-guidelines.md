@@ -18,7 +18,8 @@ Individual commands use the pinned `rust-toolchain.toml`, committed `Cargo.lock`
 - `dbg!`, `todo!` and `unimplemented!` in production code.
 - Wildcard-version path dependencies; internal versions and paths belong in `[workspace.dependencies]`.
 - A production dependency on `test-support`.
-- Lower/middle/upper dependency edges not allowed by `architecture.toml`.
+- Dependency edges among `hardware_module`, `protocol_module` and
+  `application_module` that are not allowed by `architecture.toml`.
 - Hand-editing generated Protobuf Rust or bypassing `contract-codec` with local DTO parsing.
 - Hardware-changing tests that run without explicit fixture/operator opt-in.
 

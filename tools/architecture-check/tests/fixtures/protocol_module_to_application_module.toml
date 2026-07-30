@@ -1,10 +1,10 @@
 [[packages]]
 name = "message-model"
-path = "crates/middle/message-model"
+path = "crates/protocol_module/message-model"
 
 [[packages]]
 name = "control-core"
-path = "crates/upper/control-core"
+path = "crates/application_module/control-core"
 
 [[dependencies]]
 source = "message-model"

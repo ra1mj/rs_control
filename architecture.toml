@@ -1,28 +1,28 @@
 version = 1
 composition_roots = ["robotctl"]
 
-[classes.lower]
-allowed_dependencies = ["lower"]
-path_prefixes = ["crates/lower/"]
+[classes.hardware_module]
+allowed_dependencies = ["hardware_module"]
+path_prefixes = ["crates/hardware_module/"]
 
-[classes.middle]
-allowed_dependencies = ["middle", "lower"]
-path_prefixes = ["crates/middle/"]
+[classes.protocol_module]
+allowed_dependencies = ["protocol_module", "hardware_module"]
+path_prefixes = ["crates/protocol_module/"]
 
-[classes.upper]
-allowed_dependencies = ["upper", "middle"]
-path_prefixes = ["crates/upper/"]
+[classes.application_module]
+allowed_dependencies = ["application_module", "protocol_module"]
+path_prefixes = ["crates/application_module/"]
 
 [classes.integration]
-allowed_dependencies = ["integration", "middle"]
+allowed_dependencies = ["integration", "protocol_module"]
 path_prefixes = ["crates/integration/"]
 
 [classes.test-support]
-allowed_dependencies = ["test-support", "integration", "upper", "middle", "lower"]
+allowed_dependencies = ["test-support", "integration", "application_module", "protocol_module", "hardware_module"]
 path_prefixes = ["crates/integration/test-support/"]
 
 [classes.app]
-allowed_dependencies = ["app", "integration", "upper", "middle", "lower"]
+allowed_dependencies = ["app", "integration", "application_module", "protocol_module", "hardware_module"]
 path_prefixes = ["apps/"]
 composition_root = true
 
@@ -33,11 +33,11 @@ path_prefixes = ["tools/"]
 [members]
 "architecture-check" = "tool"
 "config-model" = "integration"
-"contract-codec" = "middle"
-"control-core" = "upper"
-"lower-core" = "lower"
-"message-model" = "middle"
-"proto-generated" = "middle"
+"contract-codec" = "protocol_module"
+"control-core" = "application_module"
+"hardware-module-core" = "hardware_module"
+"message-model" = "protocol_module"
+"proto-generated" = "protocol_module"
 "proto-compat-check" = "tool"
 "robotctl" = "app"
 "test-support" = "test-support"

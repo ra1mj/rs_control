@@ -4,7 +4,7 @@
 
 ### 1. Scope / Trigger
 
-Use this contract whenever work changes a lower trait, robot YAML field, semantic middle message, Protobuf field, command authority field, codec or composition-root startup mapping. These are safety/cross-layer changes even when the diff is small.
+Use this contract whenever work changes a `hardware_module` trait, robot YAML field, semantic `protocol_module` message, Protobuf field, command authority field, codec or composition-root startup mapping. These are safety/cross-layer changes even when the diff is small.
 
 ### 2. Signatures
 
@@ -44,13 +44,13 @@ Every external `Header` contains source ID, 16-byte non-zero boot ID, boot-local
 
 Protobuf package and key-space major version are `robot.v1`. Enums reserve zero as `<ENUM>_UNSPECIFIED`; removed field numbers are reserved and never reused. SI units appear in field names/comments. Coordinates are right-handed: x forward, y left, z up, radians for angles.
 
-Local cross-process fast paths remain middle-layer implementations behind the
+Local cross-process fast paths remain protocol-module implementations behind the
 same semantic ports. Shared memory uses an explicit fixed-layout payload
 contract, layout magic/version/schema identity, bounded capacity, cache-line
 separated SPSC ownership, torn-read detection, crash-reclaim leases and
-sequence/drop counters. Upper code never opens the shared-memory object. Rust
+sequence/drop counters. `application_module` code never opens the shared-memory object. Rust
 `needs_drop::<T>() == false` is not evidence that a type is safe for shared
-memory; any mmap/raw-atomic `unsafe` stays private to a reviewed middle boundary.
+memory; any mmap/raw-atomic `unsafe` stays private to a reviewed `protocol_module` boundary.
 
 ### 4. Validation & Error Matrix
 
@@ -60,22 +60,23 @@ memory; any mmap/raw-atomic `unsafe` stays private to a reviewed middle boundary
 | Unsupported schema version | `config-model` | `UnsupportedSchemaVersion` |
 | Chassis roles differ from morphology | `config-model` | `RoleMismatch` |
 | Duplicate/out-of-range group motor ID | `config-model` | typed duplicate/range error |
-| Non-`none` arm role mismatch | later upper profile + composition root | refuse startup/arming |
+| Non-`none` arm role mismatch | later `application_module` profile + composition root | refuse startup/arming |
 | Missing wire submessage | `contract-codec` | `CodecError::MissingField` |
 | Unknown/zero wire enum | `contract-codec` | `CodecError::UnknownEnum` |
 | ID not 16 bytes/all zero | `message-model` | `Id128Error` |
 | Zero validity/session/deadline | `message-model` constructor | `SemanticError` |
 | Expired lease/command | enforcement/codec at supplied monotonic time | `SemanticError::Expired` |
 | Forbidden Cargo edge | `architecture-check` | non-zero exit with all violations |
-| Incompatible SHM layout/schema/endianness | middle local IPC boundary | reject attach before exposing a port |
-| Full/slow/crashed SHM endpoint | middle queue policy | explicit latest/drop/reject result plus counters; producer never blocks indefinitely |
+| Incompatible SHM layout/schema/endianness | `protocol_module` local IPC boundary | reject attach before exposing a port |
+| Full/slow/crashed SHM endpoint | `protocol_module` queue policy | explicit latest/drop/reject result plus counters; producer never blocks indefinitely |
 
 ### 5. Good/Base/Bad Cases
 
 - Good: `mecanum_4` with exactly four compiled roles, unique IDs and a valid UART IMU; normalization is stable and produces a recorded SHA-256.
 - Base: arm morphology `none` with `{}` motor IDs.
 - Bad: placing CAN bitrate in robot YAML, mapping two chassis roles to one ID,
-  accepting `UNSPECIFIED` quality, sending an expired command, letting upper code
+  accepting `UNSPECIFIED` quality, sending an expired command, letting
+  `application_module` code
   mmap IPC directly or treating a destructor-free Rust type as shared-memory POD.
 
 ### 6. Tests Required
@@ -83,9 +84,9 @@ memory; any mmap/raw-atomic `unsafe` stays private to a reviewed middle boundary
 - Config unit tests assert every chassis profile, deterministic parse-normalize-parse/hash, unknown fields/version, role mismatch, arm identifier/`none`, duplicate/range IDs, transport/baud and size bound.
 - CLI integration tests assert exit status and byte-stable output.
 - Codec tests assert header/lease/command round trips, malformed bytes, missing submessages, identity length, unknown enums and expiry.
-- Architecture fixtures assert upper-to-lower, lower-to-middle, middle-to-upper and production-to-test-support rejection; the real graph must also pass.
+- Architecture fixtures assert application_module-to-hardware_module, hardware_module-to-protocol_module, protocol_module-to-application_module and production-to-test-support rejection; the real graph must also pass.
 - `tools/bufw lint` and `breaking` plus `proto-compat-check` are mandatory for schema changes.
-- Middle local IPC tests assert incompatible-layout rejection, torn reads,
+- `protocol_module` local IPC tests assert incompatible-layout rejection, torn reads,
   endpoint exhaustion, slow consumers, sequence/drop accounting and `SIGKILL`
   lease reclamation; target benchmarks compare it with the pinned Horus commit.
 
@@ -94,14 +95,14 @@ memory; any mmap/raw-atomic `unsafe` stays private to a reviewed middle boundary
 #### Wrong
 
 ```rust
-// Generated DTO leaks into upper code and may contain quality = 0/999.
+// Generated DTO leaks into application_module code and may contain quality = 0/999.
 fn control(input: proto_generated::robot::v1::Header) { /* ... */ }
 ```
 
 #### Correct
 
 ```rust
-// The middle boundary owns fallible conversion; upper code receives a valid semantic type.
+// The protocol_module boundary owns fallible conversion; application_module code receives a valid semantic type.
 let header = contract_codec::decode_header(bytes)?;
 controller.step(TimedInput { header, value })?;
 ```

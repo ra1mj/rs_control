@@ -5,7 +5,7 @@
 This child materializes the parent architecture without adding runtime behavior. Contract ownership is:
 
 ```text
-upper -> middle -> lower
+application_module -> protocol_module -> hardware_module
 apps  -> integration config + any layer, wiring only
 ```
 
@@ -13,13 +13,13 @@ apps  -> integration config + any layer, wiring only
 
 ## Initial crates
 
-- `crates/lower/lower-core`: monotonic time, lifecycle, quality, frames, transport/device traits and lower errors.
-- `crates/middle/message-model`: semantic headers, clock/quality, lease and command validation; may depend on lower types only where a mapping boundary genuinely requires it.
-- `crates/middle/proto-generated`: Prost output and descriptor-set ownership.
-- `crates/middle/contract-codec`: one mapping/validation owner between semantic models and generated Protobuf.
+- `crates/hardware_module/hardware-module-core`: monotonic time, lifecycle, quality, frames, transport/device traits and hardware_module errors.
+- `crates/protocol_module/message-model`: semantic headers, clock/quality, lease and command validation; may depend on hardware_module types only where a mapping boundary genuinely requires it.
+- `crates/protocol_module/proto-generated`: Prost output and descriptor-set ownership.
+- `crates/protocol_module/contract-codec`: one mapping/validation owner between semantic models and generated Protobuf.
 - `crates/integration/config-model`: strict YAML AST, topology validation, normalization and hash.
 - `crates/integration/test-support`: empty fixture library used only by dev-dependencies.
-- `crates/upper/control-core`: minimal compile-time proof of the upper class, depending only on middle.
+- `crates/application_module/control-core`: minimal compile-time proof of the application_module class, depending only on protocol_module.
 - `apps/robotctl`: configuration-only composition root.
 - `tools/architecture-check`: Cargo-metadata dependency-policy gate.
 - `tools/proto-compat-check`: disposable C++/Python generation smoke test using the pinned `protoc`.
@@ -30,7 +30,7 @@ Store crate classifications and composition-root allowlist in a checked-in polic
 
 The checker also rejects unclassified workspace members, so adding a crate cannot silently bypass the policy. Fixture manifests test each forbidden edge without modifying the real workspace.
 
-## Lower contracts
+## hardware_module contracts
 
 Hot-path contracts are synchronous and caller-buffered. A fixed-capacity `FrameBatch<F, const N: usize>` owns initialized frames without growing after construction. Trait documentation states whether calls may block; concrete realtime implementations must be non-blocking even though this base task has no OS transport.
 
@@ -44,7 +44,7 @@ Serde uses `deny_unknown_fields`. Parsing and semantic validation are separate s
 - `omni_3`: front, rear-left, rear-right.
 - `omni_4`: front-left, front-right, rear-left, rear-right.
 - `swerve_4`: drive and steering IDs for front-left/front-right/rear-left/rear-right modules.
-- arm `none`: no IDs. Other syntactically valid named profiles require at least one binding; their exact joint-role set is validated against the selected compiled upper-layer profile by the later composition root before hardware enable.
+- arm `none`: no IDs. Other syntactically valid named profiles require at least one binding; their exact joint-role set is validated against the selected compiled application-module profile by the later composition root before hardware enable.
 
 Motor IDs are unsigned 11-bit CAN identifiers in this configuration phase, with zero rejected to avoid broadcast/reserved ambiguity in later device profiles. Duplicate IDs are rejected within each device group; a later composition root also checks cross-group conflicts when chassis and arm share a physical bus. Normalization uses a canonical typed projection rather than serializing an unordered map directly. The SHA-256 digest covers UTF-8 normalized YAML bytes.
 
@@ -52,7 +52,7 @@ Motor IDs are unsigned 11-bit CAN identifiers in this configuration phase, with 
 
 Schemas use package `robot.v1`, stable field numbers, `UNSPECIFIED = 0` enum sentinels and explicit units in names/comments. `proto-generated/build.rs` runs Prost and emits one descriptor set. Vendored `protoc` avoids host-tool variance; Buf owns source lint/evolution policy.
 
-Generated messages are wire DTOs, not the upper API. `message-model` owns semantic domain types; `contract-codec` performs fallible conversions and is the only owner of wire validation. A common header includes source ID, boot ID, sequence, source monotonic timestamp, publish Unix timestamp, validity, frame ID, clock status/uncertainty and quality.
+Generated messages are wire DTOs, not the application_module API. `message-model` owns semantic domain types; `contract-codec` performs fallible conversions and is the only owner of wire validation. A common header includes source ID, boot ID, sequence, source monotonic timestamp, publish Unix timestamp, validity, frame ID, clock status/uncertainty and quality.
 
 ## Rollback
 

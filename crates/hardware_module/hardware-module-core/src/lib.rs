@@ -1,4 +1,4 @@
-//! Allocation-conscious contracts owned by the robot lower layer.
+//! Allocation-conscious contracts owned by the robot `hardware_module`.
 //!
 //! These traits are synchronous and caller-buffered. Implementations used by a
 //! realtime thread must additionally honour the non-blocking guarantees stated
@@ -33,7 +33,7 @@ impl MonoTime {
     }
 }
 
-/// Lower-layer device lifecycle.
+/// Hardware-module device lifecycle.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum LifecycleState {
     /// Driver has not been configured.
@@ -52,7 +52,7 @@ pub enum LifecycleState {
     Faulted,
 }
 
-/// Validates and stores lower-layer lifecycle transitions.
+/// Validates and stores hardware-module lifecycle transitions.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Lifecycle {
     state: LifecycleState,
@@ -114,7 +114,7 @@ impl Lifecycle {
     }
 }
 
-/// An attempted lifecycle transition that violates the lower-layer state model.
+/// An attempted lifecycle transition that violates the hardware-module state model.
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 #[error("invalid device lifecycle transition from {from:?} to {to:?}")]
 pub struct TransitionError {
@@ -124,7 +124,7 @@ pub struct TransitionError {
     pub to: LifecycleState,
 }
 
-/// Quality attached to a lower-layer device sample.
+/// Quality attached to a hardware-module device sample.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SampleQuality {
     /// Sample is valid for its documented use.
@@ -246,7 +246,7 @@ pub trait FrameTransport {
     fn health(&self) -> TransportHealth;
 }
 
-/// Error shared by lower device-driver lifecycle and command handling.
+/// Error shared by hardware-module device-driver lifecycle and command handling.
 #[derive(Debug, Error)]
 pub enum DeviceError<Fault>
 where

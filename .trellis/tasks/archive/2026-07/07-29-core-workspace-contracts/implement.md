@@ -7,7 +7,7 @@
 - [x] Add architecture policy, checker and invalid-graph fixtures.
 - [x] Verify the real graph and all rejection fixtures.
 
-## 2. Lower contracts
+## 2. hardware_module contracts
 
 - [x] Implement strongly typed monotonic time, lifecycle and sample quality.
 - [x] Implement fixed-capacity frame batches and synchronous transport/device contracts.
@@ -20,12 +20,12 @@
 - [x] Implement canonical normalization and SHA-256 hashing.
 - [x] Add valid/invalid fixtures and `robotctl` commands.
 
-## 4. Protobuf and middle contracts
+## 4. Protobuf and protocol_module contracts
 
 - [x] Add Buf configuration and `robot.v1` schemas.
 - [x] Generate Prost types and descriptor set reproducibly.
 - [x] Smoke-test standard C++ and Python generation with the same pinned `protoc`.
-- [x] Implement middle semantic model and the sole wire codec/validator.
+- [x] Implement protocol_module semantic model and the sole wire codec/validator.
 - [x] Add round-trip, unknown-enum and malformed/invalid semantic tests.
 
 ## 5. Verification

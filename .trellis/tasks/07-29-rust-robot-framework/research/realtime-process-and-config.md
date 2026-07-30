@@ -31,7 +31,7 @@ Sources:
 
 - Zenoh supports pub/sub, query, configurable deployment topology, batching, priorities, and shared-memory transport.
 - Shared-memory support reduces payload copies across processes, but it does not remove executor scheduling, queueing, backpressure, or lifecycle concerns.
-- The deterministic realtime loop should therefore access a middle-layer-owned preallocated mailbox/ring buffer. The same middle layer mirrors selected data to Zenoh/Protobuf for cross-process and cross-node consumers.
+- The deterministic realtime loop should therefore access a protocol-module-owned preallocated mailbox/ring buffer. The same protocol_module layer mirrors selected data to Zenoh/Protobuf for cross-process and cross-node consumers.
 - Candidate mechanisms must be benchmarked on both target boards before final selection.
 
 Sources:
@@ -48,7 +48,7 @@ Source: https://docs.kernel.org/userspace-api/media/v4l/dmabuf.html
 
 ## Preliminary direction
 
-- Keep compile-time layer dependencies strictly `upper -> middle -> lower`.
+- Keep compile-time layer dependencies strictly `application_module -> protocol_module -> hardware_module`.
 - Build deployment units as vertical runtime cells when co-location is beneficial; process boundaries do not need to mirror compile-time layers.
 - Isolate device I/O, realtime control, middleware/network, vision inference, logging, and FSM work by thread or process according to blocking and failure behavior.
 - Use system service supervision for process lifecycle and watchdog integration; keep the robot FSM responsible for mission/safety state rather than duplicating the operating system's process manager.

@@ -157,7 +157,7 @@ Project adaptation:
 
 - latest-value state, lossy sensor streams, discrete commands/actions and recorder queues require different overflow contracts;
 - every overwrite/reject must increment an observable counter and preserve sequence-gap evidence;
-- Protobuf stays out of the 1 kHz local fast path and is mirrored by a non-RT middle-layer bridge;
+- Protobuf stays out of the 1 kHz local fast path and is mirrored by a non-RT protocol-module bridge;
 - layout magic/version/schema/endianness and endpoint-capacity exhaustion become explicit contracts.
 
 ### 6.3 Crash-safe process endpoint registration
@@ -184,7 +184,7 @@ Project decision:
 
 - no automatic POD detection;
 - require an explicit, reviewed `bytemuck::Pod`-like contract with fixed representation and initialized padding, or transport opaque bytes/descriptors;
-- isolate all future mmap/atomic-pointer `unsafe` in a small middle-layer crate while keeping the workspace-wide default `unsafe_code = forbid` elsewhere;
+- isolate all future mmap/atomic-pointer `unsafe` in a small protocol-module crate while keeping the workspace-wide default `unsafe_code = forbid` elsewhere;
 - use descriptors/owned pools for camera and point-cloud payloads instead of putting process-local pointers in shared memory.
 
 ## 7. Remaining target-only facts

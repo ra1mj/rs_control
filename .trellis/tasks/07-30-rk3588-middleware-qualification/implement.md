@@ -50,7 +50,21 @@
       evidence.
 - [x] Run `./tools/ci.sh`, task validation and `git diff --check`.
 
-## 5. Physical execution gate
+## 5. Software delivery gate
+
+- [x] Check in the standalone Horus adapter source and lock without adding it
+      to the project Cargo workspace or production runtime dependency graph.
+- [x] Add an offline/locked builder that requires the clean pinned Horus commit,
+      embeds that identity and creates an absent external executable.
+- [x] Implement real separate-process 64/256/1024-byte paired measurements,
+      zero-after-arm allocation accounting and versioned preflight/benchmark
+      evidence compatible with the strict evaluator.
+- [x] Implement slow/stopped consumer, full queue, integrity, clean-exit and
+      killed-peer reclamation cases with explicit bounded/loss observations.
+- [x] Run the host-only non-qualification self-test against the pinned checkout;
+      keep all aarch64, `mlockall`, perf and physical identity claims target-only.
+
+## 6. Physical execution gate
 
 - [ ] On the identified Orange Pi 5 Plus, run baseline matrix and retain raw
       immutable results for every candidate/config.

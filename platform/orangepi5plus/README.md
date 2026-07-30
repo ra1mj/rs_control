@@ -20,6 +20,7 @@ platform/orangepi5plus/scripts/rt-affinity.sh plan
 platform/orangepi5plus/scripts/can-link.sh plan
 platform/orangepi5plus/tests/host-test.sh
 platform/orangepi5plus/tests/middleware-host-test.sh
+platform/orangepi5plus/scripts/build-horus-adapter.sh --verify-only
 # After a target run, with an absolute bundle path:
 platform/orangepi5plus/scripts/verify-middleware-evidence.py \
   --evidence /absolute/path/to/sealed-middleware-evidence \
@@ -37,6 +38,7 @@ configure a real network link, send CAN traffic or require root.
 | `kernel/` | Verified vendor config overlay and package build entry point |
 | `config/` | Candidate runtime/CAN profile and hardware evidence template |
 | `scripts/` | Explicit link, affinity, evidence, thermal and qualification tools |
+| `horus-adapter/` | Standalone pinned-source comparison adapter; excluded from the robot workspace/runtime graph |
 | `systemd/` | Fail-closed privileged preparation separated from applications |
 | `tests/host-test.sh` | Fixture-only platform regression gate |
 | `tests/middleware-host-test.sh` | Middleware target-plan and evidence-evaluator fixtures |

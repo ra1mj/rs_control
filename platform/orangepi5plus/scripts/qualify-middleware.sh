@@ -210,7 +210,7 @@ git -C "$mw_horus_source" rev-parse --is-inside-work-tree >/dev/null 2>&1 || pla
 mw_actual_commit=$(git -C "$mw_workspace" rev-parse HEAD)
 [ "$mw_actual_commit" = "$mw_app_commit" ] || platform_die "workspace commit mismatch: $mw_actual_commit"
 [ -z "$(git -C "$mw_workspace" status --porcelain)" ] || platform_die 'workspace must be clean for target qualification'
-mw_horus_commit=$(awk -F= '$1 == "HORUS_COMMIT" { value=$2; count++ } END { if (count != 1 || value !~ /^[0-9a-f]{40}$/) exit 1; print value }' "$mw_platform_root/sources.lock") || platform_die 'invalid HORUS_COMMIT source lock'
+mw_horus_commit=$(awk -F= '$1 == "HORUS_COMMIT" { value=$2; count++ } END { if (count != 1 || length(value) != 40 || value !~ /^[0-9a-f]+$/) exit 1; print value }' "$mw_platform_root/sources.lock") || platform_die 'invalid HORUS_COMMIT source lock'
 mw_actual_horus_commit=$(git -C "$mw_horus_source" rev-parse HEAD)
 [ "$mw_actual_horus_commit" = "$mw_horus_commit" ] || platform_die "Horus commit mismatch: $mw_actual_horus_commit"
 [ -z "$(git -C "$mw_horus_source" status --porcelain)" ] || platform_die 'Horus checkout must be clean for target qualification'

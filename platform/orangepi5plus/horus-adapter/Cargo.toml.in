@@ -1,0 +1,20 @@
+[package]
+name = "rs-control-horus-qualification-adapter"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.92"
+publish = false
+
+[dependencies]
+bytemuck = { version = "1.25.0", features = ["derive"] }
+horus_core = { path = "@HORUS_CORE_PATH@", default-features = false }
+libc = "0.2.183"
+serde = { version = "1.0.228", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1.0.149"
+
+[profile.release]
+lto = "thin"
+
+[workspace]

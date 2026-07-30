@@ -47,6 +47,8 @@ mw_direct_pid_fallback_case() {
 }
 
 mw_run 'middleware qualification shell parses' sh -n "$mw_root/scripts/qualify-middleware.sh"
+mw_run 'Horus adapter build shell parses' sh -n "$mw_root/scripts/build-horus-adapter.sh"
+mw_run 'Horus adapter source and pinned build contract verify' "$mw_root/scripts/build-horus-adapter.sh" --verify-only
 mw_run 'process supervision shell parses' sh -n "$mw_root/lib/process-supervision.sh"
 mw_run 'session cleanup terminates and reaps a process group' mw_session_term_case
 mw_run 'session cleanup escalates when TERM is ignored' mw_session_kill_case

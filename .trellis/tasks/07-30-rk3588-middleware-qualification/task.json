@@ -28,6 +28,6 @@
     "platform/orangepi5plus/sources.lock",
     ".trellis/spec/backend/realtime-platform.md"
   ],
-  "notes": "Host child archived and entry gate passed. Target envelope, schema-v2 measurements, perf/evaluator contracts, pinned-Horus source review, validated adapter preflight, supervised interruption cleanup and independent sealed-bundle verification pass host checks. Current execution host is x86_64 with no device-tree, so physical Orange Pi baseline/concurrent evidence, Horus execution and selection remain required.",
+  "notes": "Host child archived and entry gate passed. Target envelope, schema-v2 measurements, perf/evaluator contracts, standalone offline-locked pinned-Horus adapter, supervised interruption cleanup and independent sealed-bundle verification pass host checks. The adapter's real x86 separate-process self-test passes but is explicitly non-qualification. Current execution host is x86_64 with no device-tree, so physical Orange Pi baseline/concurrent evidence, lock-required target Horus execution and selection remain required.",
   "meta": {}
 }

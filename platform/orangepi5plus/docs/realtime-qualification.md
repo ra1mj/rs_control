@@ -109,9 +109,34 @@ been reviewed and its immutable aggregate hash is placed in
 ## Middleware candidate qualification
 
 Build the project `middleware-qualification` executable from a clean exact
-commit and place the pinned Horus checkout and its reviewed adapter outside the
-project checkout. The adapter is an external research tool; it must not add
-Horus to the workspace or fetch during a run. Its `preflight` subcommand emits
+commit and place the pinned Horus checkout outside the project checkout. The
+reviewed adapter source and its lock file live under `horus-adapter/`, outside
+the project Rust workspace; the built executable is an external research tool
+and does not add Horus to the robot workspace or runtime graph. Build it only
+through the checked-in offline entry point:
+
+```bash
+platform/orangepi5plus/scripts/build-horus-adapter.sh --verify-only
+platform/orangepi5plus/scripts/build-horus-adapter.sh \
+  --horus-source /absolute/path/clean/pinned-horus \
+  --output /absolute/path/absent/reviewed-horus-adapter
+```
+
+The builder verifies the exact source lock, clean checkout and pinned commit,
+renders the external path only in an isolated temporary build tree, uses
+`cargo build --offline --locked`, embeds the actual commit in the binary and
+creates the requested output without overwriting. On an x86 development host,
+the built binary can exercise its real separate-process payload/fault paths
+without writing qualification evidence:
+
+```bash
+/absolute/path/reviewed-horus-adapter self-test \
+  --source-commit fac3cfb8704e275bde9daec6d554a17c59dd8532
+```
+
+This prints `target_qualification=false`, skips the target memory-lock claim,
+and is forbidden on aarch64. It cannot replace target preflight or evidence.
+The adapter's `preflight` subcommand emits
 schema-v1 JSON proving the exact source/target, power-of-two capacity, complete
 payload/kind matrix, explicit `repr(C)` bytemuck-POD layout, Linux monotonic
 clock, `try_send`/`try_recv` hot path, successful

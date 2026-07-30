@@ -29,11 +29,15 @@ qualify-middleware.sh --profile 1khz|500hz --mode baseline|concurrent \
   --runner <file> --workspace <dir> --app-commit <sha> \
   --app-build-id <token> --hardware-manifest <file> --overlay-file <file> \
   --horus-source <dir> --horus-runner <file> [stress/evidence inputs]
+build-horus-adapter.sh --verify-only
+build-horus-adapter.sh --horus-source <absolute-clean-pinned-dir> \
+  --output <absolute-absent-file>
 reviewed-horus-adapter preflight|benchmark|fault-suite \
   --source-commit <sha> --capacity <power-of-two-16..1024> \
   --payload-bytes <64|256|1024|64,256,1024> \
   --memory-policy lock-required --payload-contract repr_c_bytemuck_pod \
   --output <absent-file> [row-specific inputs]
+reviewed-horus-adapter self-test --source-commit <pinned-sha>
 verify-middleware-evidence.py --evidence <absolute-sealed-directory> \
   --expected-app-commit <reviewed-sha> [--expected-sha256 <external-digest>]
 platform_stop_session <setsid-leader-pid> [grace-seconds]
@@ -107,6 +111,21 @@ REQUIRE_CONTROL_MAX_CAPACITY, REQUIRE_IO_MAX_CAPACITY
   `try_send`/`try_recv` hot path. The generic Horus `needs_drop` POD heuristic
   remains a recorded semantic difference, never layout proof. The envelope
   never edits a runtime profile.
+- The reviewed Horus adapter is a standalone nested Cargo project, not a member
+  of the application workspace and not a production/runtime dependency. Its
+  builder requires an absolute clean checkout at the source-locked commit,
+  renders the external `horus_core` path only inside an owned temporary build
+  tree, uses the checked lock with `cargo build --offline --locked`, embeds the
+  verified commit in the binary and hard-links to an absent output. The binary
+  rejects any different `--source-commit`. `self-test` runs the real paired
+  process and fault orchestration only on non-aarch64, emits no JSON/output file,
+  prints `target_qualification=false`, and may skip memory locking only inside
+  its hidden child protocol. Public evidence commands refuse non-aarch64 before
+  creating output; unlocked self-test is forbidden on aarch64.
+  Its isolated unsafe surface is limited to the counting system-allocator
+  forwarder and checked Linux `clock_gettime`/`mlockall` wrappers; it must pass
+  standalone all-target Clippy with warnings denied and is never linked into an
+  application binary.
 - Every long-running command owned by `qualify-middleware.sh`, including the
   platform envelope, runs in a distinct `setsid` session. HUP/INT/TERM makes
   the wrapper exit with 129/130/143; EXIT cleanup sends bounded TERM and then
@@ -136,6 +155,10 @@ REQUIRE_CONTROL_MAX_CAPACITY, REQUIRE_IO_MAX_CAPACITY
 | Condition | Required result |
 |---|---|
 | Source commit/hash/config mismatch | Abort before fetch/build |
+| Horus adapter relative/dirty/wrong checkout or existing build output | Refuse offline build |
+| Horus adapter runtime commit differs from its embedded build identity | Refuse before evidence output |
+| Public Horus evidence command on non-aarch64 | Refuse before memory lock or output creation |
+| Unlocked adapter self-test on aarch64 | Refuse; use lock-required target commands |
 | Output directory already contains data | Refuse overwrite |
 | CPU role overlap/offline/disallowed/low-capacity RT role | Refuse check/apply |
 | CAN IRQ missing or readback differs | Refuse qualified preparation |
@@ -162,6 +185,9 @@ REQUIRE_CONTROL_MAX_CAPACITY, REQUIRE_IO_MAX_CAPACITY
   stressor and reports `incomplete` because it is below eight hours. An
   interrupted target run instead retains an unsealed partial directory and
   exits with the signal-derived status.
+- Base: the external Horus binary passes `self-test` on x86 and reports
+  `target_qualification=false`; this proves software orchestration only and
+  leaves every hardware/RT acceptance item open.
 - Bad: label host fixture output as RK3588 qualification, broaden CPU `7` to
   “one of 6,7”, move every IRQ away from every RT role, auto-recover bus-off or
   silently fall back to 500 Hz.
@@ -177,7 +203,15 @@ REQUIRE_CONTROL_MAX_CAPACITY, REQUIRE_IO_MAX_CAPACITY
   deterministic comparison bytes, semantic mismatch, torn-fault rejection,
   nested-manifest anchoring, raw-result re-evaluation, tamper rejection,
   process-group termination/reaping and ignored-TERM escalation under
-  `/bin/sh`.
+  `/bin/sh`. It also runs `build-horus-adapter.sh --verify-only`, which checks
+  the standalone source formatting, source-lock parse and required build files
+  without fetching Horus.
+- With the pinned checkout available, build the adapter offline/locked, run its
+  host `self-test`, assert the three paired payload rows have exact counts and
+  zero hot allocations, assert slow/stopped full accounting and clean/killed
+  replacement consumers, then assert no qualification JSON or owned SHM
+  namespace remains. Separately assert public `preflight` on x86 fails with no
+  output file.
 - Cyclictest fixtures assert `100000 ns` pass, `100001 ns` fail, integer/unit
   strictness, expected CPU and minimum cycle coverage.
 - `tools/ci.sh` includes the host test but performs no fetch, kernel build, root
@@ -217,4 +251,11 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 # EXIT cleanup validates the PGID, sends bounded TERM/KILL to
 # -$owned_session_pid, then waits for $owned_session_pid.
+
+# External comparison build: the absolute Horus path exists only in the
+# temporary manifest. The application Cargo workspace remains unchanged.
+build-horus-adapter.sh --horus-source /abs/pinned-horus \
+  --output /abs/absent/reviewed-horus-adapter
+# An x86 self-test is explicitly non-qualification and writes no evidence.
+reviewed-horus-adapter self-test --source-commit <pinned-sha>
 ```

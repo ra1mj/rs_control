@@ -3,6 +3,23 @@
 Scope: source commit `fac3cfb8704e275bde9daec6d554a17c59dd8532`.
 This is a source-level adapter contract, not target performance evidence.
 
+## Delivered software adapter
+
+The reviewed implementation now lives at
+`platform/orangepi5plus/horus-adapter/` with its own manifest template and lock;
+it is not a member of the application workspace. The only supported build entry
+is `scripts/build-horus-adapter.sh`, which validates the clean pinned checkout,
+renders its absolute path in a temporary build tree, builds offline/locked and
+embeds the verified source commit. The binary implements the three evidence
+subcommands below plus a non-aarch64 `self-test` that emits no evidence and
+prints `target_qualification=false`.
+
+Against the local clean pinned checkout, the standalone crate passes five unit
+tests, all-target Clippy with warnings denied, release build and a real
+separate-process self-test covering every payload size, slow/stopped consumers,
+explicit full accounting, clean exit and SIGKILL replacement. These are
+software gates only; `mlockall`, perf and RK3588 identity remain target gates.
+
 ## Why the bundled benchmark is not reusable
 
 - `benchmarks/src/bin/all_paths_latency.rs` fixes its own iteration count,

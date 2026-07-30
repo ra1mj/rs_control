@@ -28,6 +28,23 @@ The Rust runner always labels its standalone output `host_research`. Only the
 target envelope, after verifying physical identity and the complete platform
 run, may emit an aggregate target verdict. It never edits a runtime profile.
 
+The Horus adapter is a separate nested Cargo project under the platform tree,
+not a member of the project workspace. Its builder verifies the source lock and
+clean exact checkout, creates a temporary manifest with the external absolute
+`horus_core` path, and builds offline/locked into a caller-chosen absent file.
+The binary embeds the verified Horus commit and rejects a different runtime
+claim. A host-only `self-test` runs the actual separate-process measurement and
+fault orchestration but writes no JSON, labels itself non-qualification, skips
+the target memory-lock claim and refuses to run on aarch64. Public evidence
+commands still refuse non-aarch64 before output creation.
+
+The adapter's unsafe surface is isolated from the application workspace and
+limited to the counting `GlobalAlloc` forwarder plus checked Linux
+`clock_gettime`/`mlockall` calls. Every pointer-free libc return is validated,
+the allocator forwards the original pointer/layout contract, and the standalone
+crate must pass `cargo clippy --all-targets -- -D warnings` against the pinned
+checkout. No unsafe adapter code is linked into project binaries.
+
 ## Measurement clock and payloads
 
 Each fixed 64/256/1024-byte payload stores sequence and Linux

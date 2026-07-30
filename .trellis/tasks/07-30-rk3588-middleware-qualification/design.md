@@ -120,3 +120,10 @@ selection evidence. Failed/incomplete bundles are preserved. Rollback is
 to discard a candidate output directory and rerun into a different absent
 directory; profiles remain candidate/unqualified until a separately reviewed
 passing digest is installed.
+
+Every long target command and the concurrent platform envelope run in their
+own `setsid` session. HUP/INT/TERM exits the wrapper with the corresponding
+129/130/143 status after bounded process-group TERM/KILL cleanup and direct
+child reaping. If interruption happens after output creation, the partial
+directory is retained for diagnosis but has no qualification standing and is
+never resumed or re-sealed; the retry uses a new absent directory.

@@ -36,6 +36,7 @@ reviewed-horus-adapter preflight|benchmark|fault-suite \
   --output <absent-file> [row-specific inputs]
 verify-middleware-evidence.py --evidence <absolute-sealed-directory> \
   --expected-app-commit <reviewed-sha> [--expected-sha256 <external-digest>]
+platform_stop_session <setsid-leader-pid> [grace-seconds]
 evaluate-cyclictest.py <json> --threshold-ns <n> \
   [--expected-cpu <id>] [--minimum-cycles <n>]
 ```
@@ -106,6 +107,14 @@ REQUIRE_CONTROL_MAX_CAPACITY, REQUIRE_IO_MAX_CAPACITY
   `try_send`/`try_recv` hot path. The generic Horus `needs_drop` POD heuristic
   remains a recorded semantic difference, never layout proof. The envelope
   never edits a runtime profile.
+- Every long-running command owned by `qualify-middleware.sh`, including the
+  platform envelope, runs in a distinct `setsid` session. HUP/INT/TERM makes
+  the wrapper exit with 129/130/143; EXIT cleanup sends bounded TERM and then
+  KILL to each owned process group and reaps its direct child. A signal handler
+  must never return into the qualification sequence. An interrupted directory
+  is retained as partial diagnostic data, is not sealed as evidence and must
+  not be reused as an output path. If the concurrent platform envelope exits,
+  the remaining candidate matrix stops and the aggregate cannot pass.
 - Every evidence generator hashes all regular files below its output except
   only its own `./SHA256SUMS`; parent manifests therefore anchor nested
   manifests. `verify-middleware-evidence.py` rejects missing/extra/reordered or
@@ -142,6 +151,7 @@ REQUIRE_CONTROL_MAX_CAPACITY, REQUIRE_IO_MAX_CAPACITY
 | Missing target `perf` cycles, lock/FIFO gate or valid Horus preflight | Refuse before evidence creation |
 | Missing candidate JSON/`perf` pair or pinned Horus fault evidence | `incomplete` |
 | Torn value, unaccounted loss, producer fault, hot allocation or invalid counted evidence | `fail` |
+| HUP/INT/TERM during middleware qualification | Stop and reap owned sessions, exit 129/130/143, retain unsealed partial output |
 | Missing/changed/reordered evidence file, unanchored nested manifest or verdict mismatch | Offline verification failure |
 
 ### 5. Good/Base/Bad Cases
@@ -149,7 +159,9 @@ REQUIRE_CONTROL_MAX_CAPACITY, REQUIRE_IO_MAX_CAPACITY
 - Good: an immutable Orange Pi build/profile/DT identity completes an eight-hour
   1 kHz concurrent run at `<= 100000 ns`, with full stress and no thermal event.
 - Base: a one-minute fixture or target research run executes every available
-  stressor and reports `incomplete` because it is below eight hours.
+  stressor and reports `incomplete` because it is below eight hours. An
+  interrupted target run instead retains an unsealed partial directory and
+  exits with the signal-derived status.
 - Bad: label host fixture output as RK3588 qualification, broaden CPU `7` to
   “one of 6,7”, move every IRQ away from every RT role, auto-recover bus-off or
   silently fall back to 500 Hz.
@@ -163,7 +175,9 @@ REQUIRE_CONTROL_MAX_CAPACITY, REQUIRE_IO_MAX_CAPACITY
 - `platform/orangepi5plus/tests/middleware-host-test.sh` asserts target dry-run
   identity/lock/matrix policy, host refusal, complete/missing/bad evidence,
   deterministic comparison bytes, semantic mismatch, torn-fault rejection,
-  nested-manifest anchoring, raw-result re-evaluation and tamper rejection.
+  nested-manifest anchoring, raw-result re-evaluation, tamper rejection,
+  process-group termination/reaping and ignored-TERM escalation under
+  `/bin/sh`.
 - Cyclictest fixtures assert `100000 ns` pass, `100001 ns` fail, integer/unit
   strictness, expected CPU and minimum cycle coverage.
 - `tools/ci.sh` includes the host test but performs no fetch, kernel build, root
@@ -179,6 +193,10 @@ REQUIRE_CONTROL_MAX_CAPACITY, REQUIRE_IO_MAX_CAPACITY
 for cpu in candidate_cpus:
     if pin(cpu) succeeds: return success
 PROFILE_QUALIFIED=1  # set after a host fixture pass
+
+# This can resume after the handler and only signals one shell PID.
+trap cleanup_one_child EXIT INT TERM HUP
+long_running_command
 ```
 
 #### Correct
@@ -191,4 +209,12 @@ PROFILE_QUALIFIED=1 only with reviewed immutable target evidence SHA-256
 # In a nested evidence directory, exclude only the manifest being written.
 find . -type f ! -path './SHA256SUMS' ... > SHA256SUMS
 verify every child SHA256SUMS before accepting the top-level manifest digest
+
+# A cleanup trap may not return into the evidence workflow.
+setsid long_running_command &
+owned_session_pid=$!
+trap 'exit 130' INT
+trap 'exit 143' TERM
+# EXIT cleanup validates the PGID, sends bounded TERM/KILL to
+# -$owned_session_pid, then waits for $owned_session_pid.
 ```

@@ -45,6 +45,9 @@
       allocation, missing Horus, torn/fault failure and deterministic output.
 - [x] Add offline sealed-bundle verification that anchors nested manifests,
       replays raw evaluation/verdict logic and rejects tampering.
+- [x] Supervise long commands as isolated process groups; make HUP/INT/TERM
+      terminate, bound escalation and reap children without sealing partial
+      evidence.
 - [x] Run `./tools/ci.sh`, task validation and `git diff --check`.
 
 ## 5. Physical execution gate

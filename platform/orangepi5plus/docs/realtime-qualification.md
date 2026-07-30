@@ -175,6 +175,13 @@ the platform thermal/stress envelope is live. Each result has a paired raw
 migrations and page faults. Process CPU time and peak resident memory are also
 reported separately for the project SHM peer.
 
+The wrapper owns each long command and the platform envelope in a separate
+`setsid` session. HUP, INT, or TERM stops the whole owned process group,
+escalates from TERM to KILL after a bounded grace period, reaps the direct
+child, and exits with 129, 130, or 143. An interruption after output creation
+leaves an intentionally unsealed diagnostic directory. Do not resume it or add
+a manifest manually; preserve it and retry with a new absent output path.
+
 `comparison.json` retains distributions, maxima, jitter span, counters,
 allocation totals, CPU/memory and perf observations. Safety failures dominate;
 missing evidence is `incomplete`, not a favorable ranking. `verdict.env` also

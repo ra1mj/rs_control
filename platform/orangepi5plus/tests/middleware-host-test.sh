@@ -19,7 +19,44 @@ mw_expect() {
 }
 mw_contains() { grep -F -- "$3" "$2" >/dev/null 2>&1 && mw_pass "$1" || { printf 'missing: %s in %s\n' "$3" "$2" >> "$mw_log"; mw_fail "$1"; }; }
 
+. "$mw_root/lib/common.sh"
+. "$mw_root/lib/process-supervision.sh"
+
+mw_session_term_case() {
+    setsid sh -c 'trap "exit 0" TERM; sleep 30 & wait' &
+    mw_session_pid=$!
+    sleep 1
+    platform_stop_session "$mw_session_pid" 1
+    ! kill -0 "-$mw_session_pid" >/dev/null 2>&1
+}
+
+mw_session_kill_case() {
+    setsid sh -c 'trap "" TERM; while :; do :; done' &
+    mw_session_pid=$!
+    sleep 1
+    platform_stop_session "$mw_session_pid" 0
+    ! kill -0 "-$mw_session_pid" >/dev/null 2>&1
+}
+
+mw_direct_pid_fallback_case() {
+    sh -c 'trap "" TERM; while :; do :; done' &
+    mw_direct_pid=$!
+    sleep 1
+    platform_stop_session "$mw_direct_pid" 0
+    ! kill -0 "$mw_direct_pid" >/dev/null 2>&1
+}
+
 mw_run 'middleware qualification shell parses' sh -n "$mw_root/scripts/qualify-middleware.sh"
+mw_run 'process supervision shell parses' sh -n "$mw_root/lib/process-supervision.sh"
+mw_run 'session cleanup terminates and reaps a process group' mw_session_term_case
+mw_run 'session cleanup escalates when TERM is ignored' mw_session_kill_case
+mw_run 'session cleanup retains a bounded direct-child fallback' mw_direct_pid_fallback_case
+mw_expect 1 'session cleanup rejects an unsafe process-group ID' sh -c \
+    '. "$1"; . "$2"; platform_stop_session 0 0' sh "$mw_root/lib/common.sh" "$mw_root/lib/process-supervision.sh"
+mw_contains 'middleware TERM trap exits with the signal status' "$mw_root/scripts/qualify-middleware.sh" \
+    "trap 'mw_interrupted 143' TERM"
+mw_contains 'platform loss stops the remaining candidate matrix' "$mw_root/scripts/qualify-middleware.sh" \
+    '[ "$mw_platform_lost" -eq 0 ] || break'
 mw_run 'middleware evidence common module compiles' env PYTHONPYCACHEPREFIX="$mw_tmp/pycache" python3 -m py_compile "$mw_root/scripts/middleware_evidence.py"
 mw_run 'middleware evaluator compiles' env PYTHONPYCACHEPREFIX="$mw_tmp/pycache" python3 -m py_compile "$mw_root/scripts/evaluate-middleware.py"
 mw_run 'Horus preflight validator compiles' env PYTHONPYCACHEPREFIX="$mw_tmp/pycache" python3 -m py_compile "$mw_root/scripts/validate-horus-preflight.py"

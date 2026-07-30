@@ -87,4 +87,7 @@ evidence contracts. The offline verifier checks every nested and top-level
 checksum manifest, re-evaluates raw middleware results, revalidates the Horus
 preflight and derives the wrapper verdict again. It reports the SHA-256 of the
 top-level manifest for external review; it never turns failed or incomplete
-evidence into a pass.
+evidence into a pass. Long target commands run in isolated sessions. An
+HUP/INT/TERM stops and reaps their complete process groups with bounded
+TERM-to-KILL escalation; any partial directory is diagnostic-only and a retry
+must use a new absent output path.

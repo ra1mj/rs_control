@@ -4,6 +4,7 @@ set -eu
 mw_script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 mw_platform_root=$(CDPATH= cd -- "$mw_script_dir/.." && pwd)
 . "$mw_platform_root/lib/common.sh"
+. "$mw_platform_root/lib/process-supervision.sh"
 
 mw_usage() {
     printf '%s\n' \
@@ -154,7 +155,56 @@ platform_require_rk3588_target_identity "$(uname -m)" "$mw_compatible"
 [ -r "$mw_rt_profile" ] || platform_die 'RT profile is not readable'
 [ -z "$mw_accelerator_runner" ] || [ -x "$mw_accelerator_runner" ] || platform_die 'accelerator runner is not executable'
 [ -z "$mw_storage_path" ] || [ -d "$mw_storage_path" ] || platform_die 'storage path is not a directory'
-for mw_command in git taskset chrt cargo python3 sha256sum perf; do platform_require_command "$mw_command"; done
+for mw_command in git taskset chrt cargo python3 sha256sum perf setsid; do platform_require_command "$mw_command"; done
+
+mw_tmp_parent=$(CDPATH= cd -- "${TMPDIR:-/tmp}" && pwd)
+mw_horus_preflight_tmp=
+mw_active_pid=
+mw_platform_pid=
+mw_platform_exit=
+mw_run_session() {
+    setsid "$@" &
+    mw_active_pid=$!
+    if wait "$mw_active_pid"; then
+        mw_session_exit=0
+    else
+        mw_session_exit=$?
+    fi
+    mw_active_pid=
+    return "$mw_session_exit"
+}
+mw_cleanup_horus_preflight() {
+    case "$mw_horus_preflight_tmp" in
+        "$mw_tmp_parent"/rs-control-horus-preflight.*) rm -rf -- "$mw_horus_preflight_tmp" ;;
+    esac
+    mw_horus_preflight_tmp=
+}
+mw_stop_active() {
+    [ -z "$mw_active_pid" ] || platform_stop_session "$mw_active_pid"
+    mw_active_pid=
+}
+mw_stop_platform() {
+    if [ -n "$mw_platform_pid" ]; then
+        platform_stop_session "$mw_platform_pid"
+        mw_platform_pid=
+        [ -n "$mw_platform_exit" ] || mw_platform_exit=143
+    fi
+}
+mw_cleanup() {
+    mw_stop_active
+    mw_stop_platform
+    mw_cleanup_horus_preflight
+}
+mw_interrupted() {
+    mw_signal_exit=$1
+    trap - INT TERM HUP
+    exit "$mw_signal_exit"
+}
+trap mw_cleanup EXIT
+trap 'mw_interrupted 130' INT
+trap 'mw_interrupted 143' TERM
+trap 'mw_interrupted 129' HUP
+
 git -C "$mw_workspace" rev-parse --is-inside-work-tree >/dev/null 2>&1 || platform_die 'workspace is not a git worktree'
 git -C "$mw_horus_source" rev-parse --is-inside-work-tree >/dev/null 2>&1 || platform_die 'Horus source is not a git worktree'
 mw_actual_commit=$(git -C "$mw_workspace" rev-parse HEAD)
@@ -179,23 +229,16 @@ mw_control_cpus=$(platform_normalize_cpu_list "$mw_control_cpus")
 case "$mw_measurement_cpu" in ''|*[!0-9]*) platform_die 'measurement CPU must be numeric' ;; esac
 platform_cpu_list_contains "$mw_control_cpus" "$mw_measurement_cpu" || platform_die 'measurement CPU is not in CONTROL_CPUS'
 "$mw_script_dir/rt-affinity.sh" check --profile "$mw_rt_profile" --sys-root "$mw_sys_root" --proc-root "$mw_proc_root" >/dev/null
-perf stat --no-big-num --field-separator ';' \
+mw_run_session perf stat --no-big-num --field-separator ';' \
     --event cycles,instructions,task-clock,context-switches,cpu-migrations,page-faults \
     --output /dev/null -- taskset --cpu-list "$mw_measurement_cpu" chrt --fifo "$mw_rt_priority" "$mw_runner" \
     --backend shm --peer process --kind ordered --payload-bytes 1024 --capacity "$mw_capacity" \
     --memory-policy lock-required --warmup 0 --samples 1 >/dev/null ||
     platform_die 'scheduler/memory-lock/runner preflight failed'
 
-mw_tmp_parent=$(CDPATH= cd -- "${TMPDIR:-/tmp}" && pwd)
 mw_horus_preflight_tmp=$(mktemp -d "$mw_tmp_parent/rs-control-horus-preflight.XXXXXX")
 mw_horus_preflight=$mw_horus_preflight_tmp/horus-preflight.json
-mw_cleanup_horus_preflight() {
-    case "$mw_horus_preflight_tmp" in
-        "$mw_tmp_parent"/rs-control-horus-preflight.*) rm -rf -- "$mw_horus_preflight_tmp" ;;
-    esac
-}
-trap mw_cleanup_horus_preflight EXIT INT TERM HUP
-"$mw_horus_runner" preflight --source-commit "$mw_horus_commit" --capacity "$mw_capacity" \
+mw_run_session "$mw_horus_runner" preflight --source-commit "$mw_horus_commit" --capacity "$mw_capacity" \
     --payload-bytes 64,256,1024 --kinds latest,ordered --latency-clock CLOCK_MONOTONIC \
     --memory-policy lock-required --payload-contract repr_c_bytemuck_pod \
     --output "$mw_horus_preflight" >/dev/null || platform_die 'Horus adapter preflight failed'
@@ -207,7 +250,6 @@ mkdir "$mw_output"
 mkdir "$mw_output/results"
 mv "$mw_horus_preflight" "$mw_output/horus-preflight.json"
 mw_cleanup_horus_preflight
-trap - EXIT INT TERM HUP
 cp "$mw_platform_root/sources.lock" "$mw_output/sources.lock"
 cp "$mw_rt_profile" "$mw_output/rt-profile.env"
 cp "$mw_hardware_manifest" "$mw_output/hardware-evidence.env"
@@ -221,26 +263,15 @@ cp "$mw_hardware_manifest" "$mw_output/hardware-evidence.env"
     printf 'SOURCES_LOCK_SHA256=%s\nRT_PROFILE_SHA256=%s\n' "$(platform_sha256 "$mw_platform_root/sources.lock")" "$(platform_sha256 "$mw_rt_profile")"
 } > "$mw_output/inputs.env"
 
-mw_platform_pid=
-mw_stop_platform() { [ -z "$mw_platform_pid" ] || kill "$mw_platform_pid" >/dev/null 2>&1 || true; }
-trap mw_stop_platform EXIT INT TERM HUP
-mw_run_platform() {
-    set -- "$mw_script_dir/qualify-rt.sh" --profile "$mw_profile" --mode "$mw_mode" --duration "$mw_duration" \
-        --output "$mw_output/platform" --rt-profile "$mw_rt_profile" --measurement-cpu "$mw_measurement_cpu" \
-        --hardware-manifest "$mw_hardware_manifest" --overlay-file "$mw_overlay_file" --app-build-id "$mw_app_build_id" \
-        --sys-root "$mw_sys_root" --proc-root "$mw_proc_root"
-    [ -z "$mw_network_peer" ] || set -- "$@" --network-peer "$mw_network_peer"
-    [ -z "$mw_network_interface" ] || set -- "$@" --network-interface "$mw_network_interface"
-    [ -z "$mw_accelerator_runner" ] || set -- "$@" --accelerator-runner "$mw_accelerator_runner"
-    [ -z "$mw_storage_path" ] || set -- "$@" --storage-path "$mw_storage_path"
-    set +e
-    "$@" > "$mw_output/platform.stdout" 2> "$mw_output/platform.stderr"
-    mw_exit=$?
-    set -e
-    printf 'EXIT_CODE=%s\n' "$mw_exit" > "$mw_output/platform-process.env"
-    exit "$mw_exit"
-}
-mw_run_platform &
+set -- "$mw_script_dir/qualify-rt.sh" --profile "$mw_profile" --mode "$mw_mode" --duration "$mw_duration" \
+    --output "$mw_output/platform" --rt-profile "$mw_rt_profile" --measurement-cpu "$mw_measurement_cpu" \
+    --hardware-manifest "$mw_hardware_manifest" --overlay-file "$mw_overlay_file" --app-build-id "$mw_app_build_id" \
+    --sys-root "$mw_sys_root" --proc-root "$mw_proc_root"
+[ -z "$mw_network_peer" ] || set -- "$@" --network-peer "$mw_network_peer"
+[ -z "$mw_network_interface" ] || set -- "$@" --network-interface "$mw_network_interface"
+[ -z "$mw_accelerator_runner" ] || set -- "$@" --accelerator-runner "$mw_accelerator_runner"
+[ -z "$mw_storage_path" ] || set -- "$@" --storage-path "$mw_storage_path"
+setsid "$@" > "$mw_output/platform.stdout" 2> "$mw_output/platform.stderr" &
 mw_platform_pid=$!
 mw_platform_lost=0
 mw_ready_deadline=$(( $(date +%s) + 60 ))
@@ -265,7 +296,7 @@ mw_project_run() {
     mw_backend=$1; mw_peer=$2; mw_kind=$3; mw_payload=$4
     mw_result=$mw_output/results/project-$mw_backend-$mw_peer-$mw_kind-$mw_payload.json
     mw_perf=${mw_result%.json}.perf
-    perf stat --no-big-num --field-separator ';' \
+    mw_run_session perf stat --no-big-num --field-separator ';' \
         --event cycles,instructions,task-clock,context-switches,cpu-migrations,page-faults \
         --output "$mw_perf" -- taskset --cpu-list "$mw_measurement_cpu" chrt --fifo "$mw_rt_priority" "$mw_runner" \
         --backend "$mw_backend" --peer "$mw_peer" --kind "$mw_kind" --payload-bytes "$mw_payload" \
@@ -277,11 +308,14 @@ if [ "$mw_platform_lost" -eq 0 ]; then
     for mw_kind in latest ordered; do
         for mw_payload in 64 256 1024; do
             mw_project_run local thread "$mw_kind" "$mw_payload"
+            [ "$mw_platform_lost" -eq 0 ] || break
             mw_project_run shm thread "$mw_kind" "$mw_payload"
+            [ "$mw_platform_lost" -eq 0 ] || break
             mw_project_run shm process "$mw_kind" "$mw_payload"
+            [ "$mw_platform_lost" -eq 0 ] || break
             mw_horus_result=$mw_output/results/horus-$mw_kind-$mw_payload.json
             mw_horus_perf=${mw_horus_result%.json}.perf
-            perf stat --no-big-num --field-separator ';' \
+            mw_run_session perf stat --no-big-num --field-separator ';' \
                 --event cycles,instructions,task-clock,context-switches,cpu-migrations,page-faults \
                 --output "$mw_horus_perf" -- taskset --cpu-list "$mw_measurement_cpu" chrt --fifo "$mw_rt_priority" "$mw_horus_runner" benchmark \
                 --kind "$mw_kind" --payload-bytes "$mw_payload" --capacity "$mw_capacity" --warmup "$mw_warmup" \
@@ -289,33 +323,39 @@ if [ "$mw_platform_lost" -eq 0 ]; then
                 --latency-clock CLOCK_MONOTONIC --payload-contract repr_c_bytemuck_pod \
                 --output "$mw_horus_result" || mw_matrix_failed=1
             mw_check_platform_live
+            [ "$mw_platform_lost" -eq 0 ] || break
         done
+        [ "$mw_platform_lost" -eq 0 ] || break
     done
 fi
 
 if [ "$mw_platform_lost" -eq 0 ]; then
     set +e
-    taskset --cpu-list "$mw_measurement_cpu" cargo test --offline --locked --manifest-path "$mw_workspace/Cargo.toml" \
+    mw_run_session taskset --cpu-list "$mw_measurement_cpu" cargo test --offline --locked --manifest-path "$mw_workspace/Cargo.toml" \
         -p middleware-shm --all-features -- --test-threads=1 \
         > "$mw_output/results/project-faults.txt" 2>&1
     mw_project_fault_exit=$?
     set -e
     printf 'EXIT_CODE=%s\n' "$mw_project_fault_exit" > "$mw_output/results/project-faults.env"
     [ "$mw_project_fault_exit" -eq 0 ] || mw_matrix_failed=1
-    "$mw_horus_runner" fault-suite --source-commit "$mw_horus_commit" --capacity "$mw_capacity" \
+    mw_run_session "$mw_horus_runner" fault-suite --source-commit "$mw_horus_commit" --capacity "$mw_capacity" \
         --payload-bytes 64,256,1024 --memory-policy lock-required --payload-contract repr_c_bytemuck_pod \
         --output "$mw_output/results/horus-faults.json" \
         > "$mw_output/results/horus-faults.txt" 2>&1 || mw_matrix_failed=1
     mw_check_platform_live
 fi
 
+if [ -n "$mw_platform_pid" ]; then
+    if wait "$mw_platform_pid"; then
+        mw_platform_exit=0
+    else
+        mw_platform_exit=$?
+    fi
+    mw_platform_pid=
+fi
+printf 'EXIT_CODE=%s\n' "$mw_platform_exit" > "$mw_output/platform-process.env"
 set +e
-wait "$mw_platform_pid"
-mw_platform_exit=$?
-set -e
-mw_platform_pid=
-set +e
-python3 -B "$mw_script_dir/evaluate-middleware.py" --results "$mw_output/results" --output "$mw_output/comparison.json" \
+mw_run_session python3 -B "$mw_script_dir/evaluate-middleware.py" --results "$mw_output/results" --output "$mw_output/comparison.json" \
     --capacity "$mw_capacity" --warmup "$mw_warmup" --samples "$mw_samples" --expected-arch aarch64 \
     --horus-commit "$mw_horus_commit"
 mw_evaluator_exit=$?

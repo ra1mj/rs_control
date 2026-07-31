@@ -1,8 +1,10 @@
 //! Robot-level controller contract proving the application-to-protocol dependency edge.
 
 mod lease;
+mod lifecycle;
 
 pub use lease::*;
+pub use lifecycle::*;
 
 use message_model::Header;
 

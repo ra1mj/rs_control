@@ -302,11 +302,11 @@ Validation:
 
 ### G2. Lifecycle and restart safety
 
-- [ ] Implement explicit transition table and exhaustive event handling.
-- [ ] Implement `Boot` motion inhibit and live health reconstruction.
-- [ ] Require fresh explicit arm after every restart.
-- [ ] Make E-stop globally preemptive and latched until explicit physical/software reset sequence.
-- [ ] Generate state graph and transition report in CI.
+- [x] Implement explicit transition table and exhaustive event handling.
+- [x] Implement `Boot` motion inhibit and live health reconstruction.
+- [x] Require fresh explicit arm after every restart.
+- [x] Make E-stop globally preemptive and latched until explicit physical/software reset sequence.
+- [x] Generate state graph and transition report in CI.
 
 ### G3. Resource leases
 
@@ -325,10 +325,10 @@ Validation:
 
 Validation:
 
-- [ ] Transition-table tests cover every state/event combination.
-- [ ] Property tests cover event duplication, loss, reorder, timeout and restart.
-- [ ] Event-log replay is deterministic.
-- [ ] Kill/restart during every active state; never auto-resume motion.
+- [x] Transition-table tests cover every state/event combination.
+- [x] Property tests cover event duplication, loss, reorder, timeout and restart.
+- [x] Event-log replay is deterministic.
+- [x] Kill/restart during every active state; never auto-resume motion.
 
 ## 10. Phase H — Chassis control
 

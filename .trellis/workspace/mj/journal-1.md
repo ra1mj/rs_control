@@ -275,3 +275,36 @@ Completed software-only H1/H2 with classified chassis-model, chassis-mecanum, ch
 ### Next Steps
 
 - None - task complete
+
+
+## Session 9: Chassis state estimation and SE2 control
+
+**Date**: 2026-07-31
+**Task**: Chassis state estimation and SE2 control
+**Branch**: `main`
+
+### Summary
+
+Completed software-only H3 with local-monotonic sample alignment, atomic age/order/skew/quality gates, deterministic wheel+IMU 2D estimation, external correction policies, bounded body/heading control, fixed-capacity SE(2) trajectories and tracking, 18 targeted tests, zero-allocation evidence and full CI.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `adf791c` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

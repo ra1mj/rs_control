@@ -346,11 +346,11 @@ Validation:
 
 ### H3. State estimation and control
 
-- [ ] Time-align wheel/IMU/external-pose inputs and propagate quality.
-- [ ] Implement 2D wheel+IMU estimator with external correction port.
-- [ ] Implement body velocity and heading control.
-- [ ] Implement timestamped SE(2) trajectory tracking.
-- [ ] Define loss/degradation behavior for wheel, IMU and external pose inputs.
+- [x] Time-align wheel/IMU/external-pose inputs and propagate quality.
+- [x] Implement 2D wheel+IMU estimator with external correction port.
+- [x] Implement body velocity and heading control.
+- [x] Implement timestamped SE(2) trajectory tracking.
+- [x] Define loss/degradation behavior for wheel, IMU and external pose inputs.
 
 Hardware gate:
 

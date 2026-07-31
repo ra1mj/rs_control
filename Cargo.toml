@@ -20,6 +20,8 @@ members = [
     "crates/application_module/chassis-omni",
     "crates/application_module/chassis-swerve",
     "crates/application_module/control-core",
+    "crates/application_module/state-estimation-2d",
+    "crates/application_module/trajectory-se2",
     "tools/architecture-check",
     "tools/hsm-spike",
     "tools/proto-compat-check",

@@ -2402,6 +2402,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "state-estimation-2d"
+version = "0.1.0"
+dependencies = [
+ "allocation-counter",
+ "chassis-model",
+ "thiserror",
+]
+
+[[package]]
 name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2712,6 +2721,16 @@ dependencies = [
  "tracing-core",
  "tracing-log",
  "tracing-serde",
+]
+
+[[package]]
+name = "trajectory-se2"
+version = "0.1.0"
+dependencies = [
+ "allocation-counter",
+ "arrayvec",
+ "chassis-model",
+ "thiserror",
 ]
 
 [[package]]

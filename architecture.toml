@@ -53,4 +53,6 @@ path_prefixes = ["tools/"]
 "proto-compat-check" = "tool"
 "robotctl" = "app"
 "ros2-mapping" = "integration"
+"state-estimation-2d" = "application_module"
 "test-support" = "test-support"
+"trajectory-se2" = "application_module"

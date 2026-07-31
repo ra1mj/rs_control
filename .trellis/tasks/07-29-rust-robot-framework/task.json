@@ -32,7 +32,8 @@
     "07-31-hsm-selection-spike",
     "07-31-lifecycle-restart-safety",
     "07-31-mission-dsl-runtime",
-    "07-31-chassis-models-kinematics"
+    "07-31-chassis-models-kinematics",
+    "07-31-chassis-estimation-control"
   ],
   "parent": null,
   "relatedFiles": [],

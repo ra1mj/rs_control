@@ -1,5 +1,9 @@
 //! Robot-level controller contract proving the application-to-protocol dependency edge.
 
+mod lease;
+
+pub use lease::*;
+
 use message_model::Header;
 
 /// Input paired with protocol-module timing and quality metadata.

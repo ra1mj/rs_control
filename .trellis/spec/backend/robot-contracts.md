@@ -444,6 +444,113 @@ cached.expires_monotonic_ns = now_monotonic_ns + route_max_age_ns;
 let decision = source_guard.evaluate_input(fallback, cached.as_ref(), now_monotonic_ns);
 ```
 
+## Scenario: Enforce resource leases in a motion runtime
+
+### 1. Scope / Trigger
+
+Use this contract when changing local lease state, authority-service session
+handling, command authorization, takeover sequencing, or the motion runtime's
+lease cache. Grant priority policy and physical safe-stop execution remain
+outside the cache.
+
+### 2. Signatures
+
+```rust
+LeaseKey::new(resource_id, lease_id, session_epoch)
+    -> Result<LeaseKey, LeaseCacheError>
+LeaseEnforcementCache::<CAPACITY>::apply(event, now_monotonic_ns)
+    -> Result<LeaseEffect<CAPACITY>, LeaseCacheError>
+LeaseEnforcementCache::<CAPACITY>::authorize(command, now_monotonic_ns)
+    -> Result<ResourceLease, LeaseCacheError>
+```
+
+`LeaseEvent` contains start-session, grant, renew, release, preempt,
+safe-confirm, session-loss and tick variants. `LeaseEffect` contains a typed
+kind, optional resulting lease and fixed-capacity removal evidence.
+
+### 3. Contracts
+
+- `control-core` owns a single-owner, fixed-capacity reducer. It imports
+  semantic `message-model` values but no middleware, generated DTO, driver,
+  clock, lock, logger or I/O implementation.
+- Epoch zero is invalid. A start epoch must be greater than every epoch the
+  process previously accepted. Starting a newer session removes every active
+  or pending entry; losing the exact current session removes them and leaves
+  no current authority.
+- One resource has at most one active or pending entry. Grant never replaces
+  an occupied entry. Renew requires exact owner/lease/session identity and a
+  strictly later, nonexpired expiration. Release removes only an exact active
+  or pending identity.
+- Preemption is two phase: an exact active incumbent is revoked immediately,
+  a distinct same-resource/current-session replacement becomes
+  `AwaitingSafe`, and neither owner can command until exact safe confirmation
+  activates that still-valid replacement.
+- Authorization uses the caller-supplied local monotonic time, requires an
+  active current-session lease and exact resource/owner/lease/session command
+  fields, and validates both exclusive deadlines without mutating state.
+- Expiry, release, preemption, session loss and session replacement return
+  bounded `LeaseRemoval` evidence with the removed lease, reason and whether
+  it previously authorized commands. Event application and authorization
+  allocate no heap memory.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+|---|---|
+| Zero or same/lower start epoch | `ZeroSessionEpoch` / `NonIncreasingSession` |
+| No current or mismatched session | `NoCurrentSession` / `SessionMismatch` |
+| Grant to occupied resource or full cache | `ResourceOccupied` / `Capacity` |
+| Expired grant/replacement/confirmation | wrapped `SemanticError::Expired` |
+| Renewal identity mismatch or non-extension | `LeaseMismatch` / `RenewalMustExtend` |
+| Active-only operation on pending entry | `LeaseNotActive` |
+| Safe confirmation on active or wrong pending identity | `LeaseNotAwaitingSafe` / `LeaseMismatch` |
+| Replacement resource differs or lease ID is reused | typed replacement error; incumbent stays active |
+| Missing command resource or foreign authority field | `ResourceNotFound` / `AuthorityMismatch` |
+| Command or active lease reaches `deadline <= now` | wrapped `SemanticError::Expired` |
+
+### 5. Good / Base / Bad Cases
+
+- Good: grant one active owner, explicitly preempt it, inhibit both owners,
+  confirm the exact pending lease after the resource is safe, then authorize
+  only the replacement.
+- Base: tick before exclusive expiration is a no-op; tick at equality removes
+  active and pending entries with exact evidence.
+- Bad: replace authority with a competing grant, authorize a pending lease,
+  reuse a prior epoch after restart, refresh expiry while checking a command,
+  or infer safety from elapsed time.
+
+### 6. Tests Required
+
+- Test every event, invalid transition, fixed-capacity boundary, renewal
+  identity, replacement constraint and exclusive expiry equality.
+- Interleave commands from active and competing owners and prove rejected
+  commands never alter the active entry.
+- Test the complete two-phase gap, pending release/expiry, exact removal
+  evidence, session loss, higher-epoch restart, and rejection of old leases,
+  commands and same/lower restart epochs.
+- Warm the reducer and authorization paths, then measure zero allocations.
+- Run warnings-denied Clippy, architecture policy and `tools/ci.sh`. Host
+  success does not qualify physical safe-stop confirmation or target timing.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+// Arrival order silently changes authority and skips the physical safety gap.
+active_by_resource.insert(command.resource_id(), command.owner_id());
+driver.write(command)?;
+```
+
+#### Correct
+
+```rust
+cache.apply(LeaseEvent::Preempt { current, replacement }, now)?;
+perform_declared_safe_action();
+cache.apply(LeaseEvent::ConfirmSafe(LeaseKey::from_lease(replacement)), now)?;
+let authority = cache.authorize(&command, now)?;
+```
+
 ## Scenario: Add a native Protobuf-to-ROS mapping contract
 
 ### 1. Scope / Trigger

@@ -310,10 +310,10 @@ Validation:
 
 ### G3. Resource leases
 
-- [ ] Implement grant, renew, release, expire and preempt events.
-- [ ] Implement `motion-rt` enforcement cache and session epochs.
-- [ ] Test all command sources concurrently; no last-writer-wins behavior.
-- [ ] Test FSM loss and stale authority after restart.
+- [x] Implement grant, renew, release, expire and preempt events.
+- [x] Implement `motion-rt` enforcement cache and session epochs.
+- [x] Test all command sources concurrently; no last-writer-wins behavior.
+- [x] Test FSM loss and stale authority after restart.
 
 ### G4. Mission DSL/runtime
 

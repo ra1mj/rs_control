@@ -6,7 +6,12 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+arrayvec.workspace = true
 message-model.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+allocation-counter.workspace = true
 
 [lints]
 workspace = true

@@ -436,7 +436,10 @@ dependencies = [
 name = "control-core"
 version = "0.1.0"
 dependencies = [
+ "allocation-counter",
+ "arrayvec",
  "message-model",
+ "thiserror",
 ]
 
 [[package]]

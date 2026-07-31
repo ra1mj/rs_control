@@ -1,0 +1,30 @@
+{
+  "id": "lifecycle-restart-safety",
+  "name": "lifecycle-restart-safety",
+  "title": "Lifecycle and restart safety",
+  "description": "Implement the production allocation-free lifecycle reducer with boot-correlated reconstruction, fresh arming, restart inhibition and latched E-stop reset semantics.",
+  "status": "completed",
+  "dev_type": "feature",
+  "scope": "backend",
+  "package": "control-core",
+  "priority": "P0",
+  "creator": "mj",
+  "assignee": "mj",
+  "createdAt": "2026-07-31",
+  "completedAt": "2026-07-31",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "07-29-rust-robot-framework",
+  "relatedFiles": [
+    "crates/application_module/control-core/src/lifecycle.rs",
+    "crates/application_module/control-core/src/lib.rs",
+    ".trellis/spec/backend/fsm-guidelines.md"
+  ],
+  "notes": "Software-only G2 child complete. control-core now owns one exhaustive direct-enum lifecycle reducer covering 8 states and 18 event kinds (144 diagnostic rows). A fresh process boot_id correlates reconstruction and operator events; strictly increasing reconstruction/operator sequences reject duplicate and reordered input, Start references the accepted Arm sequence, and fault clear matches the current fault generation. Unsafe reconstruction enters inhibited Fault. E-stop globally preempts every non-Shutdown state, advances an assertion generation, and requires matching current-boot release plus software reset. Reset preserves interrupted Boot/Fault prerequisites instead of bypassing them. Every Running exit synchronously orders CancelMission before ReleaseResources. Eleven lifecycle tests cover complete projections, stale boot/generations, loss/duplicate/reorder/timeout, restart from every state, deterministic replay/report/DOT and zero allocations. control-core has no statig dependency. Architecture check and tools/ci.sh passed. Physical actuation, target timing, systemd kill tests and Orange Pi qualification remain hardware/deployment gates.",
+  "meta": {}
+}

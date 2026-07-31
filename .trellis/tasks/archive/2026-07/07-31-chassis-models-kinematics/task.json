@@ -1,0 +1,32 @@
+{
+  "id": "chassis-models-kinematics",
+  "name": "chassis-models-kinematics",
+  "title": "Chassis SI models and kinematics",
+  "description": "Implement software-only H1/H2 body-frame SI types, constraints, feasibility/saturation evidence, and mecanum-4, omni-3/4, and swerve-4 forward/inverse kinematics with deterministic host tests.",
+  "status": "completed",
+  "dev_type": "feature",
+  "scope": "backend",
+  "package": "chassis-model,chassis-mecanum,chassis-omni,chassis-swerve",
+  "priority": "P1",
+  "creator": "mj",
+  "assignee": "mj",
+  "createdAt": "2026-07-31",
+  "completedAt": "2026-07-31",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "07-29-rust-robot-framework",
+  "relatedFiles": [
+    "crates/application_module/chassis-model/",
+    "crates/application_module/chassis-mecanum/",
+    "crates/application_module/chassis-omni/",
+    "crates/application_module/chassis-swerve/",
+    ".trellis/spec/backend/chassis-kinematics.md"
+  ],
+  "notes": "Software-only H1/H2 complete: four classified application crates, canonical body Twist2 reuse, immutable saturation evidence, normalized fixed-size least squares, mecanum-4, symmetric/custom omni-3/4, and swerve-4 reversal/rate-limit/angle-hold behavior. Twenty-three targeted tests, zero-allocation assertions, architecture policy and full CI pass. Lifted-chassis, CAN-load and physical morphology qualification remain open hardware gates.",
+  "meta": {}
+}

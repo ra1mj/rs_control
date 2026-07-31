@@ -9,7 +9,10 @@ rmw = "rmw_cyclonedds_cpp"
 native_encoding = "application/protobuf"
 protobuf_descriptor_sha256 = "451e371ad7b72015520426c6a2c35ad1115692895ea949d4ff70dab8493c4266"
 ros_interface_revision = "ros2-humble-reviewed-snapshot-2026-07-30"
+zenoh_version = "1.9.0"
 ros2dds_version = "1.9.0"
+ros2dds_build_id = "eclipse-zenoh/zenoh-bridge-ros2dds@1.9.0"
+ros2dds_mode = "standalone"
 adapter_outside_realtime = true
 adapter_can_issue_leases = false
 

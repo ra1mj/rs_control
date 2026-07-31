@@ -4,8 +4,10 @@
 //! ROS, DDS or Zenoh runtime dependency.
 
 mod projection;
+mod runtime;
 
 pub use projection::*;
+pub use runtime::*;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -25,6 +27,12 @@ use thiserror::Error;
 pub const MANIFEST_SCHEMA_VERSION: u32 = 1;
 /// Native sample encoding required by the canonical protocol.
 pub const PROTOBUF_ENCODING: &str = "application/protobuf";
+/// Exact Zenoh family qualified by the first compatibility profile.
+pub const SUPPORTED_ZENOH_VERSION: &str = "1.9.0";
+/// Exact standalone ros2dds release qualified by the first profile.
+pub const SUPPORTED_ROS2DDS_VERSION: &str = "1.9.0";
+/// Expected standalone executable build identity.
+pub const SUPPORTED_ROS2DDS_BUILD_ID: &str = "eclipse-zenoh/zenoh-bridge-ros2dds@1.9.0";
 
 /// Complete checked-in mapping manifest.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -67,12 +75,28 @@ pub struct Profile {
     pub protobuf_descriptor_sha256: String,
     /// Reviewed ROS interface source revision.
     pub ros_interface_revision: String,
+    /// Zenoh compatibility family shared by native clients and the bridge.
+    pub zenoh_version: String,
     /// Optional standalone ros2dds executable version.
     pub ros2dds_version: String,
+    /// Exact standalone ros2dds build identity.
+    pub ros2dds_build_id: String,
+    /// Standalone/plugin deployment selection.
+    pub ros2dds_mode: Ros2DdsMode,
     /// Adapter executor is outside the qualified realtime process.
     pub adapter_outside_realtime: bool,
     /// Must remain false: the adapter cannot mint authority.
     pub adapter_can_issue_leases: bool,
+}
+
+/// Supported ros2dds deployment shape.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Ros2DdsMode {
+    /// Crash-isolated standalone executable.
+    Standalone,
+    /// Dynamic plugin loaded into a Zenoh router; rejected by this profile.
+    DynamicPlugin,
 }
 
 /// Deployment ownership needed to prevent loops and duplicate DDS paths.
@@ -487,7 +511,12 @@ fn validate_manifest(
             "profile.ros_interface_revision",
             &manifest.profile.ros_interface_revision,
         ),
+        ("profile.zenoh_version", &manifest.profile.zenoh_version),
         ("profile.ros2dds_version", &manifest.profile.ros2dds_version),
+        (
+            "profile.ros2dds_build_id",
+            &manifest.profile.ros2dds_build_id,
+        ),
     ] {
         require(!value.is_empty(), field, "cannot be empty")?;
     }
@@ -505,6 +534,26 @@ fn validate_manifest(
         !manifest.profile.adapter_can_issue_leases,
         "profile.adapter_can_issue_leases",
         "adapter cannot issue authority leases",
+    )?;
+    require(
+        manifest.profile.zenoh_version == SUPPORTED_ZENOH_VERSION,
+        "profile.zenoh_version",
+        "unsupported Zenoh compatibility version",
+    )?;
+    require(
+        manifest.profile.ros2dds_version == SUPPORTED_ROS2DDS_VERSION,
+        "profile.ros2dds_version",
+        "ros2dds must match the supported Zenoh compatibility version",
+    )?;
+    require(
+        manifest.profile.ros2dds_build_id == SUPPORTED_ROS2DDS_BUILD_ID,
+        "profile.ros2dds_build_id",
+        "unexpected standalone ros2dds build identity",
+    )?;
+    require(
+        manifest.profile.ros2dds_mode == Ros2DdsMode::Standalone,
+        "profile.ros2dds_mode",
+        "ros2dds must run as a standalone executable",
     )?;
     validate_sha256(
         &manifest.profile.protobuf_descriptor_sha256,
@@ -1079,7 +1128,8 @@ mod tests {
     use std::{fs, path::PathBuf};
 
     use super::{
-        Direction, TfAuthority, TfKind, prefixes_overlap, validate_manifest, validate_ros_frame,
+        Direction, Ros2DdsMode, TfAuthority, TfKind, prefixes_overlap, validate_manifest,
+        validate_ros_frame,
     };
 
     fn profile_root() -> PathBuf {
@@ -1174,6 +1224,42 @@ mod tests {
         assert!(
             validate_manifest(
                 &collision,
+                &profile_root(),
+                proto_generated::FILE_DESCRIPTOR_SET
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn manifest_rejects_incompatible_or_embedded_ros2dds() {
+        let mut wrong_zenoh = manifest();
+        wrong_zenoh.profile.zenoh_version = "1.8.0".to_owned();
+        assert!(
+            validate_manifest(
+                &wrong_zenoh,
+                &profile_root(),
+                proto_generated::FILE_DESCRIPTOR_SET
+            )
+            .is_err()
+        );
+
+        let mut wrong_bridge = manifest();
+        wrong_bridge.profile.ros2dds_version = "1.8.0".to_owned();
+        assert!(
+            validate_manifest(
+                &wrong_bridge,
+                &profile_root(),
+                proto_generated::FILE_DESCRIPTOR_SET
+            )
+            .is_err()
+        );
+
+        let mut plugin = manifest();
+        plugin.profile.ros2dds_mode = Ros2DdsMode::DynamicPlugin;
+        assert!(
+            validate_manifest(
+                &plugin,
                 &profile_root(),
                 proto_generated::FILE_DESCRIPTOR_SET
             )

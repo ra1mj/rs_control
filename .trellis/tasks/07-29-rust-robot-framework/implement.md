@@ -369,16 +369,16 @@ Hardware gate:
 
 ### I2. Cross-language example
 
-- [ ] Generate C++ and Python Protobuf clients.
-- [ ] Build one isolated example algorithm process using only Zenoh/Protobuf.
-- [ ] Kill/restart it under load; motion remains safe.
+- [x] Generate C++ and Python Protobuf clients.
+- [x] Build one isolated example algorithm process using only Zenoh/Protobuf.
+- [x] Kill/restart it under load; motion remains safe.
 
 ### I3. ROS 2 bridge
 
-- [ ] Pin a compatible standalone `zenoh-bridge-ros2dds` release.
-- [ ] Implement explicit mapping for one sensor topic, one command, one service/query and one action.
-- [ ] Validate SI units, coordinate frames, QoS, cancellation, lease and stale-command behavior.
-- [ ] Verify bridge/DDS failure cannot bypass local safety.
+- [x] Pin a compatible standalone `zenoh-bridge-ros2dds` release.
+- [x] Implement explicit mapping for one sensor topic, one command, one service/query and one action.
+- [x] Validate SI units, coordinate frames, QoS, cancellation, lease and stale-command behavior.
+- [x] Verify bridge/DDS failure cannot bypass local safety.
 
 ## 12. Phase J — Full integration and release gate
 

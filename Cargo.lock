@@ -509,6 +509,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "cross-language-contract"
+version = "0.1.0"
+dependencies = [
+ "contract-codec",
+ "message-model",
+ "middleware-api",
+ "middleware-local",
+ "middleware-zenoh",
+ "protoc-bin-vendored",
+ "tempfile",
+]
+
+[[package]]
 name = "crossbeam"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"

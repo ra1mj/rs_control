@@ -282,6 +282,11 @@ SourceGuard::evaluate_input(fallback, cached_sample, now_mono_ns)
     -> NetworkInputDecision<T>
 CommandIntent::materialize(local_lease, received_mono_ns, route_max_ttl_ns)
     -> Result<CommandEnvelope, SemanticError>
+heading_hold.py --connect <tcp-endpoint>
+    --input-key <navigation-odometry-key>
+    --output-key <control-command-intent-key>
+    --owner-id <owner> --lease-id <hex-128> --session-epoch <u64>
+    --requested-ttl-ns <u64> [--boot-id <qualification-only-hex-128>]
 ```
 
 ### 3. Contracts
@@ -344,6 +349,12 @@ CommandIntent::materialize(local_lease, received_mono_ns, route_max_ttl_ns)
   `transport_tcp`; compression, unstable and shared-memory features stay off.
   The exact dependency-policy exceptions and their removal condition live in
   `deny.toml` and the task research record.
+- Standalone non-Rust algorithm examples consume only generated Protobuf
+  clients, the exact compatible Zenoh release and language-standard libraries.
+  They publish command intents, never executable local deadlines or authority.
+  The canonical key domain includes `navigation` for odometry/state-estimation
+  data. Exact Python dependency and lockfile pins are
+  `eclipse-zenoh==1.9.0` and `protobuf==7.35.1`.
 
 ### 4. Validation & Error Matrix
 
@@ -371,6 +382,8 @@ CommandIntent::materialize(local_lease, received_mono_ns, route_max_ttl_ns)
 | Disconnected immediate-unavailable/safe-stop route | `Unavailable` / `SafeStopSignal`, even with a fresh cache |
 | Resource/owner/lease/session mismatch | `SemanticError::AuthorityMismatch`; no executable command |
 | Zero TTL or expired local lease | reject; requested TTL above route maximum is capped |
+| Algorithm process exits or is killed | local producer continues; no new remote intent is accepted; existing command expires at its exclusive local deadline |
+| Algorithm restarts with a new boot ID | reject until the receiver explicitly authorizes that boot; prior-boot cache/sequence state grants nothing |
 | Zero/multiple/error/late query replies | `NoReply`/`MultipleReplies`/`RemoteError`/`Timeout` |
 | Full callback/command queue | drop or typed `CommandQueueFull`; no callback blocking |
 
@@ -383,9 +396,13 @@ CommandIntent::materialize(local_lease, received_mono_ns, route_max_ttl_ns)
   stalled; generations and overwrite counters advance without a Zenoh call.
 - Base fallback: a disconnected `HoldUntilExpired` route uses its last accepted value
   before the exclusive expiry and exposes unavailable at equality.
+- Good cross-language: Rust publishes validated odometry over real TCP Zenoh,
+  a standalone generated-client Python process publishes a bounded chassis
+  intent, and Rust applies source, boot, lease and local-deadline validation.
 - Bad: pass a `zenoh::Session` or generated DTO to application/RT code, use an
   unbounded channel, accept a payload boot change as authorization, execute a
-  remote absolute monotonic deadline, or refresh cached expiry on reconnect.
+  remote absolute monotonic deadline, refresh cached expiry on reconnect, or
+  kill only a launcher wrapper while treating its still-running child as dead.
 
 ### 6. Tests Required
 
@@ -408,6 +425,12 @@ CommandIntent::materialize(local_lease, received_mono_ns, route_max_ttl_ns)
 - A serialized explicit-TCP loopback test covers semantic -> Protobuf -> real
   Zenoh -> semantic, command materialization, query/queryable timeout,
   liveliness put/delete and local disconnection after bridge stop.
+- A cross-language qualification test generates Python clients from every
+  `robot/v1` schema, launches the actual interpreter, checks a Rust -> Python
+  -> Rust odometry/intent round trip, kills and reaps that interpreter while a
+  bounded local producer progresses, observes exclusive deadline expiry, then
+  restarts with a new boot and proves explicit reauthorization. Dependency
+  pins and the Python import boundary are asserted from checked-in files.
 - Run warnings-denied Clippy, architecture policy, Buf compatibility,
   cross-language generation, dependency policy and `./tools/ci.sh`.
 
@@ -442,6 +465,19 @@ cached.expires_monotonic_ns = now_monotonic_ns + route_max_age_ns;
 
 ```rust
 let decision = source_guard.evaluate_input(fallback, cached.as_ref(), now_monotonic_ns);
+```
+
+#### Wrong process qualification
+
+```text
+kill the `uv run` launcher PID; assume the algorithm child stopped
+```
+
+#### Correct process qualification
+
+```text
+launch/track the actual interpreter (or its process group); kill and reap it
+before asserting that no further remote intents arrive
 ```
 
 ## Scenario: Enforce resource leases in a motion runtime
@@ -572,6 +608,9 @@ project_twist_ingress(input, route, aliases, context) -> Result<ChassisSetpoint,
 CommandEnvelope::from_bridge_ingress(header, lease, command_id,
                                      received_mono_ns, ttl_ns, max_ttl_ns)
     -> Result<CommandEnvelope, SemanticError>
+RuntimeGate::begin_epoch(epoch) -> Result<(), RuntimeError>
+RuntimeGate::evaluate(registry, evidence) -> Result<RuntimeReport, RuntimeError>
+RuntimeGate::admission(report, route) -> RouteAdmission
 ```
 
 The checked-in profile lives at
@@ -605,6 +644,18 @@ The checked-in profile lives at
   terminal cancellation, and declare bounded feedback/result retention.
 - ROS, DDS, Zenoh and ros2dds runtime dependencies stay out of
   `protocol_module`; `ros2-mapping` remains an `integration` crate.
+- The checked-in profile pins `zenoh_version`, `ros2dds_version`,
+  `ros2dds_build_id` and `ros2dds_mode`. The supported ros2dds path is the
+  standalone executable at exact identity
+  `eclipse-zenoh/zenoh-bridge-ros2dds@1.9.0`; dynamic-plugin or parallel direct
+  DDS paths are rejected.
+- A supervisor begins a nonzero, strictly increasing process epoch. Ready
+  evidence must match that epoch plus the profile ID, runtime Protobuf
+  descriptor SHA-256, canonical manifest fingerprint and every bridge version/
+  build/mode field. Starting a new epoch immediately invalidates old reports.
+- External readiness is transport evidence, not command authority. A ready
+  route with `local_lease_required` returns `LocalValidationRequired`; only the
+  existing local lease and local monotonic deadline path may admit execution.
 
 ### 4. Validation & Error Matrix
 
@@ -623,6 +674,10 @@ The checked-in profile lives at
 | Stale/future ROS command stamp | ingress projection | reject observation |
 | Missing/expired lease or zero TTL bound | `CommandEnvelope::from_bridge_ingress` | reject; cap nonzero requested TTL to route maximum |
 | Unknown action/cancel/status enum | `contract-codec` | `CodecError::UnknownEnum` |
+| Zero/non-increasing supervisor epoch or evidence from another epoch | `RuntimeGate` | typed epoch error; no report/admission |
+| Ready adapter omits or mismatches profile/descriptor/manifest/bridge identity | `RuntimeGate` | `MissingIdentity` / field-specific `IdentityMismatch` |
+| Adapter, native Zenoh, ROS graph or required ros2dds path is not ready | `RuntimeGate` | route admission is `Closed` with the exact path failure |
+| Prior report used after restart | `RuntimeGate::admission` | `Closed(StaleEvidence)` |
 
 ### 5. Good / Base / Bad Cases
 
@@ -631,10 +686,14 @@ The checked-in profile lives at
   `imu_link` through an explicit alias and preserves acquisition time.
 - Base: a static transform has reliable/transient-local QoS, a single child
   authority and an explicit reception-time-degraded fallback.
+- Good runtime: current-epoch evidence matches every checked-in identity and
+  required path; sensor routes are available while command routes still
+  require local validation.
 - Bad: infer ROS names from Zenoh keys, put route/QoS fields in robot YAML,
   accept `KEEP_ALL`, copy source monotonic time into a ROS stamp, mint a lease
   from a ROS publisher, load ros2dds into the native router, or emulate
-  `rmw_zenoh` private keys.
+  `rmw_zenoh` private keys. Never retain readiness across an adapter restart or
+  treat bridge availability as an authority grant.
 
 ### 6. Tests Required
 
@@ -651,8 +710,13 @@ The checked-in profile lives at
 - Assert IMU unavailable/unknown sentinels, required acquisition/drop behavior,
   frame aliases, UUID correlation, cancel lifecycle/result retention and local
   lease/deadline capping.
+- Assert exact sensor/command/service/action route policies and exact bridge
+  identity pins. Mutate every identity dimension and external component state;
+  prove restart invalidation, fail-closed admission, action cancel acceptance
+  distinct from terminal cancellation, and DDS loss unable to extend an
+  already constructed local deadline.
 - Run `tools/ci.sh`; target-board/network/ROS runtime qualification is additive
-  and belongs to the later adapter task.
+  and remains a separate claim from this host-software contract.
 
 ### 7. Wrong vs Correct
 
@@ -678,4 +742,25 @@ let input = project_twist_ingress(&twist, route, aliases, TwistIngressContext {
     requested_ttl_ns,
 })?;
 native_command_port.try_send(input)?;
+```
+
+#### Wrong runtime readiness
+
+```rust
+// Process liveness silently restores command admission after restart.
+if adapter_pid_exists() {
+    admit_remote_command();
+}
+```
+
+#### Correct runtime readiness
+
+```rust
+gate.begin_epoch(supervisor_epoch)?;
+let report = gate.evaluate(&registry, &current_identity_and_path_evidence)?;
+match gate.admission(report, command_route) {
+    RouteAdmission::LocalValidationRequired => validate_local_lease_and_deadline(),
+    RouteAdmission::Available => unreachable!("command routes require local authority"),
+    RouteAdmission::Closed(reason) => fail_closed(reason),
+}
 ```

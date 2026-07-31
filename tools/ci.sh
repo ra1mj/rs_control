@@ -7,6 +7,10 @@ cd "$ci_repo_root"
 platform/orangepi5plus/tests/host-test.sh
 platform/orangepi5plus/tests/middleware-host-test.sh
 
+uv sync --project examples/python-zenoh-algorithm --frozen
+uv run --project examples/python-zenoh-algorithm --frozen \
+    python -m py_compile examples/python-zenoh-algorithm/heading_hold.py
+
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
 cargo test --locked --workspace --all-features

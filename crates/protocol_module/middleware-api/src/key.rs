@@ -17,6 +17,8 @@ pub enum KeyDomain {
     Device,
     /// Robot control commands and state.
     Control,
+    /// Navigation estimates, transforms and algorithm results.
+    Navigation,
     /// Component and system health.
     Health,
     /// System/mission lifecycle.
@@ -32,6 +34,7 @@ impl KeyDomain {
         match self {
             Self::Device => "device",
             Self::Control => "control",
+            Self::Navigation => "navigation",
             Self::Health => "health",
             Self::Fsm => "fsm",
             Self::Perception => "perception",
@@ -46,6 +49,7 @@ impl FromStr for KeyDomain {
         match value {
             "device" => Ok(Self::Device),
             "control" => Ok(Self::Control),
+            "navigation" => Ok(Self::Navigation),
             "health" => Ok(Self::Health),
             "fsm" => Ok(Self::Fsm),
             "perception" => Ok(Self::Perception),
@@ -213,6 +217,7 @@ mod tests {
         for domain in [
             KeyDomain::Device,
             KeyDomain::Control,
+            KeyDomain::Navigation,
             KeyDomain::Health,
             KeyDomain::Fsm,
             KeyDomain::Perception,

@@ -1,0 +1,31 @@
+{
+  "id": "lease-enforcement-cache",
+  "name": "lease-enforcement-cache",
+  "title": "Lease enforcement cache",
+  "description": "Implement a fixed-capacity allocation-free resource lease reducer and motion enforcement cache with session restart safety and two-phase preemption.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": "application-module resource lease reducer and motion enforcement cache",
+  "package": "application_module",
+  "priority": "P1",
+  "creator": "mj",
+  "assignee": "mj",
+  "createdAt": "2026-07-31",
+  "completedAt": "2026-07-31",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "07-29-rust-robot-framework",
+  "relatedFiles": [
+    "crates/application_module/control-core",
+    "crates/protocol_module/message-model/src/lib.rs",
+    ".trellis/tasks/07-29-rust-robot-framework/implement.md",
+    ".trellis/spec/backend/robot-contracts.md"
+  ],
+  "notes": "Software-only G3 child complete. control-core now owns a fixed-capacity allocation-free lease reducer and motion enforcement cache with strict epochs, exact grant/renew/release/expiry authorization, two-phase preemption, typed removal evidence and fail-closed session loss/restart. Eight host tests cover invalid transitions, interleaved competing owners, exclusive expiry and zero allocations. Targeted checks, architecture policy and final tools/ci.sh passed. FSM priority policy, motion process wiring, physical safe action, Orange Pi and target timing qualification remain out of scope.",
+  "meta": {}
+}

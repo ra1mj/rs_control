@@ -127,5 +127,5 @@ cargo deny check
 - [x] Mark only evidence-backed task and parent Phase I2/I3 software
       checkboxes complete; leave camera/Orange Pi/live target qualification
       open.
-- [ ] Commit implementation/task/spec records, archive the task, record the
+- [x] Commit implementation/task/spec records, archive the task, record the
       developer journal and push the branch.

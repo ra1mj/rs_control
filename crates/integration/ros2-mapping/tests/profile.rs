@@ -35,6 +35,6 @@ fn manifest_fingerprint_is_deterministic() {
     assert_eq!(first.fingerprint(), second.fingerprint());
     assert_eq!(
         first.fingerprint(),
-        "7cab3c3efdcbbe0cf97a3135b7d210f64daf661a25802d0b3316b679dcb49976"
+        "5af4dbbb1731b4064c1fb80df360f86c54f411e4cc63af1353fe92996871211f"
     );
 }

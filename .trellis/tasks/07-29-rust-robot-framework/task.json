@@ -25,7 +25,8 @@
     "07-29-module-layer-naming",
     "07-30-zenoh-ros2-contract",
     "07-30-zenoh-protobuf-middleware",
-    "07-30-local-shm-rk3588-qualification"
+    "07-30-local-shm-rk3588-qualification",
+    "07-31-motor-feedback-contract"
   ],
   "parent": null,
   "relatedFiles": [],

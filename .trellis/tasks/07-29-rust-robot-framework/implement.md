@@ -222,7 +222,7 @@ Target-board benchmark:
 ### D2. Codec and Zenoh adapter
 
 - [x] Implement the canonical key builder/parser in one crate.
-- [ ] Map hardware_module samples to message model and Protobuf once at the protocol_module boundary.
+- [x] Map hardware_module samples to message model and Protobuf once at the protocol_module boundary.
 - [x] Implement stream, action/ack, query/queryable and liveliness interaction classes.
 - [x] Assign semantic QoS classes without allowing Zenoh calls on RT threads.
 - [x] Validate source/boot/sequence/time/validity/quality for all network input.

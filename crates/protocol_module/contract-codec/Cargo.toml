@@ -8,9 +8,14 @@ license.workspace = true
 [dependencies]
 arrayvec.workspace = true
 message-model.workspace = true
+motor-damiao.workspace = true
 prost.workspace = true
 proto-generated.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+allocation-counter.workspace = true
+hardware-module-core.workspace = true
 
 [lints]
 workspace = true

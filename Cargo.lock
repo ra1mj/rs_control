@@ -422,8 +422,11 @@ dependencies = [
 name = "contract-codec"
 version = "0.1.0"
 dependencies = [
+ "allocation-counter",
  "arrayvec",
+ "hardware-module-core",
  "message-model",
+ "motor-damiao",
  "prost",
  "proto-generated",
  "thiserror",

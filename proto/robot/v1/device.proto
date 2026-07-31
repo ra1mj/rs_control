@@ -4,6 +4,16 @@ package robot.v1;
 
 import "robot/v1/common.proto";
 
+// One explicitly qualified motor-temperature observation.
+message TemperatureObservation {
+  oneof observation {
+    // Calibrated temperature in degrees Celsius.
+    double calibrated_celsius = 1;
+    // Device-protocol value whose physical conversion is not qualified.
+    uint32 raw = 2;
+  }
+}
+
 // Standardized motor feedback in SI units.
 message MotorState {
   // Common sample metadata.
@@ -16,12 +26,18 @@ message MotorState {
   double velocity_radps = 4;
   // Estimated torque in newton metres.
   double torque_nm = 5;
-  // Power-stage temperature in degrees Celsius.
+  // Legacy power-stage Celsius value; used only when explicit_temperature_observations is false.
   double mos_temperature_c = 6;
-  // Rotor temperature in degrees Celsius.
+  // Legacy rotor Celsius value; used only when explicit_temperature_observations is false.
   double rotor_temperature_c = 7;
   // Stable driver-owned numeric fault code; zero means no reported device fault.
   uint32 fault_code = 8;
+  // Explicit power-stage observation.
+  TemperatureObservation mos_temperature = 9;
+  // Explicit rotor/winding observation.
+  TemperatureObservation rotor_temperature = 10;
+  // Selects fields 9 and 10; false preserves the original fields 6 and 7.
+  bool explicit_temperature_observations = 11;
 }
 
 // IMU sample expressed in the frame named by Header.frame_id.

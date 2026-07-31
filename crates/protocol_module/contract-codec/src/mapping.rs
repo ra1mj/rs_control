@@ -4,15 +4,18 @@ use arrayvec::ArrayVec;
 use message_model::{
     ActionCancelDecision, ActionCancelRequest, ActionCancelResponse, ActionFeedback, ActionGoal,
     ActionGoalIntent, ActionName, ActionResult, ActionStatus, AsciiId, ChassisSetpoint,
-    ChassisSetpointIntent, ChassisTrajectoryPoint, CommandIntent, CommandIntentFields,
-    ComponentHealth, Covariance3, Covariance6, CovarianceStatus, ExecuteChassisTrajectoryFeedback,
-    ExecuteChassisTrajectoryGoal, ExecuteChassisTrajectoryResult, Fault, FaultRecoverability,
-    FaultSeverity, HealthSnapshotRequest, HealthSnapshotResponse, Id128, ImuMeasurement, ImuState,
-    JointState, JointStateAggregate, LifecycleState, MAX_COMPONENT_FAULTS, MAX_HEALTH_COMPONENTS,
-    MAX_JOINTS, MAX_TRAJECTORY_POINTS, MAX_TRANSFORMS, OdometryState, OdometryStateFields, Pose3,
-    ProtobufTypeName, RegisteredPayload, StampedTransform, StampedTransformFields, TransformBatch,
-    Twist2, Twist3, UnitQuaternion, Vector3,
+    ChassisSetpointIntent, ChassisTrajectoryPoint, ClockState, ClockStatus, CommandIntent,
+    CommandIntentFields, ComponentHealth, Covariance3, Covariance6, CovarianceStatus,
+    ExecuteChassisTrajectoryFeedback, ExecuteChassisTrajectoryGoal, ExecuteChassisTrajectoryResult,
+    Fault, FaultRecoverability, FaultSeverity, Header, HeaderFields, HealthSnapshotRequest,
+    HealthSnapshotResponse, Id128, ImuMeasurement, ImuState, JointState, JointStateAggregate,
+    LifecycleState, MAX_COMPONENT_FAULTS, MAX_HEALTH_COMPONENTS, MAX_JOINTS, MAX_TRAJECTORY_POINTS,
+    MAX_TRANSFORMS, MotorState, MotorStateFields, OdometryState, OdometryStateFields, Pose3,
+    ProtobufTypeName, RegisteredPayload, ResourceId, SemanticError, SourceId, StampedTransform,
+    StampedTransformFields, TemperatureObservation, TransformBatch, Twist2, Twist3, UnitQuaternion,
+    Vector3,
 };
+use motor_damiao::DamiaoFeedback;
 use prost::Message;
 use proto_generated::robot::v1 as wire;
 
@@ -20,6 +23,209 @@ use crate::{
     CodecError, command_envelope_from_wire, command_envelope_to_wire, header_from_wire,
     header_to_wire,
 };
+
+/// Namespace for Damiao status-nibble fault codes in semantic motor state.
+pub const DAMIAO_STATUS_FAULT_BASE: u32 = 0x0001_0000;
+
+/// Stable process/resource metadata used to map one Damiao sample.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DamiaoMotorStateContext {
+    source_id: SourceId,
+    boot_id: Id128,
+    resource_id: ResourceId,
+    valid_for_ns: u64,
+}
+
+impl DamiaoMotorStateContext {
+    /// Constructs a mapping context with a nonzero local validity window.
+    pub fn new(
+        source_id: SourceId,
+        boot_id: Id128,
+        resource_id: ResourceId,
+        valid_for_ns: u64,
+    ) -> Result<Self, SemanticError> {
+        if valid_for_ns == 0 {
+            return Err(SemanticError::ZeroValidity);
+        }
+        Ok(Self {
+            source_id,
+            boot_id,
+            resource_id,
+            valid_for_ns,
+        })
+    }
+
+    /// Returns the stable feedback publisher identity.
+    #[must_use]
+    pub const fn source_id(self) -> SourceId {
+        self.source_id
+    }
+
+    /// Returns the publisher boot identity.
+    #[must_use]
+    pub const fn boot_id(self) -> Id128 {
+        self.boot_id
+    }
+
+    /// Returns the logical motor resource.
+    #[must_use]
+    pub const fn resource_id(self) -> ResourceId {
+        self.resource_id
+    }
+
+    /// Returns the local sample validity window.
+    #[must_use]
+    pub const fn valid_for_ns(self) -> u64 {
+        self.valid_for_ns
+    }
+}
+
+/// Maps validated Damiao feedback into the backend-neutral semantic contract.
+pub fn damiao_feedback_to_motor_state(
+    feedback: DamiaoFeedback,
+    context: DamiaoMotorStateContext,
+) -> Result<MotorState, SemanticError> {
+    let faulted = feedback.status.is_fault();
+    let header = Header::new(HeaderFields {
+        source_id: context.source_id,
+        boot_id: context.boot_id,
+        sequence: feedback.sequence,
+        source_monotonic_ns: feedback.observed_monotonic.as_nanos(),
+        publish_unix_ns: None,
+        acquisition_timestamp: None,
+        valid_for_ns: context.valid_for_ns,
+        frame_id: None,
+        clock_status: ClockStatus {
+            state: ClockState::Local,
+            uncertainty_ns: 0,
+        },
+        quality: if faulted {
+            message_model::DataQuality::Faulted
+        } else {
+            message_model::DataQuality::Valid
+        },
+    })?;
+    MotorState::new(MotorStateFields {
+        header,
+        resource_id: context.resource_id,
+        position_rad: f64::from(feedback.position),
+        velocity_radps: f64::from(feedback.velocity),
+        torque_nm: f64::from(feedback.torque),
+        mos_temperature: TemperatureObservation::raw(u32::from(feedback.mos_temperature_raw)),
+        rotor_temperature: TemperatureObservation::raw(u32::from(feedback.winding_temperature_raw)),
+        fault_code: if faulted {
+            DAMIAO_STATUS_FAULT_BASE | u32::from(feedback.status.as_raw())
+        } else {
+            0
+        },
+    })
+}
+
+/// Encodes a validated motor state.
+pub fn encode_motor_state(value: &MotorState) -> Vec<u8> {
+    motor_state_to_wire(value).encode_to_vec()
+}
+
+/// Decodes and validates a motor state.
+pub fn decode_motor_state(bytes: &[u8]) -> Result<MotorState, CodecError> {
+    motor_state_from_wire(wire::MotorState::decode(bytes)?)
+}
+
+/// Converts a semantic motor state into its additive wire representation.
+#[must_use]
+pub fn motor_state_to_wire(value: &MotorState) -> wire::MotorState {
+    wire::MotorState {
+        header: Some(header_to_wire(&value.header())),
+        resource_id: value.resource_id().as_str().to_owned(),
+        position_rad: value.position_rad(),
+        velocity_radps: value.velocity_radps(),
+        torque_nm: value.torque_nm(),
+        mos_temperature_c: 0.0,
+        rotor_temperature_c: 0.0,
+        fault_code: value.fault_code(),
+        mos_temperature: Some(temperature_observation_to_wire(value.mos_temperature())),
+        rotor_temperature: Some(temperature_observation_to_wire(value.rotor_temperature())),
+        explicit_temperature_observations: true,
+    }
+}
+
+/// Converts and validates a motor-state wire DTO.
+pub fn motor_state_from_wire(value: wire::MotorState) -> Result<MotorState, CodecError> {
+    let (mos_temperature, rotor_temperature) = if value.explicit_temperature_observations {
+        if value.mos_temperature_c != 0.0 || value.rotor_temperature_c != 0.0 {
+            return Err(CodecError::InvalidField {
+                field: "motor.temperature",
+                reason: "legacy and explicit temperature representations cannot both be set",
+            });
+        }
+        (
+            temperature_observation_from_wire(
+                value
+                    .mos_temperature
+                    .ok_or(CodecError::MissingField("motor.mos_temperature"))?,
+                "motor.mos_temperature",
+            )?,
+            temperature_observation_from_wire(
+                value
+                    .rotor_temperature
+                    .ok_or(CodecError::MissingField("motor.rotor_temperature"))?,
+                "motor.rotor_temperature",
+            )?,
+        )
+    } else {
+        if value.mos_temperature.is_some() || value.rotor_temperature.is_some() {
+            return Err(CodecError::InvalidField {
+                field: "motor.temperature",
+                reason: "explicit temperature fields require their selector",
+            });
+        }
+        (
+            TemperatureObservation::calibrated_celsius(value.mos_temperature_c)?,
+            TemperatureObservation::calibrated_celsius(value.rotor_temperature_c)?,
+        )
+    };
+    MotorState::new(MotorStateFields {
+        header: header_from_wire(value.header.ok_or(CodecError::MissingField("header"))?)?,
+        resource_id: AsciiId::parse(&value.resource_id)?,
+        position_rad: value.position_rad,
+        velocity_radps: value.velocity_radps,
+        torque_nm: value.torque_nm,
+        mos_temperature,
+        rotor_temperature,
+        fault_code: value.fault_code,
+    })
+    .map_err(CodecError::from)
+}
+
+fn temperature_observation_to_wire(value: TemperatureObservation) -> wire::TemperatureObservation {
+    let observation = if let Some(raw) = value.raw_value() {
+        wire::temperature_observation::Observation::Raw(raw)
+    } else {
+        wire::temperature_observation::Observation::CalibratedCelsius(
+            value
+                .calibrated_celsius_value()
+                .expect("validated temperature has exactly one representation"),
+        )
+    };
+    wire::TemperatureObservation {
+        observation: Some(observation),
+    }
+}
+
+fn temperature_observation_from_wire(
+    value: wire::TemperatureObservation,
+    field: &'static str,
+) -> Result<TemperatureObservation, CodecError> {
+    match value.observation {
+        Some(wire::temperature_observation::Observation::Raw(value)) => {
+            Ok(TemperatureObservation::raw(value))
+        }
+        Some(wire::temperature_observation::Observation::CalibratedCelsius(value)) => {
+            TemperatureObservation::calibrated_celsius(value).map_err(CodecError::from)
+        }
+        None => Err(CodecError::MissingField(field)),
+    }
+}
 
 /// Encodes a validated IMU state.
 pub fn encode_imu_state(value: &ImuState) -> Vec<u8> {
@@ -1139,22 +1345,27 @@ fn action_status_from_wire(value: i32) -> Result<ActionStatus, CodecError> {
 
 #[cfg(test)]
 mod tests {
+    use allocation_counter::measure;
+    use hardware_module_core::{MonoTime, StandardCanId};
     use message_model::{
         AcquisitionTimestamp, ActionCancelDecision, ActionCancelResponse, ActionGoal, AsciiId,
         ChassisSetpointIntent, ClockState, ClockStatus, CommandEnvelope, CommandEnvelopeFields,
         CommandIntent, CommandIntentFields, Covariance3, Covariance6, CovarianceStatus,
-        DataQuality, Header, HeaderFields, Id128, ImuMeasurement, ImuState, OdometryState,
-        OdometryStateFields, Pose3, RegisteredPayload, TimestampDomain, Twist2, Twist3,
-        UnitQuaternion, Vector3,
+        DataQuality, Header, HeaderFields, Id128, ImuMeasurement, ImuState, MotorState,
+        MotorStateFields, OdometryState, OdometryStateFields, Pose3, RegisteredPayload,
+        TemperatureObservation, TimestampDomain, Twist2, Twist3, UnitQuaternion, Vector3,
     };
+    use motor_damiao::{DamiaoEscId, DamiaoFeedback, DamiaoStatus};
     use prost::Message;
     use proto_generated::robot::v1 as wire;
 
     use super::{
-        action_goal_from_wire, action_goal_to_wire, decode_action_cancel_response,
-        decode_chassis_setpoint_intent, decode_imu_state, decode_odometry_state,
-        encode_action_cancel_response, encode_chassis_setpoint_intent, encode_imu_state,
-        encode_odometry_state, imu_state_to_wire, trajectory_goal_from_wire,
+        DAMIAO_STATUS_FAULT_BASE, DamiaoMotorStateContext, action_goal_from_wire,
+        action_goal_to_wire, damiao_feedback_to_motor_state, decode_action_cancel_response,
+        decode_chassis_setpoint_intent, decode_imu_state, decode_motor_state,
+        decode_odometry_state, encode_action_cancel_response, encode_chassis_setpoint_intent,
+        encode_imu_state, encode_motor_state, encode_odometry_state, imu_state_to_wire,
+        motor_state_to_wire, trajectory_goal_from_wire,
     };
 
     fn header(frame: Option<&str>) -> Header {
@@ -1194,6 +1405,183 @@ mod tests {
             values[index * 6 + index] = 0.1;
         }
         Covariance6::new(values).unwrap()
+    }
+
+    fn motor_state(
+        mos_temperature: TemperatureObservation,
+        rotor_temperature: TemperatureObservation,
+    ) -> MotorState {
+        MotorState::new(MotorStateFields {
+            header: header(None),
+            resource_id: AsciiId::parse("arm.left.joint_1").unwrap(),
+            position_rad: 1.25,
+            velocity_radps: -2.5,
+            torque_nm: 3.75,
+            mos_temperature,
+            rotor_temperature,
+            fault_code: 0x0b,
+        })
+        .unwrap()
+    }
+
+    fn damiao_context() -> DamiaoMotorStateContext {
+        DamiaoMotorStateContext::new(
+            AsciiId::parse("motion-rt").unwrap(),
+            Id128::new([9; 16]).unwrap(),
+            AsciiId::parse("arm.left.joint_1").unwrap(),
+            1_000_000,
+        )
+        .unwrap()
+    }
+
+    fn damiao_feedback(status: DamiaoStatus) -> DamiaoFeedback {
+        DamiaoFeedback {
+            source_id: StandardCanId::new(0x11).unwrap(),
+            esc_id: DamiaoEscId::new(1).unwrap(),
+            status,
+            position: 1.25,
+            velocity: -2.5,
+            torque: 3.75,
+            mos_temperature_raw: 42,
+            winding_temperature_raw: 43,
+            observed_monotonic: MonoTime::from_nanos(123_456),
+            sequence: 77,
+        }
+    }
+
+    #[test]
+    fn motor_state_round_trip_preserves_raw_and_calibrated_temperatures() {
+        let raw = motor_state(
+            TemperatureObservation::raw(42),
+            TemperatureObservation::raw(43),
+        );
+        assert_eq!(decode_motor_state(&encode_motor_state(&raw)).unwrap(), raw);
+        let wire = motor_state_to_wire(&raw);
+        assert!(wire.explicit_temperature_observations);
+        assert_eq!(wire.mos_temperature_c, 0.0);
+        assert_eq!(wire.rotor_temperature_c, 0.0);
+
+        let calibrated = motor_state(
+            TemperatureObservation::calibrated_celsius(41.5).unwrap(),
+            TemperatureObservation::calibrated_celsius(-5.25).unwrap(),
+        );
+        assert_eq!(
+            decode_motor_state(&encode_motor_state(&calibrated)).unwrap(),
+            calibrated
+        );
+    }
+
+    #[test]
+    fn motor_state_decoder_preserves_legacy_celsius_and_rejects_ambiguity() {
+        let state = motor_state(
+            TemperatureObservation::raw(42),
+            TemperatureObservation::raw(43),
+        );
+        let mut wire = motor_state_to_wire(&state);
+        wire.explicit_temperature_observations = false;
+        wire.mos_temperature = None;
+        wire.rotor_temperature = None;
+        wire.mos_temperature_c = 41.5;
+        wire.rotor_temperature_c = -5.25;
+        let legacy = decode_motor_state(&wire.encode_to_vec()).unwrap();
+        assert_eq!(
+            legacy.mos_temperature().calibrated_celsius_value(),
+            Some(41.5)
+        );
+        assert_eq!(
+            legacy.rotor_temperature().calibrated_celsius_value(),
+            Some(-5.25)
+        );
+
+        let mut missing = motor_state_to_wire(&state);
+        missing.mos_temperature = None;
+        assert!(decode_motor_state(&missing.encode_to_vec()).is_err());
+
+        let mut missing_oneof = motor_state_to_wire(&state);
+        missing_oneof.mos_temperature = Some(wire::TemperatureObservation { observation: None });
+        assert!(decode_motor_state(&missing_oneof.encode_to_vec()).is_err());
+
+        let mut conflicting = motor_state_to_wire(&state);
+        conflicting.mos_temperature_c = 1.0;
+        assert!(decode_motor_state(&conflicting.encode_to_vec()).is_err());
+
+        let mut selector_missing = motor_state_to_wire(&state);
+        selector_missing.explicit_temperature_observations = false;
+        assert!(decode_motor_state(&selector_missing.encode_to_vec()).is_err());
+
+        let mut nonfinite = motor_state_to_wire(&state);
+        nonfinite.mos_temperature = Some(wire::TemperatureObservation {
+            observation: Some(
+                wire::temperature_observation::Observation::CalibratedCelsius(f64::NAN),
+            ),
+        });
+        assert!(decode_motor_state(&nonfinite.encode_to_vec()).is_err());
+
+        let mut legacy_nonfinite = motor_state_to_wire(&state);
+        legacy_nonfinite.explicit_temperature_observations = false;
+        legacy_nonfinite.mos_temperature = None;
+        legacy_nonfinite.rotor_temperature = None;
+        legacy_nonfinite.mos_temperature_c = f64::NAN;
+        assert!(decode_motor_state(&legacy_nonfinite.encode_to_vec()).is_err());
+    }
+
+    #[test]
+    fn damiao_mapping_preserves_identity_time_sequence_and_raw_values_without_allocating() {
+        let context = damiao_context();
+        let feedback = damiao_feedback(DamiaoStatus::Enabled);
+        let mut mapped = None;
+        let allocations = measure(|| {
+            mapped = Some(damiao_feedback_to_motor_state(feedback, context).unwrap());
+        });
+        assert_eq!(allocations.count_total, 0);
+
+        let state = mapped.unwrap();
+        assert_eq!(state.header().source_id(), context.source_id());
+        assert_eq!(state.header().boot_id(), context.boot_id());
+        assert_eq!(state.header().sequence(), 77);
+        assert_eq!(state.header().source_monotonic_ns(), 123_456);
+        assert_eq!(state.header().valid_for_ns(), 1_000_000);
+        assert_eq!(state.header().clock_status().state, ClockState::Local);
+        assert_eq!(state.header().clock_status().uncertainty_ns, 0);
+        assert_eq!(state.header().quality(), DataQuality::Valid);
+        assert_eq!(state.resource_id(), context.resource_id());
+        assert_eq!(state.position_rad(), f64::from(feedback.position));
+        assert_eq!(state.velocity_radps(), f64::from(feedback.velocity));
+        assert_eq!(state.torque_nm(), f64::from(feedback.torque));
+        assert_eq!(state.mos_temperature().raw_value(), Some(42));
+        assert_eq!(state.rotor_temperature().raw_value(), Some(43));
+        assert_eq!(state.fault_code(), 0);
+
+        assert!(
+            DamiaoMotorStateContext::new(
+                context.source_id(),
+                context.boot_id(),
+                context.resource_id(),
+                0
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn damiao_mapping_distinguishes_nonfault_and_fault_statuses() {
+        for status in [DamiaoStatus::Disabled, DamiaoStatus::Enabled] {
+            let state =
+                damiao_feedback_to_motor_state(damiao_feedback(status), damiao_context()).unwrap();
+            assert_eq!(state.header().quality(), DataQuality::Valid);
+            assert_eq!(state.fault_code(), 0);
+        }
+
+        for (status, fault_code) in [
+            (DamiaoStatus::OverVoltage, 0x08),
+            (DamiaoStatus::Unknown(0x12), 0x02),
+            (DamiaoStatus::Unknown(0), 0x00),
+        ] {
+            let state =
+                damiao_feedback_to_motor_state(damiao_feedback(status), damiao_context()).unwrap();
+            assert_eq!(state.header().quality(), DataQuality::Faulted);
+            assert_eq!(state.fault_code(), DAMIAO_STATUS_FAULT_BASE | fault_code);
+        }
     }
 
     #[test]

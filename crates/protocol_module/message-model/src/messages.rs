@@ -16,6 +16,155 @@ pub const MAX_COMPONENT_FAULTS: usize = 32;
 /// Maximum components in one health query/response.
 pub const MAX_HEALTH_COMPONENTS: usize = 64;
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum TemperatureValue {
+    Raw(u32),
+    CalibratedCelsius(f64),
+}
+
+/// Temperature observation with an explicit qualification level.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TemperatureObservation {
+    value: TemperatureValue,
+}
+
+impl TemperatureObservation {
+    /// Preserves a device-protocol value without assigning physical units.
+    #[must_use]
+    pub const fn raw(value: u32) -> Self {
+        Self {
+            value: TemperatureValue::Raw(value),
+        }
+    }
+
+    /// Constructs a finite calibrated Celsius observation.
+    pub fn calibrated_celsius(value: f64) -> Result<Self, SemanticError> {
+        require_finite(value, "motor.temperature_c")?;
+        Ok(Self {
+            value: TemperatureValue::CalibratedCelsius(value),
+        })
+    }
+
+    /// Returns the unqualified raw value when this is a raw observation.
+    #[must_use]
+    pub const fn raw_value(self) -> Option<u32> {
+        match self.value {
+            TemperatureValue::Raw(value) => Some(value),
+            TemperatureValue::CalibratedCelsius(_) => None,
+        }
+    }
+
+    /// Returns degrees Celsius only when this is a calibrated observation.
+    #[must_use]
+    pub const fn calibrated_celsius_value(self) -> Option<f64> {
+        match self.value {
+            TemperatureValue::Raw(_) => None,
+            TemperatureValue::CalibratedCelsius(value) => Some(value),
+        }
+    }
+}
+
+/// Fields supplied to [`MotorState::new`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MotorStateFields {
+    /// Common sample metadata.
+    pub header: Header,
+    /// Stable logical motor resource.
+    pub resource_id: crate::ResourceId,
+    /// Rotor/output position in radians.
+    pub position_rad: f64,
+    /// Angular velocity in radians per second.
+    pub velocity_radps: f64,
+    /// Estimated torque in newton metres.
+    pub torque_nm: f64,
+    /// Power-stage temperature observation.
+    pub mos_temperature: TemperatureObservation,
+    /// Rotor/winding temperature observation.
+    pub rotor_temperature: TemperatureObservation,
+    /// Stable driver-owned numeric fault code; zero means no reported fault.
+    pub fault_code: u32,
+}
+
+/// Validated backend-neutral motor feedback.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MotorState {
+    header: Header,
+    resource_id: crate::ResourceId,
+    position_rad: f64,
+    velocity_radps: f64,
+    torque_nm: f64,
+    mos_temperature: TemperatureObservation,
+    rotor_temperature: TemperatureObservation,
+    fault_code: u32,
+}
+
+impl MotorState {
+    /// Constructs a motor sample with finite physical values.
+    pub fn new(fields: MotorStateFields) -> Result<Self, SemanticError> {
+        require_finite(fields.position_rad, "motor.position_rad")?;
+        require_finite(fields.velocity_radps, "motor.velocity_radps")?;
+        require_finite(fields.torque_nm, "motor.torque_nm")?;
+        Ok(Self {
+            header: fields.header,
+            resource_id: fields.resource_id,
+            position_rad: fields.position_rad,
+            velocity_radps: fields.velocity_radps,
+            torque_nm: fields.torque_nm,
+            mos_temperature: fields.mos_temperature,
+            rotor_temperature: fields.rotor_temperature,
+            fault_code: fields.fault_code,
+        })
+    }
+
+    /// Returns common sample metadata.
+    #[must_use]
+    pub const fn header(self) -> Header {
+        self.header
+    }
+
+    /// Returns the logical motor resource.
+    #[must_use]
+    pub const fn resource_id(self) -> crate::ResourceId {
+        self.resource_id
+    }
+
+    /// Returns rotor/output position in radians.
+    #[must_use]
+    pub const fn position_rad(self) -> f64 {
+        self.position_rad
+    }
+
+    /// Returns angular velocity in radians per second.
+    #[must_use]
+    pub const fn velocity_radps(self) -> f64 {
+        self.velocity_radps
+    }
+
+    /// Returns estimated torque in newton metres.
+    #[must_use]
+    pub const fn torque_nm(self) -> f64 {
+        self.torque_nm
+    }
+
+    /// Returns the power-stage temperature observation.
+    #[must_use]
+    pub const fn mos_temperature(self) -> TemperatureObservation {
+        self.mos_temperature
+    }
+
+    /// Returns the rotor/winding temperature observation.
+    #[must_use]
+    pub const fn rotor_temperature(self) -> TemperatureObservation {
+        self.rotor_temperature
+    }
+
+    /// Returns the stable driver-owned fault code.
+    #[must_use]
+    pub const fn fault_code(self) -> u32 {
+        self.fault_code
+    }
+}
+
 /// Covariance availability for a present IMU measurement.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum CovarianceStatus {
@@ -560,7 +709,10 @@ fn require_distinct_frames(parent: FrameId, child: FrameId) -> Result<(), Semant
 mod tests {
     use arrayvec::ArrayVec;
 
-    use super::{CovarianceStatus, ImuMeasurement, ImuState, JointState, JointStateAggregate};
+    use super::{
+        CovarianceStatus, ImuMeasurement, ImuState, JointState, JointStateAggregate, MotorState,
+        MotorStateFields, TemperatureObservation,
+    };
     use crate::{
         AsciiId, ClockState, ClockStatus, DataQuality, Header, HeaderFields, Id128, UnitQuaternion,
         Vector3,
@@ -609,6 +761,56 @@ mod tests {
             )
             .is_ok()
         );
+    }
+
+    #[test]
+    fn motor_state_preserves_explicit_temperatures_and_rejects_nonfinite_values() {
+        let base = MotorStateFields {
+            header: header(None),
+            resource_id: AsciiId::parse("arm.left.joint_1").unwrap(),
+            position_rad: 1.0,
+            velocity_radps: -2.0,
+            torque_nm: 3.0,
+            mos_temperature: TemperatureObservation::raw(42),
+            rotor_temperature: TemperatureObservation::calibrated_celsius(37.5).unwrap(),
+            fault_code: 0,
+        };
+        let state = MotorState::new(base).unwrap();
+        assert_eq!(state.resource_id().as_str(), "arm.left.joint_1");
+        assert_eq!(state.position_rad(), 1.0);
+        assert_eq!(state.velocity_radps(), -2.0);
+        assert_eq!(state.torque_nm(), 3.0);
+        assert_eq!(state.mos_temperature().raw_value(), Some(42));
+        assert_eq!(
+            state.rotor_temperature().calibrated_celsius_value(),
+            Some(37.5)
+        );
+        assert_eq!(state.fault_code(), 0);
+
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(
+                MotorState::new(MotorStateFields {
+                    position_rad: invalid,
+                    ..base
+                })
+                .is_err()
+            );
+            assert!(
+                MotorState::new(MotorStateFields {
+                    velocity_radps: invalid,
+                    ..base
+                })
+                .is_err()
+            );
+            assert!(
+                MotorState::new(MotorStateFields {
+                    torque_nm: invalid,
+                    ..base
+                })
+                .is_err()
+            );
+            assert!(TemperatureObservation::calibrated_celsius(invalid).is_err());
+        }
     }
 
     #[test]

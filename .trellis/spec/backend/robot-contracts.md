@@ -134,6 +134,117 @@ let header = contract_codec::decode_header(bytes)?;
 controller.step(TimedInput { header, value })?;
 ```
 
+## Scenario: Map motor feedback into the protocol contract
+
+### 1. Scope / Trigger
+
+Use this contract when adding a motor-feedback adapter, changing
+`robot.v1.MotorState`, qualifying a device temperature conversion, or changing
+the mapping of hardware status, observation time, sequence, quality, or fault
+code. The protocol boundary must not manufacture physical units that the
+hardware decoder has not established.
+
+### 2. Signatures
+
+```rust
+TemperatureObservation::raw(value: u32) -> TemperatureObservation
+TemperatureObservation::calibrated_celsius(value: f64)
+    -> Result<TemperatureObservation, SemanticError>
+MotorState::new(fields: MotorStateFields) -> Result<MotorState, SemanticError>
+DamiaoMotorStateContext::new(source_id, boot_id, resource_id, valid_for_ns)
+    -> Result<DamiaoMotorStateContext, SemanticError>
+damiao_feedback_to_motor_state(feedback, context)
+    -> Result<MotorState, SemanticError>
+encode_motor_state(value: &MotorState) -> Vec<u8>
+decode_motor_state(bytes: &[u8]) -> Result<MotorState, CodecError>
+```
+
+### 3. Contracts
+
+- `message-model::MotorState` is the backend-neutral application-facing value.
+  `contract-codec` alone maps `motor-damiao::DamiaoFeedback` and converts the
+  semantic value to/from generated Protobuf DTOs.
+- Position, velocity, torque and calibrated Celsius values must be finite.
+  A device byte with unqualified signedness, sentinel, or scale is
+  `TemperatureObservation::raw`; it is never cast or relabeled as Celsius.
+- Damiao mapping uses the feedback's `MonoTime` observation and driver sequence
+  in a local-clock header. Stable source/boot/resource identity and a nonzero
+  validity window come from an opaque `DamiaoMotorStateContext`.
+- Disabled/enabled feedback has `DataQuality::Valid` and fault code zero.
+  Fault/unknown status has `DataQuality::Faulted` and a nonzero code formed as
+  `DAMIAO_STATUS_FAULT_BASE | status.as_raw()`, preserving the raw nibble.
+- Original Protobuf Celsius fields 6 and 7 retain their meaning. New writers
+  set `explicit_temperature_observations`, leave 6/7 at scalar defaults and
+  populate the field-9/10 `TemperatureObservation` oneofs. With the selector
+  clear, only legacy 6/7 are accepted; with it set, both new observations are
+  required and legacy values must be defaults.
+- A schema change updates the Buf golden only after breaking and
+  cross-language checks pass against the old golden. It also changes
+  `proto_generated::FILE_DESCRIPTOR_SET`; every checked-in
+  `protobuf_descriptor_sha256` and derived route-manifest fingerprint must be
+  updated and tested in the same change.
+
+### 4. Validation & Error Matrix
+
+| Condition | Owner | Required result |
+|---|---|---|
+| Non-finite motor SI or calibrated temperature | `message-model` constructor | `SemanticError::NonFinite` |
+| Zero mapping validity | `DamiaoMotorStateContext::new` | `SemanticError::ZeroValidity` |
+| New temperature missing its oneof value | `contract-codec` | `CodecError::MissingField` |
+| Selector set with a missing new observation | `contract-codec` | `CodecError::MissingField` |
+| Selector set with non-default legacy Celsius | `contract-codec` | `CodecError::InvalidField` |
+| Selector clear with new observation fields | `contract-codec` | `CodecError::InvalidField` |
+| Damiao fault/unknown status | one-time feedback mapper | faulted quality plus namespaced nonzero code |
+| Generated descriptor SHA differs from ROS profile | `ros2-mapping::RouteRegistry` | reject profile startup |
+
+### 5. Good / Base / Bad Cases
+
+- Good: enabled Damiao feedback maps finite SI values, exact local time and
+  sequence, raw temperature bytes, valid quality and fault code zero.
+- Base: an old `MotorState` carrying only fields 6/7 decodes as calibrated
+  Celsius without changing their established field meaning.
+- Bad: cast raw byte `42` to `42.0 °C`, emit faulted quality with code zero,
+  accept simultaneous legacy/new temperatures, or update the golden while
+  leaving a stale ROS route descriptor SHA.
+
+### 6. Tests Required
+
+- `message-model` tests every non-finite physical/calibrated field and both
+  temperature representations.
+- `contract-codec` round-trips raw and calibrated observations; it exercises
+  legacy fields, missing oneofs, selector mismatch, conflicting
+  representations and non-finite Celsius input.
+- Damiao mapping tests disabled, enabled, known fault, unknown status and
+  defensive `Unknown(0)`; assertions include identities, validity, clock,
+  sequence, physical values, raw temperatures, quality, fault code and zero
+  allocations.
+- Run Buf format/lint/breaking and C++/Python generation before replacing the
+  golden descriptor. Run `ros2-mapping` profile/fingerprint tests after
+  updating every descriptor SHA.
+- Run `cargo run --locked -p architecture-check -- check` and `tools/ci.sh`.
+  Host success does not qualify physical temperature conversion.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+let motor = MotorStateFields {
+    mos_temperature: TemperatureObservation::calibrated_celsius(
+        f64::from(feedback.mos_temperature_raw),
+    )?,
+    fault_code: u32::from(feedback.status.as_raw()),
+    // ...
+};
+```
+
+#### Correct
+
+```rust
+let state = contract_codec::damiao_feedback_to_motor_state(feedback, context)?;
+assert_eq!(state.mos_temperature().raw_value(), Some(42));
+```
+
 ## Scenario: Add or change local/Zenoh middleware delivery
 
 ### 1. Scope / Trigger

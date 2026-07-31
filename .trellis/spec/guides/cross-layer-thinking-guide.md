@@ -56,6 +56,9 @@ After implementation:
 - [ ] Add accepted round-trip and rejected malformed/unknown/stale cases.
 - [ ] Test restart/epoch behavior when identity or ordering matters.
 - [ ] Verify all consumers use the canonical semantic type/decoder.
+- [ ] After a Protobuf descriptor change, search every checked-in descriptor
+      SHA/fingerprint consumer and update it only after the old-golden breaking
+      gate passes.
 - [ ] Run the architecture check and full host gate.
 - [ ] Keep target-only acceptance open until immutable physical evidence exists.
 

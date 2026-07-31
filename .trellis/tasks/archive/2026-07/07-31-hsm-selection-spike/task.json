@@ -1,0 +1,32 @@
+{
+  "id": "hsm-selection-spike",
+  "name": "hsm-selection-spike",
+  "title": "HSM selection spike",
+  "description": "Prototype the required lifecycle HSM in statig and a direct enum reference, measure host-visible tradeoffs, and record one production selection without hardware dependencies.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": "host-only statig versus direct-enum lifecycle HSM comparison and production selection",
+  "package": null,
+  "priority": "P1",
+  "creator": "mj",
+  "assignee": "mj",
+  "createdAt": "2026-07-31",
+  "completedAt": "2026-07-31",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "07-29-rust-robot-framework",
+  "relatedFiles": [
+    "tools/hsm-spike",
+    "Cargo.toml",
+    "architecture.toml",
+    ".trellis/spec/backend",
+    ".trellis/tasks/07-29-rust-robot-framework/implement.md"
+  ],
+  "notes": "Software-only G1 child complete. A development-only harness compares exhaustive direct-enum and no-macro statig 0.4.1 candidates across the same eight-state/twelve-event contract. Seven unit tests plus one process-output test prove identical projections, global E-stop, ordered Running cancellation, restart inhibition, deterministic 96-row/DOT output and zero allocations. Release host evidence records equal workload checksums; direct enum uses 1,648 fewer file bytes, 808 fewer text bytes and 108 versus 343 source lines. Source inspection and a regression test record statig's reversed before_transition arguments; the optional macro path's future-incompatible dependency was removed before final CI. Direct enum is selected for production G2. Final tools/ci.sh passed without the future-incompat warning. Hardware, Orange Pi, target timing and G2 implementation remain open.",
+  "meta": {}
+}

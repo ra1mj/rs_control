@@ -296,9 +296,9 @@ Validation:
 
 ### G1. HSM library spike
 
-- [ ] Prototype required HSM transitions in `statig` and a minimal direct-enum reference.
-- [ ] Compare allocation, binary size, transition visibility, graph generation, async leakage, cancellation and test ergonomics.
-- [ ] Record the selection decision; do not carry both implementations into production.
+- [x] Prototype required HSM transitions in `statig` and a minimal direct-enum reference.
+- [x] Compare allocation, binary size, transition visibility, graph generation, async leakage, cancellation and test ergonomics.
+- [x] Record the selection decision; do not carry both implementations into production.
 
 ### G2. Lifecycle and restart safety
 

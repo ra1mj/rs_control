@@ -19,6 +19,7 @@ normative for code under `crates/`, `apps/`, `tools/`, `proto/`, and
 | [Robot Contracts](./robot-contracts.md) | Layer, YAML, Protobuf and middleware delivery contracts | Active |
 | [Error Handling](./error-handling.md) | Typed boundary and safety-error conventions | Active |
 | [Diagnostics and CLI Output](./logging-guidelines.md) | Typed runtime diagnostics and deterministic process output | Active |
+| [Lifecycle FSM](./fsm-guidelines.md) | Exhaustive lifecycle reducer, restart and graph contracts | Active |
 | [Quality Guidelines](./quality-guidelines.md) | Required checks and forbidden patterns | Active |
 | [Realtime Platform](./realtime-platform.md) | Kernel, affinity, CAN and qualification contracts | Active |
 
@@ -35,6 +36,8 @@ Before changing Rust code or a cross-layer contract:
    output, evidence records, or any code that might run on an RT path.
 5. Read `quality-guidelines.md` and run the applicable commands before review.
 6. Read `realtime-platform.md` before changing `platform/`, RT placement, privileged preparation or hardware evidence.
+7. Read `fsm-guidelines.md` before changing lifecycle states, events,
+   transitions, restart semantics or mission-cancellation boundaries.
 
 ## Quality Check
 

@@ -28,7 +28,8 @@
     "07-30-local-shm-rk3588-qualification",
     "07-31-motor-feedback-contract",
     "07-31-network-input-fallback",
-    "07-31-lease-enforcement-cache"
+    "07-31-lease-enforcement-cache",
+    "07-31-hsm-selection-spike"
   ],
   "parent": null,
   "relatedFiles": [],

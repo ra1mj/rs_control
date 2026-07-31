@@ -1,0 +1,29 @@
+{
+  "id": "00-bootstrap-guidelines",
+  "name": "00-bootstrap-guidelines",
+  "title": "Bootstrap Guidelines",
+  "description": "Fill in project development guidelines for AI agents",
+  "status": "completed",
+  "dev_type": "docs",
+  "scope": null,
+  "package": null,
+  "priority": "P1",
+  "creator": "mj",
+  "assignee": "mj",
+  "createdAt": "2026-07-29",
+  "completedAt": "2026-07-31",
+  "branch": null,
+  "base_branch": null,
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    ".trellis/spec/backend/",
+    ".trellis/spec/frontend/"
+  ],
+  "notes": "Bootstrapped from the real Rust workspace on 2026-07-31. The generated full-stack classification was corrected to backend-only; database/frontend templates were removed, source-backed diagnostics and shared design guides were added, and tools/ci.sh passed.",
+  "meta": {}
+}

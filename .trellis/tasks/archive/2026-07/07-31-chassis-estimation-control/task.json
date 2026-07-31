@@ -1,0 +1,31 @@
+{
+  "id": "chassis-estimation-control",
+  "name": "chassis-estimation-control",
+  "title": "Chassis state estimation and SE2 control",
+  "description": "Implement software-only H3 local-monotonic sample alignment, wheel+IMU 2D estimation with external pose correction, body velocity/heading control, and fixed-capacity timestamped SE(2) trajectory tracking with explicit degradation.",
+  "status": "completed",
+  "dev_type": "feature",
+  "scope": "backend",
+  "package": "chassis-model,state-estimation-2d,trajectory-se2",
+  "priority": "P1",
+  "creator": "mj",
+  "assignee": "mj",
+  "createdAt": "2026-07-31",
+  "completedAt": "2026-07-31",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "07-29-rust-robot-framework",
+  "relatedFiles": [
+    "crates/application_module/chassis-model/",
+    "crates/application_module/state-estimation-2d/",
+    "crates/application_module/trajectory-se2/",
+    ".trellis/spec/backend/chassis-estimation-control.md"
+  ],
+  "notes": "Software-only H3 complete: immutable BodyPose2/local timed samples, atomic age/order/skew/quality gates, wheel+IMU fusion, external correction policies, bounded velocity/heading control and fixed-capacity SE(2) tracking. Eighteen targeted tests, zero-allocation assertions, architecture policy and full CI pass. External clock conversion, leases, morphology projection and physical sensor/chassis qualification remain owning-boundary gates.",
+  "meta": {}
+}

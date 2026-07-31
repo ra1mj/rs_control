@@ -1,0 +1,29 @@
+{
+  "id": "mission-dsl-runtime",
+  "name": "mission-dsl-runtime",
+  "title": "Mission DSL and deterministic runtime",
+  "description": "Implement the software-only G4 typed mission DSL, immutable validated IR, deterministic event reducer, action correlation and cancellation scopes.",
+  "status": "completed",
+  "dev_type": "feature",
+  "scope": "backend",
+  "package": "control-core",
+  "priority": "P1",
+  "creator": "mj",
+  "assignee": "mj",
+  "createdAt": "2026-07-31",
+  "completedAt": "2026-07-31",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "07-29-rust-robot-framework",
+  "relatedFiles": [
+    "crates/application_module/control-core/src/mission/",
+    ".trellis/spec/backend/mission-guidelines.md"
+  ],
+  "notes": "Software-only G4 complete: immutable bounded IR (64 nodes, 8 direct children/resources), static 64-active/256-invocation budgets, deterministic zero-allocation runtime, exact command correlation and terminal-evidence cancellation. Eighteen mission tests and full CI pass. Startup-only Box indirection is documented; remote action, lease, target timing and Orange Pi qualification remain separate gates.",
+  "meta": {}
+}

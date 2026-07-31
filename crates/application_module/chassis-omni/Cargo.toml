@@ -1,0 +1,15 @@
+[package]
+name = "chassis-omni"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+chassis-model.workspace = true
+
+[dev-dependencies]
+allocation-counter.workspace = true
+
+[lints]
+workspace = true

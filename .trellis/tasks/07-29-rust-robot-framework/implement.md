@@ -334,15 +334,15 @@ Validation:
 
 ### H1. Shared models
 
-- [ ] Define SI/body-frame types, constraints and explicit feasibility/saturation results.
-- [ ] Implement common fixture vectors and invariants for all morphologies.
+- [x] Define SI/body-frame types, constraints and explicit feasibility/saturation results.
+- [x] Implement common fixture vectors and invariants for all morphologies.
 
 ### H2. Kinematics
 
-- [ ] Implement mecanum-4 forward/inverse kinematics.
-- [ ] Implement omni-3/omni-4 forward/inverse kinematics.
-- [ ] Implement swerve-4 forward/inverse kinematics, steering optimization and rate limits.
-- [ ] Validate singular/near-singular, saturation, reversal and zero-speed behavior.
+- [x] Implement mecanum-4 forward/inverse kinematics.
+- [x] Implement omni-3/omni-4 forward/inverse kinematics.
+- [x] Implement swerve-4 forward/inverse kinematics, steering optimization and rate limits.
+- [x] Validate singular/near-singular, saturation, reversal and zero-speed behavior.
 
 ### H3. State estimation and control
 

@@ -32,6 +32,10 @@ path_prefixes = ["tools/"]
 
 [members]
 "architecture-check" = "tool"
+"chassis-mecanum" = "application_module"
+"chassis-model" = "application_module"
+"chassis-omni" = "application_module"
+"chassis-swerve" = "application_module"
 "config-model" = "integration"
 "contract-codec" = "protocol_module"
 "control-core" = "application_module"

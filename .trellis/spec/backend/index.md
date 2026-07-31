@@ -21,6 +21,7 @@ normative for code under `crates/`, `apps/`, `tools/`, `proto/`, and
 | [Diagnostics and CLI Output](./logging-guidelines.md) | Typed runtime diagnostics and deterministic process output | Active |
 | [Lifecycle FSM](./fsm-guidelines.md) | Exhaustive lifecycle reducer, restart and graph contracts | Active |
 | [Mission IR and Runtime](./mission-guidelines.md) | Bounded mission validation, action correlation and cancellation | Active |
+| [Chassis Kinematics](./chassis-kinematics.md) | Body-frame SI models, morphology maps and constraint evidence | Active |
 | [Quality Guidelines](./quality-guidelines.md) | Required checks and forbidden patterns | Active |
 | [Realtime Platform](./realtime-platform.md) | Kernel, affinity, CAN and qualification contracts | Active |
 
@@ -41,6 +42,8 @@ Before changing Rust code or a cross-layer contract:
    transitions, restart semantics or mission-cancellation boundaries.
 8. Read `mission-guidelines.md` before changing mission nodes, graph
    validation, action correlation, retry/timeout or cancellation behavior.
+9. Read `chassis-kinematics.md` before changing chassis geometry, wheel/module
+   order, forward/inverse maps, saturation or steering optimization.
 
 ## Quality Check
 

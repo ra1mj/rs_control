@@ -9,5 +9,8 @@ license.workspace = true
 message-model.workspace = true
 thiserror.workspace = true
 
+[dev-dependencies]
+allocation-counter.workspace = true
+
 [lints]
 workspace = true

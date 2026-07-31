@@ -275,6 +275,11 @@ ZenohBridge::query(endpoint: EndpointId, payload: Vec<u8>)
     -> Result<Vec<u8>, BridgeError>
 SourceGuard::accept(header, value, received_mono_ns, policy, evidence)
     -> Result<ReceivedSample<T>, IngressError>
+CachedInput::new(value, expires_mono_ns) -> CachedInput<T>
+evaluate_network_input(fallback, route_available, cached, now_mono_ns)
+    -> NetworkInputDecision<T>
+SourceGuard::evaluate_input(fallback, cached_sample, now_mono_ns)
+    -> NetworkInputDecision<T>
 CommandIntent::materialize(local_lease, received_mono_ns, route_max_ttl_ns)
     -> Result<CommandEnvelope, SemanticError>
 ```
@@ -320,6 +325,17 @@ CommandIntent::materialize(local_lease, received_mono_ns, route_max_ttl_ns)
   rejects duplicates/reorder/retired boots, records sequence gaps, and keeps
   anti-replay state across disconnect. Liveliness changes availability only;
   it does not authorize a boot or grant a lease.
+- Network fallback is evaluated only from the declared `FallbackBehavior`,
+  route availability, an optional borrowed cache and its exclusive local
+  monotonic expiry. An available fresh cache is current. After disconnect,
+  `HoldUntilExpired` may borrow that cache only while `now < expiry`;
+  `Unavailable` and `SafeStopSignal` react immediately. Missing/expired hold
+  returns unavailable. Reconnect and fallback never refresh an expiry.
+  `middleware-api` owns this decision table; a concrete backend adapts its
+  opaque accepted sample into it rather than exposing backend state to an
+  application. The Zenoh adapter also requires the cached source/boot to match
+  the guard's current authorized identity, so authorizing a replacement boot
+  invalidates still-fresh prior-boot cache immediately.
 - `ZenohBridge` owns the only session, callbacks, encoding allocation, waits,
   retries and shutdown join on a named non-RT worker. Callback inboxes and
   commands are bounded and use nonblocking sends. QoS maps only to stable
@@ -348,6 +364,11 @@ CommandIntent::materialize(local_lease, received_mono_ns, route_max_ttl_ns)
 | Duplicate/reordered sequence | reject; do not refresh local expiry |
 | Accepted sequence gap | accept newer value and add exact missing count |
 | Expired/untrusted/poor-quality sample | typed rejection; cached value is not refreshed |
+| Available route plus unexpired cache | `NetworkInputDecision::UseCurrent` |
+| Disconnected route plus unexpired hold cache | `NetworkInputDecision::UseHeld` until exclusive expiry |
+| Missing/expired hold cache | `NetworkInputDecision::Unavailable` |
+| Cached sample belongs to prior/unexpected boot | treat as missing before fallback evaluation |
+| Disconnected immediate-unavailable/safe-stop route | `Unavailable` / `SafeStopSignal`, even with a fresh cache |
 | Resource/owner/lease/session mismatch | `SemanticError::AuthorityMismatch`; no executable command |
 | Zero TTL or expired local lease | reject; requested TTL above route maximum is capped |
 | Zero/multiple/error/late query replies | `NoReply`/`MultipleReplies`/`RemoteError`/`Timeout` |
@@ -360,9 +381,11 @@ CommandIntent::materialize(local_lease, received_mono_ns, route_max_ttl_ns)
   with local reception/expiry metadata.
 - Base: a latest producer keeps publishing while the bridge consumer is
   stalled; generations and overwrite counters advance without a Zenoh call.
+- Base fallback: a disconnected `HoldUntilExpired` route uses its last accepted value
+  before the exclusive expiry and exposes unavailable at equality.
 - Bad: pass a `zenoh::Session` or generated DTO to application/RT code, use an
-  unbounded channel, accept a payload boot change as authorization, or execute
-  a remote absolute monotonic deadline.
+  unbounded channel, accept a payload boot change as authorization, execute a
+  remote absolute monotonic deadline, or refresh cached expiry on reconnect.
 
 ### 6. Tests Required
 
@@ -379,7 +402,9 @@ CommandIntent::materialize(local_lease, received_mono_ns, route_max_ttl_ns)
   reject missing/malformed/unknown/zero inputs.
 - Fault tests script loss, delay/stale, duplicate, reorder, source/quality,
   boot restart, disconnect/reconnect and prior-lease rejection with exact
-  counters.
+  expiries and counters. Fallback tests cover the full
+  route/cache/policy decision matrix, equality-at-expiry, reconnect without
+  refresh and zero allocations.
 - A serialized explicit-TCP loopback test covers semantic -> Protobuf -> real
   Zenoh -> semantic, command materialization, query/queryable timeout,
   liveliness put/delete and local disconnection after bridge stop.
@@ -404,6 +429,19 @@ local_command_port.try_publish(intent)?;
 let intent = contract_codec::decode_chassis_setpoint_intent(bytes)?;
 let command = intent.materialize(active_local_lease, received_mono_ns, route_max_ttl_ns)?;
 validated_command_port.try_publish(command)?;
+```
+
+#### Wrong fallback
+
+```rust
+// Reconnect silently grants a stale sample a new lifetime.
+cached.expires_monotonic_ns = now_monotonic_ns + route_max_age_ns;
+```
+
+#### Correct fallback
+
+```rust
+let decision = source_guard.evaluate_input(fallback, cached.as_ref(), now_monotonic_ns);
 ```
 
 ## Scenario: Add a native Protobuf-to-ROS mapping contract

@@ -70,6 +70,85 @@ pub enum FallbackBehavior {
     SafeStopSignal,
 }
 
+/// Borrowed cached input with its exclusive local-monotonic expiry.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CachedInput<'a, T> {
+    value: &'a T,
+    expires_monotonic_ns: u64,
+}
+
+impl<'a, T> CachedInput<'a, T> {
+    /// Borrows a validated cached value without changing its expiry.
+    #[must_use]
+    pub const fn new(value: &'a T, expires_monotonic_ns: u64) -> Self {
+        Self {
+            value,
+            expires_monotonic_ns,
+        }
+    }
+
+    /// Returns the cached value.
+    #[must_use]
+    pub const fn value(&self) -> &'a T {
+        self.value
+    }
+
+    /// Returns the exclusive local-monotonic expiry.
+    #[must_use]
+    pub const fn expires_monotonic_ns(&self) -> u64 {
+        self.expires_monotonic_ns
+    }
+
+    /// Returns whether the cache remains usable at the supplied local time.
+    #[must_use]
+    pub const fn usable_at(&self, now_monotonic_ns: u64) -> bool {
+        now_monotonic_ns < self.expires_monotonic_ns
+    }
+}
+
+/// Backend-neutral outcome for one network-dependent input.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NetworkInputDecision<'a, T> {
+    /// Use the newest accepted sample while its route remains available.
+    UseCurrent(&'a T),
+    /// Temporarily retain an accepted sample after route loss.
+    UseHeld(&'a T),
+    /// Expose absence to the policy owner.
+    Unavailable,
+    /// Request the policy owner to enter its typed safe-stop path.
+    SafeStopSignal,
+}
+
+/// Evaluates a declared fallback without I/O, allocation, or refreshing state.
+///
+/// Cache expiry is exclusive. Reconnecting a route never makes an expired
+/// value current again; only a newly accepted sample can replace the cache.
+#[must_use]
+pub const fn evaluate_network_input<T>(
+    fallback: FallbackBehavior,
+    route_available: bool,
+    cached: Option<CachedInput<'_, T>>,
+    now_monotonic_ns: u64,
+) -> NetworkInputDecision<'_, T> {
+    if let Some(cached) = cached
+        && cached.usable_at(now_monotonic_ns)
+    {
+        if route_available {
+            return NetworkInputDecision::UseCurrent(cached.value());
+        }
+        if matches!(fallback, FallbackBehavior::HoldUntilExpired) {
+            return NetworkInputDecision::UseHeld(cached.value());
+        }
+    }
+
+    match fallback {
+        FallbackBehavior::HoldUntilExpired | FallbackBehavior::Unavailable => {
+            NetworkInputDecision::Unavailable
+        }
+        FallbackBehavior::SafeStopSignal => NetworkInputDecision::SafeStopSignal,
+    }
+}
+
 /// Nonzero endpoint resource bounds.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct EndpointBounds {
@@ -262,6 +341,7 @@ pub enum EndpointError {
 
 #[cfg(test)]
 mod tests {
+    use allocation_counter::measure;
     use message_model::{AsciiId, MAX_TYPE_NAME_LEN};
 
     use super::*;
@@ -334,5 +414,88 @@ mod tests {
             validate_route_set(&[first, second]),
             Err(EndpointError::DuplicateKeyOwnership)
         );
+    }
+
+    #[test]
+    fn network_input_fallback_covers_current_held_unavailable_and_safe_stop() {
+        let value = 7_u8;
+        let fresh = Some(CachedInput::new(&value, 20));
+
+        for fallback in [
+            FallbackBehavior::HoldUntilExpired,
+            FallbackBehavior::Unavailable,
+            FallbackBehavior::SafeStopSignal,
+        ] {
+            assert_eq!(
+                evaluate_network_input(fallback, true, fresh, 19),
+                NetworkInputDecision::UseCurrent(&value)
+            );
+        }
+
+        assert_eq!(
+            evaluate_network_input(FallbackBehavior::HoldUntilExpired, false, fresh, 19),
+            NetworkInputDecision::UseHeld(&value)
+        );
+        assert_eq!(
+            evaluate_network_input(FallbackBehavior::Unavailable, false, fresh, 19),
+            NetworkInputDecision::Unavailable
+        );
+        assert_eq!(
+            evaluate_network_input(FallbackBehavior::SafeStopSignal, false, fresh, 19),
+            NetworkInputDecision::SafeStopSignal
+        );
+
+        for route_available in [true, false] {
+            for cached in [None, fresh] {
+                assert_eq!(
+                    evaluate_network_input(
+                        FallbackBehavior::HoldUntilExpired,
+                        route_available,
+                        cached,
+                        20
+                    ),
+                    NetworkInputDecision::Unavailable
+                );
+                assert_eq!(
+                    evaluate_network_input(
+                        FallbackBehavior::Unavailable,
+                        route_available,
+                        cached,
+                        20
+                    ),
+                    NetworkInputDecision::Unavailable
+                );
+                assert_eq!(
+                    evaluate_network_input(
+                        FallbackBehavior::SafeStopSignal,
+                        route_available,
+                        cached,
+                        20
+                    ),
+                    NetworkInputDecision::SafeStopSignal
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn network_input_fallback_never_refreshes_expiry_and_allocates_nothing() {
+        let value = 9_u8;
+        let cached = Some(CachedInput::new(&value, 20));
+        let allocations = measure(|| {
+            assert_eq!(
+                evaluate_network_input(FallbackBehavior::HoldUntilExpired, false, cached, 19),
+                NetworkInputDecision::UseHeld(&value)
+            );
+            assert_eq!(
+                evaluate_network_input(FallbackBehavior::HoldUntilExpired, true, cached, 20),
+                NetworkInputDecision::Unavailable
+            );
+            assert_eq!(
+                evaluate_network_input(FallbackBehavior::SafeStopSignal, false, cached, 19),
+                NetworkInputDecision::SafeStopSignal
+            );
+        });
+        assert_eq!(allocations.count_total, 0);
     }
 }

@@ -326,7 +326,7 @@ fn real_tcp_loopback_preserves_semantics_authority_queries_and_liveliness() {
                 )
                 .map_err(|_| RouteHandlingError::Rejected)?;
             let setpoint = materialize_chassis_setpoint(
-                accepted.value,
+                accepted.into_value(),
                 lease,
                 LOCAL_RECEIVE_NS,
                 ROUTE_MAXIMUM_TTL_NS,

@@ -3,6 +3,7 @@ use message_model::{
     ChassisSetpoint, ChassisSetpointIntent, ClockState, CommandEnvelope, CommandIntent,
     DataQuality, Header, Id128, ResourceLease, SemanticError, SourceId,
 };
+use middleware_api::{CachedInput, FallbackBehavior, NetworkInputDecision, evaluate_network_input};
 use thiserror::Error;
 
 /// Evidence used to evaluate network age at local reception.
@@ -55,17 +56,54 @@ impl IngressPolicy {
 /// Locally timestamped, validated network sample.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ReceivedSample<T> {
+    header: Header,
     /// Decoded semantic value.
-    pub value: T,
+    value: T,
     /// Local monotonic reception time.
-    pub received_monotonic_ns: u64,
+    received_monotonic_ns: u64,
     /// Exclusive local monotonic expiry.
-    pub expires_monotonic_ns: u64,
+    expires_monotonic_ns: u64,
     /// Freshness evidence retained for diagnostics.
-    pub evidence: FreshnessEvidence,
+    evidence: FreshnessEvidence,
 }
 
 impl<T> ReceivedSample<T> {
+    /// Returns the validated source/boot/sequence metadata.
+    #[must_use]
+    pub const fn header(&self) -> Header {
+        self.header
+    }
+
+    /// Borrows the decoded semantic value.
+    #[must_use]
+    pub const fn value(&self) -> &T {
+        &self.value
+    }
+
+    /// Returns the decoded semantic value.
+    #[must_use]
+    pub fn into_value(self) -> T {
+        self.value
+    }
+
+    /// Returns the local monotonic reception time.
+    #[must_use]
+    pub const fn received_monotonic_ns(&self) -> u64 {
+        self.received_monotonic_ns
+    }
+
+    /// Returns the exclusive local monotonic expiry.
+    #[must_use]
+    pub const fn expires_monotonic_ns(&self) -> u64 {
+        self.expires_monotonic_ns
+    }
+
+    /// Returns the retained freshness evidence.
+    #[must_use]
+    pub const fn evidence(&self) -> FreshnessEvidence {
+        self.evidence
+    }
+
     /// Returns whether the cached sample remains usable at local time `now`.
     #[must_use]
     pub const fn usable_at(&self, now_monotonic_ns: u64) -> bool {
@@ -175,6 +213,27 @@ impl<const RETIRED_BOOTS: usize> SourceGuard<RETIRED_BOOTS> {
         self.counters
     }
 
+    /// Evaluates fallback after excluding a foreign or prior-boot cache.
+    #[must_use]
+    pub fn evaluate_input<'a, T>(
+        &self,
+        fallback: FallbackBehavior,
+        cached: Option<&'a ReceivedSample<T>>,
+        now_monotonic_ns: u64,
+    ) -> NetworkInputDecision<'a, T> {
+        evaluate_network_input(
+            fallback,
+            self.available,
+            cached
+                .filter(|sample| {
+                    sample.header.source_id() == self.expected_source
+                        && Some(sample.header.boot_id()) == self.current_boot
+                })
+                .map(|sample| CachedInput::new(&sample.value, sample.expires_monotonic_ns)),
+            now_monotonic_ns,
+        )
+    }
+
     /// Validates source/boot/sequence/quality/freshness and wraps a decoded value.
     pub fn accept<T>(
         &mut self,
@@ -275,6 +334,7 @@ impl<const RETIRED_BOOTS: usize> SourceGuard<RETIRED_BOOTS> {
         self.last_sequence = Some(header.sequence());
         increment(&mut self.counters.accepted);
         Ok(ReceivedSample {
+            header,
             value,
             received_monotonic_ns,
             expires_monotonic_ns,
@@ -422,7 +482,7 @@ mod tests {
                 FreshnessEvidence::ReceptionOnly,
             )
             .unwrap();
-        assert_eq!(accepted.expires_monotonic_ns, 10_080);
+        assert_eq!(accepted.expires_monotonic_ns(), 10_080);
         assert_eq!(
             guard.accept(
                 header("imu-driver", 1, 2, DataQuality::Valid),

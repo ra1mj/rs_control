@@ -230,10 +230,10 @@ Target-board benchmark:
 
 ### D3. Network fault tests
 
-- [ ] Inject delay, jitter, loss, duplicate, reorder, disconnect, reconnect and publisher restart.
+- [x] Inject delay, jitter, loss, duplicate, reorder, disconnect, reconnect and publisher restart.
 - [x] Verify expired/prior-boot/prior-lease commands are rejected.
 - [x] Verify the 1 kHz local thread never waits on the Zenoh executor.
-- [ ] Verify network sensor fallback/stop policies are deterministic.
+- [x] Verify network sensor fallback/stop policies are deterministic.
 
 ## 7. Phase E — Single-motor vertical slice
 

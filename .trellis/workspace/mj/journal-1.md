@@ -207,3 +207,38 @@ Delivered Linux layout-v1 SPSC SHM latest/ordered ports with explicit Pod schema
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: Lifecycle safety and deterministic mission runtime
+
+**Date**: 2026-07-31
+**Task**: Lifecycle safety and deterministic mission runtime
+**Branch**: `main`
+
+### Summary
+
+Selected the direct exhaustive lifecycle reducer, enforced restart/E-stop safety, and completed the bounded typed mission IR with deterministic zero-allocation runtime, correlation, cancellation, validation, examples, specs, and full CI evidence.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `61afeab` | (see git log) |
+| `758ea7c` | (see git log) |
+| `804810d` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

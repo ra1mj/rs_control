@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 7
+- **Total Sessions**: 8
 - **Last Active**: 2026-07-31
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~244 | Active |
+| `journal-1.md` | ~277 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 8 | 2026-07-31 | Chassis SI models and kinematics | `c72b83a` | `main` |
 | 7 | 2026-07-31 | Lifecycle safety and deterministic mission runtime | `61afeab`, `758ea7c`, `804810d` | `main` |
 | 6 | 2026-07-30 | Shared-memory middleware backend | `1f0948e`, `3f09fcd` | `main` |
 | 5 | 2026-07-30 | Zenoh Protobuf middleware | `4105340` | `main` |

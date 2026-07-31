@@ -242,3 +242,36 @@ Selected the direct exhaustive lifecycle reducer, enforced restart/E-stop safety
 ### Next Steps
 
 - None - task complete
+
+
+## Session 8: Chassis SI models and kinematics
+
+**Date**: 2026-07-31
+**Task**: Chassis SI models and kinematics
+**Branch**: `main`
+
+### Summary
+
+Completed software-only H1/H2 with classified chassis-model, chassis-mecanum, chassis-omni and chassis-swerve crates; added validated SI geometry, uniform saturation evidence, fixed-size least squares, all morphology maps, steering optimization/rate limits, 23 targeted tests, zero-allocation evidence and full CI.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c72b83a` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

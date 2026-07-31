@@ -22,7 +22,7 @@
   "parent": null,
   "relatedFiles": [
     ".trellis/spec/backend/",
-    ".trellis/spec/frontend/"
+    ".trellis/spec/guides/"
   ],
   "notes": "Bootstrapped from the real Rust workspace on 2026-07-31. The generated full-stack classification was corrected to backend-only; database/frontend templates were removed, source-backed diagnostics and shared design guides were added, and tools/ci.sh passed.",
   "meta": {}

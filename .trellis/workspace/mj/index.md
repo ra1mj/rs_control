@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 9
+- **Total Sessions**: 10
 - **Last Active**: 2026-07-31
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~310 | Active |
+| `journal-1.md` | ~343 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 10 | 2026-07-31 | Cross-language algorithm and ROS 2 safety contract | `95589b2` | `main` |
 | 9 | 2026-07-31 | Chassis state estimation and SE2 control | `adf791c` | `main` |
 | 8 | 2026-07-31 | Chassis SI models and kinematics | `c72b83a` | `main` |
 | 7 | 2026-07-31 | Lifecycle safety and deterministic mission runtime | `61afeab`, `758ea7c`, `804810d` | `main` |

@@ -308,3 +308,36 @@ Completed software-only H3 with local-monotonic sample alignment, atomic age/ord
 ### Next Steps
 
 - None - task complete
+
+
+## Session 10: Cross-language algorithm and ROS 2 safety contract
+
+**Date**: 2026-07-31
+**Task**: Cross-language algorithm and ROS 2 safety contract
+**Branch**: `main`
+
+### Summary
+
+Added an exact-locked standalone Python Zenoh/Protobuf heading-hold process, real Rust-Python TCP kill/restart qualification, and epoch/identity-bound standalone ros2dds runtime admission with fail-closed host tests; full software CI passed without hardware.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `95589b2` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

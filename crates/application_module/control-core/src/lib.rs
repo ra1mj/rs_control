@@ -2,9 +2,11 @@
 
 mod lease;
 mod lifecycle;
+mod mission;
 
 pub use lease::*;
 pub use lifecycle::*;
+pub use mission::*;
 
 use message_model::Header;
 

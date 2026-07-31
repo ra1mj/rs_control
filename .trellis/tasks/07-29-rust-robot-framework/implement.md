@@ -317,11 +317,11 @@ Validation:
 
 ### G4. Mission DSL/runtime
 
-- [ ] Implement typed nodes and immutable validated IR.
-- [ ] Implement deterministic single-thread event reducer.
-- [ ] Implement correlated action acknowledgements and cancellation scopes.
-- [ ] Validate resource conflicts, unreachable nodes, unbounded retries/loops and missing timeouts.
-- [ ] Create one representative automatic project using sequence, branch, parallel, timeout, retry and cancellation.
+- [x] Implement typed nodes and immutable validated IR.
+- [x] Implement deterministic single-thread event reducer.
+- [x] Implement correlated action acknowledgements and cancellation scopes.
+- [x] Validate resource conflicts, unreachable nodes, unbounded retries/loops and missing timeouts.
+- [x] Create one representative automatic project using sequence, branch, parallel, timeout, retry and cancellation.
 
 Validation:
 

@@ -30,7 +30,8 @@
     "07-31-network-input-fallback",
     "07-31-lease-enforcement-cache",
     "07-31-hsm-selection-spike",
-    "07-31-lifecycle-restart-safety"
+    "07-31-lifecycle-restart-safety",
+    "07-31-mission-dsl-runtime"
   ],
   "parent": null,
   "relatedFiles": [],

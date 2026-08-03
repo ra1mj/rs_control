@@ -27,7 +27,7 @@
 - [x] Add post-preparation allocation checks and per-family benchmarks.
 - [x] Meet prepared PRM <=200 us and nominal fast-query targets.
 - [x] Run targeted Clippy/tests, architecture and dependency/source gates.
-- [ ] Run `trellis-check`, commit and archive independently.
+- [x] Run `trellis-check`, commit and archive independently.
 
 Rollback removes only the failing named kernel and restores typed
 unavailability. It never maps the name to RRT-Connect.

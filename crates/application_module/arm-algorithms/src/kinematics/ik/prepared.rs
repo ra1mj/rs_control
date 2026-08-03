@@ -281,6 +281,18 @@ impl<'model> PreparedKinematics<'model> {
         self.generation
     }
 
+    /// Returns the validated chain used by downstream prepared algorithms.
+    #[must_use]
+    pub(crate) const fn chain(&self) -> KinematicChain<'model> {
+        self.chain
+    }
+
+    /// Returns one preparation-time sampling interval in stable joint order.
+    #[must_use]
+    pub(crate) fn sampling_bound(&self, index: usize) -> [f64; 2] {
+        self.bounds[index].sampling
+    }
+
     /// Returns active degrees of freedom.
     #[must_use]
     pub fn dof(&self) -> usize {
@@ -316,7 +328,7 @@ impl<'model> PreparedKinematics<'model> {
         IkWorkspace::new(self, maximum_population)
     }
 
-    pub(super) fn validate_values(&self, values: &[f64]) -> Result<(), ArmAlgorithmError> {
+    pub(crate) fn validate_values(&self, values: &[f64]) -> Result<(), ArmAlgorithmError> {
         if values.len() != self.dof() {
             return Err(ArmAlgorithmError::DimensionMismatch {
                 field: "ik.coordinates",

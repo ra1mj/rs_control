@@ -37,17 +37,17 @@ must not duplicate chain preparation or introduce a second profile identity.
 
 ## Acceptance Criteria
 
-- [ ] Family-specific fixtures and statistics prove no identity aliases
+- [x] Family-specific fixtures and statistics prove no identity aliases
       RRT-Connect or direct interpolation.
-- [ ] Identical seeds reproduce complete plans and counters; changed seeds are
+- [x] Identical seeds reproduce complete plans and counters; changed seeds are
       recorded and remain within all constraints.
-- [ ] Start/goal/edge invalidity, bad seed/config, capacity and every budget
+- [x] Start/goal/edge invalidity, bad seed/config, capacity and every budget
       exhaustion mode are tested.
-- [ ] RRT* variants demonstrate cost/rewiring behavior; BiTRRT transition state,
+- [x] RRT* variants demonstrate cost/rewiring behavior; BiTRRT transition state,
       EST density, KPIECE cell coverage and PRM reuse are each exercised.
-- [ ] Roadmap identity/generation mismatch fails before query.
-- [ ] Warm allocation and Release performance gates meet SP-09.
-- [ ] No collision-unchecked plan reaches physical admission.
+- [x] Roadmap identity/generation mismatch fails before query.
+- [x] Warm allocation and Release performance gates meet SP-09.
+- [x] No collision-unchecked plan reaches physical admission.
 
 ## Out of Scope
 

@@ -24,6 +24,7 @@ normative for code under `crates/`, `apps/`, `tools/`, `proto/`, and
 | [Chassis Kinematics](./chassis-kinematics.md) | Body-frame SI models, morphology maps and constraint evidence | Active |
 | [Chassis Estimation and Control](./chassis-estimation-control.md) | Local-time fusion, degradation and SE(2) tracking | Active |
 | [Arm Kinematics and IK](./arm-kinematics.md) | Prepared morphology-bound FK/IK, solver provenance and performance contracts | Active |
+| [Arm Sampling and Roadmap Planning](./arm-planning.md) | Prepared deterministic sampling families, PRM reuse and performance contracts | Active |
 | [Quality Guidelines](./quality-guidelines.md) | Required checks and forbidden patterns | Active |
 | [Realtime Platform](./realtime-platform.md) | Kernel, affinity, CAN and qualification contracts | Active |
 
@@ -50,6 +51,8 @@ Before changing Rust code or a cross-layer contract:
     alignment, estimator quality, body/heading control or SE(2) trajectories.
 11. Read `arm-kinematics.md` before changing arm FK/IK, prepared geometry,
     solver selection, IK cache identity or warm-path performance.
+12. Read `arm-planning.md` before changing arm sampling planners, prepared
+    planning workspaces, PRM identity or planner evidence.
 
 ## Quality Check
 

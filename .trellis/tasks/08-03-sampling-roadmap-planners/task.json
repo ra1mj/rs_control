@@ -3,7 +3,7 @@
   "name": "sampling-roadmap-planners",
   "title": "Implement distinct sampling and roadmap planners",
   "description": "Implement independent bounded RRT-Connect, RRT*, BiRRT*, BiTRRT, EST, KPIECE and PRM kernels with deterministic seeds, prepared workspaces and truthful evidence.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": "backend",
   "scope": "independent deterministic bounded RRT-Connect, RRT*, bidirectional RRT*, BiTRRT, EST, KPIECE and prepared PRM kernels",
   "package": "backend",

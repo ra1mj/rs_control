@@ -1,15 +1,30 @@
 //! Deterministic bounded joint-space planning with collision-unchecked typestate.
 
+mod bi_rrt_star;
+mod bitrrt;
+mod core;
+mod est;
+mod kpiece;
+mod prm;
+mod rrt_connect;
+mod rrt_star;
+
 use std::marker::PhantomData;
 
 use message_model::{
     ArmJointOrder, ArmJointVector, ArmPosition, ArmProfileId, KinematicGroupId,
     MAX_TRAJECTORY_POINTS,
 };
-use rand::{RngExt, SeedableRng};
-use rand_chacha::ChaCha8Rng;
 
-use crate::{ArmAlgorithmError, CollisionUnchecked, kinematics::KinematicChain};
+use crate::{
+    ArmAlgorithmError, CollisionUnchecked,
+    kinematics::{KinematicChain, PreparedKinematics},
+};
+
+pub use core::{PlannerWorkspace, PreparedPlanning};
+pub use prm::{PreparedRoadmap, PrmBuildStatistics, PrmQueryOptions};
+
+use core::{State, copy_position, edge_is_valid, interpolate_edge, validate_state};
 
 /// Project planning topology request.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -91,7 +106,7 @@ impl PlannerKind {
         }
     }
 
-    const fn uses_sampling(self) -> bool {
+    const fn is_delivered_sampling_kernel(self) -> bool {
         matches!(
             self,
             Self::RrtConnect
@@ -101,8 +116,6 @@ impl PlannerKind {
                 | Self::Est
                 | Self::Kpiece
                 | Self::Prm
-                | Self::ConstrainedRrt
-                | Self::Stomp
         )
     }
 }
@@ -193,13 +206,48 @@ impl PlannerConfig {
         self.seed
     }
 
+    /// Returns the iteration ceiling.
+    #[must_use]
+    pub const fn maximum_iterations(self) -> u32 {
+        self.maximum_iterations
+    }
+
+    /// Returns the random-sample ceiling.
+    #[must_use]
+    pub const fn maximum_samples(self) -> u32 {
+        self.maximum_samples
+    }
+
+    /// Returns the aggregate search-node ceiling.
+    #[must_use]
+    pub const fn maximum_nodes(self) -> u32 {
+        self.maximum_nodes
+    }
+
     /// Returns the wall-duration admission budget.
     ///
-    /// The deterministic kernel does not read a clock; the caller enforces
-    /// this independent deadline around the bounded work loop.
+    /// Kernels do not read a clock; orchestration enforces this deadline.
     #[must_use]
     pub const fn maximum_duration_ns(self) -> u64 {
         self.maximum_duration_ns
+    }
+
+    /// Returns maximum extension distance in joint-space SI coordinates.
+    #[must_use]
+    pub const fn step_size(self) -> f64 {
+        self.step_size
+    }
+
+    /// Returns state-check resolution along an edge.
+    #[must_use]
+    pub const fn edge_resolution(self) -> f64 {
+        self.edge_resolution
+    }
+
+    /// Returns goal-directed sampling probability.
+    #[must_use]
+    pub const fn goal_bias(self) -> f64 {
+        self.goal_bias
     }
 }
 
@@ -219,15 +267,79 @@ impl ArmStateValidator for JointLimitsOnly {
     }
 }
 
+/// Auditable proof that the requested family, rather than a shared alias, ran.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum PlannerEvidence {
+    /// Common valid-edge optimization; the named kernel was not needed.
+    DirectEdge,
+    /// Alternating extend/connect search.
+    RrtConnect { connect_attempts: u32 },
+    /// Single-tree parent selection and rewiring.
+    RrtStar {
+        parent_candidates: u32,
+        rewires: u32,
+        best_cost: f64,
+        informed_samples: u32,
+    },
+    /// Two independently rewired trees.
+    BidirectionalRrtStar {
+        parent_candidates: u32,
+        rewires: u32,
+        connection_candidates: u32,
+        best_cost: f64,
+    },
+    /// Boltzmann transition-test state.
+    BiTrrt {
+        transitions: u32,
+        rejected_transitions: u32,
+        frustration_resets: u32,
+        final_temperature: f64,
+    },
+    /// Inverse-density expansion state.
+    Est {
+        density_evaluations: u32,
+        sparse_selections: u32,
+    },
+    /// Projected-cell exploration state.
+    Kpiece {
+        cells: u32,
+        border_selections: u32,
+        successful_expansions: u32,
+        failed_expansions: u32,
+    },
+    /// Prepared graph construction/query state.
+    Prm {
+        roadmap_nodes: u32,
+        roadmap_edges: u32,
+        nodes_expanded: u32,
+        lazy_edge_checks: u32,
+    },
+}
+
 /// Deterministic planner accounting.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PlannerStatistics {
     iterations: u32,
     samples: u32,
     nodes: u32,
+    evidence: PlannerEvidence,
 }
 
 impl PlannerStatistics {
+    pub(crate) const fn new(
+        iterations: u32,
+        samples: u32,
+        nodes: u32,
+        evidence: PlannerEvidence,
+    ) -> Self {
+        Self {
+            iterations,
+            samples,
+            nodes,
+            evidence,
+        }
+    }
+
     /// Returns completed main-loop iterations.
     #[must_use]
     pub const fn iterations(self) -> u32 {
@@ -244,6 +356,12 @@ impl PlannerStatistics {
     #[must_use]
     pub const fn nodes(self) -> u32 {
         self.nodes
+    }
+
+    /// Returns family-specific execution evidence.
+    #[must_use]
+    pub const fn evidence(self) -> PlannerEvidence {
+        self.evidence
     }
 }
 
@@ -304,7 +422,65 @@ impl<Evidence> ArmPlan<Evidence> {
     }
 }
 
-/// Plans one collision-unchecked single-group path.
+impl PreparedPlanning<'_, '_> {
+    /// Executes a named planner using caller-reused prepared storage.
+    pub fn plan(
+        &self,
+        planner: PlannerKind,
+        start: &ArmJointVector<ArmPosition>,
+        goal: &ArmJointVector<ArmPosition>,
+        config: PlannerConfig,
+        validator: &impl ArmStateValidator,
+        workspace: &mut PlannerWorkspace,
+    ) -> Result<ArmPlan<CollisionUnchecked>, ArmAlgorithmError> {
+        PlanningTopology::SingleGroup.require_supported()?;
+        workspace.reset(self, config)?;
+        let start = copy_position(self, start)?;
+        let goal = copy_position(self, goal)?;
+        validate_state(self, &start, validator, 0)?;
+        validate_state(self, &goal, validator, 1)?;
+
+        let statistics = if edge_is_valid(self, &start, &goal, config.edge_resolution, validator) {
+            interpolate_edge(
+                &start,
+                &goal,
+                config.step_size,
+                self.dof(),
+                &mut workspace.path,
+            )?;
+            PlannerStatistics::new(0, 0, 2, PlannerEvidence::DirectEdge)
+        } else {
+            if !planner.is_delivered_sampling_kernel() {
+                return Err(ArmAlgorithmError::UnsupportedCapability {
+                    capability: "optimization_planner_kernel",
+                });
+            }
+            match planner {
+                PlannerKind::RrtConnect => {
+                    rrt_connect::solve(self, start, goal, config, validator, workspace)?
+                }
+                PlannerKind::RrtStar => {
+                    rrt_star::solve(self, start, goal, config, validator, workspace)?
+                }
+                PlannerKind::BidirectionalRrtStar => {
+                    bi_rrt_star::solve(self, start, goal, config, validator, workspace)?
+                }
+                PlannerKind::BiTrrt => {
+                    bitrrt::solve(self, start, goal, config, validator, workspace)?
+                }
+                PlannerKind::Est => est::solve(self, start, goal, config, validator, workspace)?,
+                PlannerKind::Kpiece => {
+                    kpiece::solve(self, start, goal, config, validator, workspace)?
+                }
+                PlannerKind::Prm => prm::solve(self, start, goal, config, validator, workspace)?,
+                _ => unreachable!("non-delivered planner rejected above"),
+            }
+        };
+        build_plan(self, planner, config.seed, &workspace.path, statistics)
+    }
+}
+
+/// Compatibility one-shot planner. Repeated callers should retain prepared objects.
 pub fn plan_joint_space(
     chain: KinematicChain<'_>,
     planner: PlannerKind,
@@ -313,46 +489,10 @@ pub fn plan_joint_space(
     config: PlannerConfig,
     validator: &impl ArmStateValidator,
 ) -> Result<ArmPlan<CollisionUnchecked>, ArmAlgorithmError> {
-    PlanningTopology::SingleGroup.require_supported()?;
-    let start_values = chain.values(start)?;
-    let goal_values = chain.values(goal)?;
-    validate_state(chain, &start_values, validator, 0)?;
-    validate_state(chain, &goal_values, validator, 1)?;
-
-    if edge_is_valid(
-        chain,
-        &start_values,
-        &goal_values,
-        config.edge_resolution,
-        validator,
-    ) {
-        let raw = interpolate_edge(&start_values, &goal_values, config.step_size);
-        return build_plan(
-            chain,
-            planner,
-            config.seed,
-            raw,
-            PlannerStatistics {
-                iterations: 0,
-                samples: 0,
-                nodes: 2,
-            },
-        );
-    }
-    if !planner.uses_sampling() {
-        return Err(ArmAlgorithmError::ConstraintViolation {
-            sample_index: 0,
-            reason: "direct optimization seed violates a constraint",
-        });
-    }
-    bidirectional_expand(
-        chain,
-        planner,
-        &start_values,
-        &goal_values,
-        config,
-        validator,
-    )
+    let kinematics = PreparedKinematics::new(chain, 1)?;
+    let prepared = PreparedPlanning::new(&kinematics, 1)?;
+    let mut workspace = PlannerWorkspace::new(&prepared, config)?;
+    prepared.plan(planner, start, goal, config, validator, &mut workspace)
 }
 
 impl ArmPlan<CollisionUnchecked> {
@@ -363,228 +503,60 @@ impl ArmPlan<CollisionUnchecked> {
         edge_resolution: f64,
         validator: &impl ArmStateValidator,
     ) -> Result<Self, ArmAlgorithmError> {
-        ensure_plan_context(self, chain)?;
         if !edge_resolution.is_finite() || edge_resolution <= 0.0 {
             return Err(ArmAlgorithmError::NonFinite {
                 field: "planner.shortcut_resolution",
             });
         }
+        let kinematics = PreparedKinematics::new(chain, 1)?;
+        let prepared = PreparedPlanning::new(&kinematics, 1)?;
+        if self.profile_id != prepared.profile_id()
+            || self.group_id != prepared.group_id()
+            || &self.order != prepared.order()
+        {
+            return Err(ArmAlgorithmError::JointOrderMismatch {
+                group: prepared.group_id(),
+            });
+        }
         let raw = self
             .waypoints
             .iter()
-            .map(|point| chain.values(point))
+            .map(|point| copy_position(&prepared, point))
             .collect::<Result<Vec<_>, _>>()?;
-        let mut shortened = Vec::new();
+        let mut shortened = Vec::with_capacity(raw.len());
         let mut current = 0;
-        shortened.push(raw[0].clone());
+        shortened.push(raw[0]);
         while current + 1 < raw.len() {
             let mut next = raw.len() - 1;
             while next > current + 1
-                && !edge_is_valid(chain, &raw[current], &raw[next], edge_resolution, validator)
+                && !edge_is_valid(
+                    &prepared,
+                    &raw[current],
+                    &raw[next],
+                    edge_resolution,
+                    validator,
+                )
             {
                 next -= 1;
             }
-            shortened.push(raw[next].clone());
+            shortened.push(raw[next]);
             current = next;
         }
-        build_plan(chain, self.planner, self.seed, shortened, self.statistics)
+        build_plan(
+            &prepared,
+            self.planner,
+            self.seed,
+            &shortened,
+            self.statistics,
+        )
     }
-}
-
-#[derive(Clone)]
-struct TreeNode {
-    state: Vec<f64>,
-    parent: Option<usize>,
-}
-
-struct SearchTree {
-    nodes: Vec<TreeNode>,
-    from_start: bool,
-}
-
-fn bidirectional_expand(
-    chain: KinematicChain<'_>,
-    planner: PlannerKind,
-    start: &[f64],
-    goal: &[f64],
-    config: PlannerConfig,
-    validator: &impl ArmStateValidator,
-) -> Result<ArmPlan<CollisionUnchecked>, ArmAlgorithmError> {
-    let bounds = sampling_bounds(chain)?;
-    let mut rng = ChaCha8Rng::from_seed(config.seed);
-    let mut first = SearchTree {
-        nodes: vec![TreeNode {
-            state: start.to_vec(),
-            parent: None,
-        }],
-        from_start: true,
-    };
-    let mut second = SearchTree {
-        nodes: vec![TreeNode {
-            state: goal.to_vec(),
-            parent: None,
-        }],
-        from_start: false,
-    };
-    let mut samples = 0_u32;
-
-    for iteration in 1..=config.maximum_iterations {
-        if samples >= config.maximum_samples
-            || first.nodes.len() + second.nodes.len() >= config.maximum_nodes as usize
-        {
-            break;
-        }
-        let target_root = &second.nodes[0].state;
-        let sample = if rng.random::<f64>() < config.goal_bias {
-            target_root.clone()
-        } else {
-            samples += 1;
-            bounds
-                .iter()
-                .map(|[lower, upper]| rng.random_range(*lower..=*upper))
-                .collect()
-        };
-        if let Some(first_index) = extend_tree(
-            chain,
-            &mut first,
-            &sample,
-            config.step_size,
-            config.edge_resolution,
-            validator,
-        ) {
-            let connection = first.nodes[first_index].state.clone();
-            if let Some(second_index) = connect_tree(
-                chain,
-                &mut second,
-                &connection,
-                config.step_size,
-                config.edge_resolution,
-                validator,
-                config.maximum_nodes as usize - first.nodes.len(),
-            ) {
-                let raw = join_trees(&first, first_index, &second, second_index);
-                return build_plan(
-                    chain,
-                    planner,
-                    config.seed,
-                    raw,
-                    PlannerStatistics {
-                        iterations: iteration,
-                        samples,
-                        nodes: (first.nodes.len() + second.nodes.len()) as u32,
-                    },
-                );
-            }
-        }
-        std::mem::swap(&mut first, &mut second);
-    }
-    Err(ArmAlgorithmError::WorkBudgetExhausted {
-        planner: planner.name(),
-        iterations: config.maximum_iterations,
-        samples,
-        nodes: (first.nodes.len() + second.nodes.len()) as u32,
-    })
-}
-
-fn extend_tree(
-    chain: KinematicChain<'_>,
-    tree: &mut SearchTree,
-    target: &[f64],
-    step_size: f64,
-    edge_resolution: f64,
-    validator: &impl ArmStateValidator,
-) -> Option<usize> {
-    let nearest = tree
-        .nodes
-        .iter()
-        .enumerate()
-        .min_by(|(_, left), (_, right)| {
-            squared_distance(&left.state, target).total_cmp(&squared_distance(&right.state, target))
-        })?
-        .0;
-    let next = steer(&tree.nodes[nearest].state, target, step_size);
-    if !edge_is_valid(
-        chain,
-        &tree.nodes[nearest].state,
-        &next,
-        edge_resolution,
-        validator,
-    ) {
-        return None;
-    }
-    tree.nodes.push(TreeNode {
-        state: next,
-        parent: Some(nearest),
-    });
-    Some(tree.nodes.len() - 1)
-}
-
-#[allow(clippy::too_many_arguments)]
-fn connect_tree(
-    chain: KinematicChain<'_>,
-    tree: &mut SearchTree,
-    target: &[f64],
-    step_size: f64,
-    edge_resolution: f64,
-    validator: &impl ArmStateValidator,
-    remaining_capacity: usize,
-) -> Option<usize> {
-    for _ in 0..remaining_capacity {
-        let index = extend_tree(chain, tree, target, step_size, edge_resolution, validator)?;
-        if squared_distance(&tree.nodes[index].state, target).sqrt() <= step_size
-            && edge_is_valid(
-                chain,
-                &tree.nodes[index].state,
-                target,
-                edge_resolution,
-                validator,
-            )
-        {
-            tree.nodes.push(TreeNode {
-                state: target.to_vec(),
-                parent: Some(index),
-            });
-            return Some(tree.nodes.len() - 1);
-        }
-    }
-    None
-}
-
-fn join_trees(
-    first: &SearchTree,
-    first_index: usize,
-    second: &SearchTree,
-    second_index: usize,
-) -> Vec<Vec<f64>> {
-    let first_path = trace(first, first_index);
-    let second_path = trace(second, second_index);
-    let (mut start_path, goal_path) = if first.from_start {
-        (first_path, second_path)
-    } else {
-        (second_path, first_path)
-    };
-    start_path.extend(goal_path.into_iter().rev().skip(1));
-    start_path
-}
-
-fn trace(tree: &SearchTree, mut index: usize) -> Vec<Vec<f64>> {
-    let mut path = Vec::new();
-    loop {
-        path.push(tree.nodes[index].state.clone());
-        let Some(parent) = tree.nodes[index].parent else {
-            break;
-        };
-        index = parent;
-    }
-    path.reverse();
-    path
 }
 
 fn build_plan(
-    chain: KinematicChain<'_>,
+    prepared: &PreparedPlanning<'_, '_>,
     planner: PlannerKind,
     seed: [u8; 32],
-    raw: Vec<Vec<f64>>,
+    raw: &[State],
     statistics: PlannerStatistics,
 ) -> Result<ArmPlan<CollisionUnchecked>, ArmAlgorithmError> {
     if raw.len() < 2 || raw.len() > MAX_TRAJECTORY_POINTS {
@@ -594,119 +566,20 @@ fn build_plan(
             maximum: MAX_TRAJECTORY_POINTS,
         });
     }
+    let chain = prepared.kinematics.chain();
     let waypoints = raw
         .iter()
-        .map(|state| chain.positions_from_values(state))
+        .map(|state| chain.positions_from_values(state.as_slice(prepared.dof())))
         .collect::<Result<Vec<_>, _>>()?;
     let _ = CollisionUnchecked::new();
     Ok(ArmPlan {
-        profile_id: chain.model().profile_id(),
-        group_id: chain.group().id(),
-        order: chain.group().joint_order().clone(),
+        profile_id: prepared.profile_id(),
+        group_id: prepared.group_id(),
+        order: prepared.order().clone(),
         planner,
         seed,
         waypoints,
         statistics,
         _evidence: PhantomData,
     })
-}
-
-fn ensure_plan_context(
-    plan: &ArmPlan<CollisionUnchecked>,
-    chain: KinematicChain<'_>,
-) -> Result<(), ArmAlgorithmError> {
-    if plan.profile_id != chain.model().profile_id()
-        || plan.group_id != chain.group().id()
-        || &plan.order != chain.group().joint_order()
-    {
-        Err(ArmAlgorithmError::JointOrderMismatch {
-            group: chain.group().id(),
-        })
-    } else {
-        Ok(())
-    }
-}
-
-fn validate_state(
-    chain: KinematicChain<'_>,
-    state: &[f64],
-    validator: &impl ArmStateValidator,
-    sample_index: usize,
-) -> Result<(), ArmAlgorithmError> {
-    let positions = chain.positions_from_values(state)?;
-    chain.forward(&positions)?;
-    validator
-        .validate(state)
-        .map_err(|reason| ArmAlgorithmError::ConstraintViolation {
-            sample_index,
-            reason,
-        })
-}
-
-fn edge_is_valid(
-    chain: KinematicChain<'_>,
-    start: &[f64],
-    goal: &[f64],
-    resolution: f64,
-    validator: &impl ArmStateValidator,
-) -> bool {
-    let distance = squared_distance(start, goal).sqrt();
-    let steps = (distance / resolution).ceil().max(1.0) as usize;
-    (0..=steps).all(|index| {
-        let alpha = index as f64 / steps as f64;
-        let state = interpolate(start, goal, alpha);
-        validate_state(chain, &state, validator, index).is_ok()
-    })
-}
-
-fn interpolate_edge(start: &[f64], goal: &[f64], step_size: f64) -> Vec<Vec<f64>> {
-    let distance = squared_distance(start, goal).sqrt();
-    let steps = (distance / step_size).ceil().max(1.0) as usize;
-    (0..=steps)
-        .map(|index| interpolate(start, goal, index as f64 / steps as f64))
-        .collect()
-}
-
-fn interpolate(start: &[f64], goal: &[f64], alpha: f64) -> Vec<f64> {
-    start
-        .iter()
-        .zip(goal)
-        .map(|(start, goal)| (goal - start).mul_add(alpha, *start))
-        .collect()
-}
-
-fn steer(start: &[f64], target: &[f64], maximum_step: f64) -> Vec<f64> {
-    let distance = squared_distance(start, target).sqrt();
-    if distance <= maximum_step {
-        target.to_vec()
-    } else {
-        interpolate(start, target, maximum_step / distance)
-    }
-}
-
-fn squared_distance(left: &[f64], right: &[f64]) -> f64 {
-    left.iter()
-        .zip(right)
-        .map(|(left, right)| (right - left).powi(2))
-        .sum()
-}
-
-fn sampling_bounds(chain: KinematicChain<'_>) -> Result<Vec<[f64; 2]>, ArmAlgorithmError> {
-    chain
-        .group()
-        .joint_order()
-        .joints()
-        .iter()
-        .map(|descriptor| {
-            let joint = chain.model().joint(descriptor.joint_id()).ok_or(
-                ArmAlgorithmError::InvalidModel {
-                    reason: "planning group references missing joint",
-                },
-            )?;
-            Ok(joint
-                .limits()
-                .and_then(|limits| limits.position())
-                .unwrap_or([-std::f64::consts::PI, std::f64::consts::PI]))
-        })
-        .collect()
 }

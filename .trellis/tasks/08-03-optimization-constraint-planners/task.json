@@ -3,7 +3,7 @@
   "name": "optimization-constraint-planners",
   "title": "Implement optimization and constrained planners",
   "description": "Implement project-native CHOMP, STOMP, GCS, IRIS, Cartesian and constrained-RRT kernels with prepared fast queries and collision-unchecked evidence.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": "backend",
   "scope": "prepared CHOMP, STOMP, constraint-region/IRIS, GCS, Cartesian and constrained-RRT kernels with microsecond warm nominal calls",
   "package": "backend",

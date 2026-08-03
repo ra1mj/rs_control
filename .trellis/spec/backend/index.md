@@ -24,7 +24,7 @@ normative for code under `crates/`, `apps/`, `tools/`, `proto/`, and
 | [Chassis Kinematics](./chassis-kinematics.md) | Body-frame SI models, morphology maps and constraint evidence | Active |
 | [Chassis Estimation and Control](./chassis-estimation-control.md) | Local-time fusion, degradation and SE(2) tracking | Active |
 | [Arm Kinematics and IK](./arm-kinematics.md) | Prepared morphology-bound FK/IK, solver provenance and performance contracts | Active |
-| [Arm Sampling and Roadmap Planning](./arm-planning.md) | Prepared deterministic sampling families, PRM reuse and performance contracts | Active |
+| [Arm Planning](./arm-planning.md) | Prepared sampling, optimization, region, Cartesian and constrained-planning contracts | Active |
 | [Quality Guidelines](./quality-guidelines.md) | Required checks and forbidden patterns | Active |
 | [Realtime Platform](./realtime-platform.md) | Kernel, affinity, CAN and qualification contracts | Active |
 

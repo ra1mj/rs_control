@@ -2,12 +2,19 @@
 
 mod bi_rrt_star;
 mod bitrrt;
+mod cartesian;
+mod chomp;
+mod constrained_rrt;
 mod core;
 mod est;
+mod gcs;
+mod iris;
 mod kpiece;
+mod optimization;
 mod prm;
 mod rrt_connect;
 mod rrt_star;
+mod stomp;
 
 use std::marker::PhantomData;
 
@@ -21,8 +28,19 @@ use crate::{
     kinematics::{KinematicChain, PreparedKinematics},
 };
 
+pub use cartesian::{
+    CartesianConfig, CartesianPlan, CartesianTermination, PreparedCartesianPlanner,
+};
+pub use chomp::PreparedChomp;
 pub use core::{PlannerWorkspace, PreparedPlanning};
+pub use gcs::PreparedRegionGraph;
+pub use iris::{ConstraintRegion, IrisConfig, PreparedConstraintRegions, RegionConstraintProvider};
+pub use optimization::{
+    IdentityProjection, ManifoldProjector, OptimizationConfig, OptimizationWorkspace,
+    SmoothnessOnly, TrajectoryCost,
+};
 pub use prm::{PreparedRoadmap, PrmBuildStatistics, PrmQueryOptions};
+pub use stomp::PreparedStomp;
 
 use core::{State, copy_position, edge_is_valid, interpolate_edge, validate_state};
 
@@ -106,7 +124,7 @@ impl PlannerKind {
         }
     }
 
-    const fn is_delivered_sampling_kernel(self) -> bool {
+    const fn is_delivered_kernel(self) -> bool {
         matches!(
             self,
             Self::RrtConnect
@@ -116,6 +134,11 @@ impl PlannerKind {
                 | Self::Est
                 | Self::Kpiece
                 | Self::Prm
+                | Self::Gcs
+                | Self::Iris
+                | Self::Chomp
+                | Self::Stomp
+                | Self::ConstrainedRrt
         )
     }
 }
@@ -314,6 +337,40 @@ pub enum PlannerEvidence {
         nodes_expanded: u32,
         lazy_edge_checks: u32,
     },
+    /// Covariant gradient optimization state.
+    Chomp {
+        initial_cost: f64,
+        final_cost: f64,
+        accepted_updates: u32,
+        rejected_updates: u32,
+    },
+    /// Seeded stochastic trajectory optimization state.
+    Stomp {
+        initial_cost: f64,
+        final_cost: f64,
+        evaluated_rollouts: u32,
+        accepted_updates: u32,
+    },
+    /// Constraint-region preparation state.
+    Iris {
+        regions: u32,
+        halfspaces: u32,
+        samples: u32,
+    },
+    /// Prepared region-graph query state.
+    Gcs {
+        regions: u32,
+        edges: u32,
+        expanded_regions: u32,
+        refined_waypoints: u32,
+    },
+    /// Projected constrained tree-search state.
+    ConstrainedRrt {
+        projection_calls: u32,
+        projection_iterations: u32,
+        projection_rejections: u32,
+        connect_attempts: u32,
+    },
 }
 
 /// Deterministic planner accounting.
@@ -450,7 +507,7 @@ impl PreparedPlanning<'_, '_> {
             )?;
             PlannerStatistics::new(0, 0, 2, PlannerEvidence::DirectEdge)
         } else {
-            if !planner.is_delivered_sampling_kernel() {
+            if !planner.is_delivered_kernel() {
                 return Err(ArmAlgorithmError::UnsupportedCapability {
                     capability: "optimization_planner_kernel",
                 });
@@ -473,7 +530,21 @@ impl PreparedPlanning<'_, '_> {
                     kpiece::solve(self, start, goal, config, validator, workspace)?
                 }
                 PlannerKind::Prm => prm::solve(self, start, goal, config, validator, workspace)?,
-                _ => unreachable!("non-delivered planner rejected above"),
+                PlannerKind::Gcs => {
+                    gcs::solve_gcs(self, start, goal, config, validator, workspace)?
+                }
+                PlannerKind::Iris => {
+                    gcs::solve_iris(self, start, goal, config, validator, workspace)?
+                }
+                PlannerKind::Chomp => {
+                    chomp::solve(self, start, goal, config, validator, workspace)?
+                }
+                PlannerKind::Stomp => {
+                    stomp::solve(self, start, goal, config, validator, workspace)?
+                }
+                PlannerKind::ConstrainedRrt => constrained_rrt::solve_identity(
+                    self, start, goal, config, validator, workspace,
+                )?,
             }
         };
         build_plan(self, planner, config.seed, &workspace.path, statistics)

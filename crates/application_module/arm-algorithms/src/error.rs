@@ -187,6 +187,32 @@ pub enum ArmAlgorithmError {
         /// Created tree/roadmap nodes.
         nodes: u32,
     },
+    /// A trajectory optimizer could not produce a lower-cost feasible result.
+    #[error(
+        "optimizer {planner} did not improve a feasible trajectory after {iterations} iterations (initial {initial_cost}, final {final_cost})"
+    )]
+    OptimizationNonConvergent {
+        /// Stable optimizer name.
+        planner: &'static str,
+        /// Completed bounded iterations.
+        iterations: u32,
+        /// Initial finite objective value.
+        initial_cost: f64,
+        /// Best finite objective value observed.
+        final_cost: f64,
+    },
+    /// A caller-owned manifold projection could not produce a feasible point.
+    #[error(
+        "manifold projection rejected sample {sample_index} after {iterations} iterations: {reason}"
+    )]
+    ProjectionFailed {
+        /// Rejected sample or waypoint index.
+        sample_index: usize,
+        /// Provider-reported projection work.
+        iterations: u32,
+        /// Static provider evidence.
+        reason: &'static str,
+    },
     /// A supplied state or interpolated edge failed an explicit constraint.
     #[error("state constraint rejected sample {sample_index}: {reason}")]
     ConstraintViolation {

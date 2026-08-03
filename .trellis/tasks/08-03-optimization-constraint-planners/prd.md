@@ -38,19 +38,19 @@ parent design.
 
 ## Acceptance Criteria
 
-- [ ] CHOMP and STOMP have distinct objective-improvement/non-convergence tests
+- [x] CHOMP and STOMP have distinct objective-improvement/non-convergence tests
       and preserve endpoints/limits/constraints.
-- [ ] Seeded STOMP repeats complete samples, costs, updates and results.
-- [ ] IRIS regions contain only points accepted by the supplied semantic
+- [x] Seeded STOMP repeats complete samples, costs, updates and results.
+- [x] IRIS regions contain only points accepted by the supplied semantic
       provider in tested fixtures and are never typed collision checked.
-- [ ] Prepared GCS queries exercise region graph search and meet OP-08.
-- [ ] Cartesian tests cover pose interpolation, IK failure, jump detection,
+- [x] Prepared GCS queries exercise region graph search and meet OP-08.
+- [x] Cartesian tests cover pose interpolation, IK failure, jump detection,
       partial paths and exact bounds.
-- [ ] Constrained RRT tests cover projection success/failure, search exhaustion
+- [x] Constrained RRT tests cover projection success/failure, search exhaustion
       and behavior distinct from unconstrained RRT-Connect.
-- [ ] Profile/group/order/constraint-generation changes invalidate every
+- [x] Profile/group/order/constraint-generation changes invalidate every
       prepared artifact.
-- [ ] Post-preparation allocation, latency, architecture, Clippy and test gates
+- [x] Post-preparation allocation, latency, architecture, Clippy and test gates
       pass.
 
 ## Out of Scope

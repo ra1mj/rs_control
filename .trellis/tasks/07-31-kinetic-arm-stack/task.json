@@ -18,7 +18,9 @@
   "commit": null,
   "pr_url": null,
   "subtasks": [],
-  "children": [],
+  "children": [
+    "08-03-advanced-arm-algorithms"
+  ],
   "parent": "07-31-kinetic-arm-algorithms",
   "relatedFiles": [
     "Cargo.toml",

@@ -1,0 +1,31 @@
+{
+  "id": "sampling-roadmap-planners",
+  "name": "sampling-roadmap-planners",
+  "title": "Implement distinct sampling and roadmap planners",
+  "description": "Implement independent bounded RRT-Connect, RRT*, BiRRT*, BiTRRT, EST, KPIECE and PRM kernels with deterministic seeds, prepared workspaces and truthful evidence.",
+  "status": "planning",
+  "dev_type": "backend",
+  "scope": "independent deterministic bounded RRT-Connect, RRT*, bidirectional RRT*, BiTRRT, EST, KPIECE and prepared PRM kernels",
+  "package": "backend",
+  "priority": "P1",
+  "creator": "mj",
+  "assignee": "mj",
+  "createdAt": "2026-08-03",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "08-03-advanced-arm-algorithms",
+  "relatedFiles": [
+    "crates/application_module/arm-algorithms/src/planning",
+    "crates/application_module/arm-algorithms/tests/planning.rs",
+    ".trellis/tasks/08-03-advanced-ik-kernels",
+    ".trellis/tasks/08-03-advanced-arm-algorithms/research/kinetic-algorithm-audit.md"
+  ],
+  "notes": "Hard dependency on the completed advanced-IK prepared kinematics surface. Planner names must not alias RRT-Connect.",
+  "meta": {}
+}

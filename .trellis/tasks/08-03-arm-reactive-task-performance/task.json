@@ -1,0 +1,32 @@
+{
+  "id": "arm-reactive-task-performance",
+  "name": "arm-reactive-task-performance",
+  "title": "Integrate arm reactive tasks and performance gates",
+  "description": "Complete singularity-aware RMP and task-to-plan integration, enforce cancellation/context invalidation, add benchmarks and run cross-child software gates.",
+  "status": "planning",
+  "dev_type": "backend",
+  "scope": "singularity-aware RMP, task-stage compilation/invalidation, cross-child authority proofs and portable plus isolated Release performance gates",
+  "package": "backend",
+  "priority": "P1",
+  "creator": "mj",
+  "assignee": "mj",
+  "createdAt": "2026-08-03",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "08-03-advanced-arm-algorithms",
+  "relatedFiles": [
+    "crates/application_module/arm-algorithms/src/reactive",
+    "crates/application_module/arm-algorithms/src/task",
+    "crates/application_module/arm-control",
+    "crates/application_module/arm-algorithms/benches",
+    ".trellis/tasks/08-03-advanced-arm-algorithms"
+  ],
+  "notes": "Starts only after all three algorithm children are committed and archived. Hardware and RK3588 performance remain open gates.",
+  "meta": {}
+}

@@ -33,6 +33,20 @@ pub enum ArmAlgorithmError {
         /// Expected group.
         group: KinematicGroupId,
     },
+    /// Prepared solver state was reused across an incompatible generation.
+    #[error("prepared algorithm generation mismatch: expected {expected}, got {actual}")]
+    PreparedGenerationMismatch {
+        /// Generation bound into the prepared model.
+        expected: u64,
+        /// Generation carried by the reusable workspace or cache.
+        actual: u64,
+    },
+    /// A reusable workspace was created for a different prepared shape.
+    #[error("prepared workspace does not match the selected model: {reason}")]
+    PreparedWorkspaceMismatch {
+        /// Static mismatch category.
+        reason: &'static str,
+    },
     /// A vector or matrix had the wrong bounded dimension.
     #[error("{field} dimension mismatch: expected {expected}, got {actual}")]
     DimensionMismatch {

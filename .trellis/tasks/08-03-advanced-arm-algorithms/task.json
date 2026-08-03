@@ -1,0 +1,38 @@
+{
+  "id": "advanced-arm-algorithms",
+  "name": "advanced-arm-algorithms",
+  "title": "Complete advanced arm algorithm implementations",
+  "description": "Replace advanced arm IK, planner, reactive and task placeholders or shared fallback kernels with truthful bounded host-software implementations.",
+  "status": "planning",
+  "dev_type": "backend",
+  "scope": "bounded multi-morphology IK, distinct planning kernels, collision-independent RMP policies and task-to-plan integration; no collision, dual-arm, floating-base, hardware or Orange Pi qualification",
+  "package": "backend",
+  "priority": "P1",
+  "creator": "mj",
+  "assignee": "mj",
+  "createdAt": "2026-08-03",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-03-advanced-ik-kernels",
+    "08-03-sampling-roadmap-planners",
+    "08-03-optimization-constraint-planners",
+    "08-03-arm-reactive-task-performance"
+  ],
+  "parent": "07-31-kinetic-arm-stack",
+  "relatedFiles": [
+    "crates/application_module/arm-algorithms",
+    "crates/application_module/arm-control",
+    "crates/application_module/arm-model",
+    "crates/protocol_module/message-model",
+    ".trellis/tasks/07-31-kinetic-arm-stack",
+    ".trellis/spec/backend"
+  ],
+  "notes": "Child completion task for the remaining unchecked advanced-algorithm items in 07-31-kinetic-arm-stack. KINETIC remains an attributed reference only.",
+  "meta": {}
+}

@@ -1,0 +1,31 @@
+{
+  "id": "advanced-ik-kernels",
+  "name": "advanced-ik-kernels",
+  "title": "Implement project-native advanced IK kernels",
+  "description": "Port or rewrite KINETIC-informed FABRIK, SQP, Bio-IK, OPW, Paden-Kahan and 7-DOF solvers with bounded deterministic workspaces and microsecond-class warm queries.",
+  "status": "in_progress",
+  "dev_type": "backend",
+  "scope": "prepared multi-morphology FABRIK, SQP, Bio-IK, OPW, Paden-Kahan and redundant seven-DOF kernels plus bounded cache/batch selection",
+  "package": "backend",
+  "priority": "P1",
+  "creator": "mj",
+  "assignee": "mj",
+  "createdAt": "2026-08-03",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "08-03-advanced-arm-algorithms",
+  "relatedFiles": [
+    "crates/application_module/arm-algorithms/src/kinematics",
+    "crates/application_module/arm-algorithms/tests/kinematics.rs",
+    "crates/application_module/arm-model",
+    ".trellis/tasks/08-03-advanced-arm-algorithms/research/kinetic-algorithm-audit.md"
+  ],
+  "notes": "Must complete before either planner child starts. KINETIC commit 3dbaa615 is the sole IK kernel source, including DLS; explicit solver requests never fall back.",
+  "meta": {}
+}

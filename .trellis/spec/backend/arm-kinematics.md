@@ -1,0 +1,128 @@
+# Arm Kinematics and Inverse Kinematics
+
+## Scenario: Add or change an arm IK kernel
+
+### 1. Scope / Trigger
+
+Use this contract for code under
+`crates/application_module/arm-algorithms/src/kinematics/` that changes inverse
+kinematics, prepared chain geometry, reusable workspaces, analytical geometry
+admission, IK caching or batch solving.
+
+KINETIC commit `3dbaa61579c4359ce4c35f246fc83e1d3110b646` is the sole
+permitted source for every IK algorithm kernel, including DLS. Project code may
+adapt types, validation, deterministic randomness, bounded storage, caching and
+performance. It must not add a KINETIC dependency, vendor its workspace or
+substitute another IK implementation.
+
+### 2. Signatures
+
+The prepared public boundary is:
+
+```rust
+PreparedKinematics::new(chain, generation) -> Result<PreparedKinematics, ArmAlgorithmError>
+PreparedKinematics::workspace(maximum_population) -> Result<IkWorkspace, ArmAlgorithmError>
+PreparedKinematics::workspace_with_byte_limit(maximum_population, maximum_bytes)
+PreparedKinematics::solve(solver, target, initial, config, workspace)
+PreparedKinematics::solve_cached(solver, target, initial, config, workspace, cache)
+PreparedKinematics::solve_batch(solver, targets, initials, config, workspace, output)
+IkCache::new(prepared, maximum_entries, maximum_bytes, translation_resolution, rotation_resolution)
+```
+
+`KinematicChain::solve_ik` is a compatibility wrapper. New repeated or
+performance-sensitive callers use the prepared boundary.
+
+### 3. Contracts
+
+- Prepared identity contains profile, group, exact joint order and a non-zero
+  caller-managed generation.
+- `IkWorkspace` belongs to exactly one prepared identity and owns all warm
+  scratch. Warm calls may mutate and reuse it but may not grow a container.
+- Randomized kernels reset `ChaCha8Rng` from the request's recorded 32-byte
+  seed. Equal prepared state, target, initial state, config and seed produce
+  byte-equal semantic results and work evidence.
+- Generic DLS and SQP accept variable-DOF revolute, continuous and prismatic
+  groups. FABRIK accepts rotary groups. Bio-IK requires an explicit seed.
+- OPW accepts only its measured Y-Z-Y wrist convention. Paden-Kahan accepts
+  measured spherical Z-Y-Z wrists. Seven-axis decomposition accepts the
+  corresponding redundant spherical-wrist convention. DOF alone is never
+  sufficient geometry evidence.
+- Every analytical candidate is checked with project FK, exact joint limits,
+  finite residuals and the caller tolerances before return.
+- `Auto` uses stable priority: OPW, Paden-Kahan, redundant seven-axis, DLS.
+  Explicit solver requests never fall back or alias another named kernel.
+- Cache keys quantize pose, while cache identity retains profile, group, order
+  and generation. A full cache rejects a new key; it does not evict silently.
+- Collision remains outside IK. An IK result carries no collision-free claim.
+
+### 4. Validation and Error Matrix
+
+| Condition | Required result |
+|---|---|
+| generation is zero | `InvalidBudget { field: "ik.prepared_generation" }` |
+| workspace/cache generation differs | `PreparedGenerationMismatch` |
+| workspace/cache profile, group, order or shape differs | `PreparedWorkspaceMismatch` |
+| initial order differs | `JointOrderMismatch` |
+| coordinate is non-finite or outside a joint/mimic limit | `NonFinite` or `JointLimit` |
+| solver DOF/joint kind/axis convention is incompatible | `UnsupportedGeometry` |
+| caller omits the seeded prepared path for randomized solver | `UnsupportedCapability { capability: "explicit_seed_required" }` |
+| work ends outside requested tolerances | `NonConvergent` with final residuals |
+| workspace, population, cache or batch output exceeds its bound | `Capacity` |
+| SQP augmented system loses required rank | `Singular` |
+
+### 5. Good, Base and Bad Cases
+
+- Good: prepare one profile/group/generation, allocate one workspace, execute
+  repeated seeded solves, and invalidate both workspace and cache on reload.
+- Base: use the compatibility wrapper for a one-shot deterministic DLS call.
+- Bad: select OPW because a group has six joints, reuse a cache after a model
+  generation change, let Bio-IK call thread-local randomness, or return the
+  closest analytical candidate when it misses the requested tolerances.
+
+### 6. Tests Required
+
+- Generic fixtures cover multiple DOFs, mixed rotary/prismatic joints,
+  reachable/unreachable targets, limits, order mismatch and deterministic
+  repeats.
+- Dedicated six- and seven-axis fixtures cover each admitted axis convention,
+  wrist singularities and a near-miss geometry rejection.
+- Solver evidence asserts the actual kernel name and solver-specific
+  iterations/evaluations/generations/candidate counts.
+- Cache tests cover quantized hits, full capacity and profile/group/order/
+  generation rejection. Batch tests prove caller-owned capacity behavior.
+- `allocation-counter` reports zero allocations for warmed calls.
+- Run the ignored Release gate explicitly:
+
+  ```text
+  cargo test --release -p arm-algorithms --test ik_performance -- --ignored --nocapture
+  ```
+
+  Analytical/cache P95 targets are 50 microseconds; numerical IK P95 target is
+  500 microseconds. These host results are not target-board qualification.
+- Run `tools/ci.sh`, architecture check and dependency/source policy.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+// DOF is not analytical compatibility, and an explicit request cannot fall back.
+if chain.dof() == 6 {
+    solve_dls(target)
+}
+```
+
+#### Correct
+
+```rust
+let prepared = PreparedKinematics::new(chain, model_generation)?;
+let mut workspace = prepared.workspace_with_byte_limit(64, byte_ceiling)?;
+let solution = prepared.solve(
+    IkSolverKind::Opw,
+    target,
+    initial,
+    config,
+    &mut workspace,
+)?;
+assert_eq!(solution.solver(), IkSolverKind::Opw);
+```

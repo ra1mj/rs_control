@@ -19,7 +19,12 @@ Delivered the pinned Rust workspace, compile-time layer policy, allocation-consc
 
 ### Main Changes
 
-- Detailed change bullets were not supplied; see the summary above.
+- Added distinct prepared CHOMP/STOMP kernels, caller cost/projection/region
+  contracts and typed optimization/projection failures.
+- Added caller-certified IRIS regions, reusable GCS region graphs, prepared-IK
+  Cartesian paths and projected constrained RRT evidence.
+- Added determinism, non-convergence, partial-path, generation-invalidation,
+  allocation and complete-call Release performance gates.
 
 ### Git Commits
 
@@ -31,7 +36,9 @@ Delivered the pinned Rust workspace, compile-time layer policy, allocation-consc
 
 ### Testing
 
-- Validation was not recorded for this session.
+- `./tools/ci.sh`
+- `RUSTDOCFLAGS='-D warnings' cargo doc -p arm-algorithms --no-deps`
+- `cargo test --release -p arm-algorithms --test planning_optimization_performance -- --ignored --nocapture`
 
 ### Status
 
@@ -395,6 +402,39 @@ Replaced the shared planner fallback with prepared deterministic RRT-Connect, RR
 | Hash | Message |
 |------|---------|
 | `b7f03a9` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 13: Optimization and constrained arm planners
+
+**Date**: 2026-08-03
+**Task**: Optimization and constrained arm planners
+**Branch**: `main`
+
+### Summary
+
+Integrated project-native KINETIC-informed CHOMP, STOMP, IRIS, prepared GCS, Cartesian prepared-IK planning and projected constrained RRT with deterministic bounded workspaces, collision-unchecked evidence, full tests and microsecond Release gates.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0c04837` | (see git log) |
 
 ### Testing
 

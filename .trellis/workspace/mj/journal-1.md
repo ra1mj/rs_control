@@ -374,3 +374,36 @@ Integrated KINETIC-derived DLS, FABRIK, SQP, Bio-IK, OPW, Paden-Kahan and redund
 ### Next Steps
 
 - None - task complete
+
+
+## Session 12: Distinct KINETIC sampling and roadmap planners
+
+**Date**: 2026-08-03
+**Task**: Distinct KINETIC sampling and roadmap planners
+**Branch**: `main`
+
+### Summary
+
+Replaced the shared planner fallback with prepared deterministic RRT-Connect, RRT*, bidirectional RRT*, BiTRRT, EST, KPIECE and reusable PRM kernels, with family evidence, generation binding, bounded workspaces and microsecond Release gates.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b7f03a9` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

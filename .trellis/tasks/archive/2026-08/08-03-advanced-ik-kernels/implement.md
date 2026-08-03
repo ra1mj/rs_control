@@ -39,7 +39,7 @@
 - [x] Run `cargo fmt`, warnings-denied Clippy and targeted tests.
 - [x] Run architecture and dependency/source policy.
 - [x] Run `trellis-check` before planner children consume the prepared API.
-- [ ] Commit and archive this child before planner children consume the
+- [x] Commit and archive this child before planner children consume the
       prepared API.
 
 Rollback after each section is the previous truthful capability state, never a

@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 13
-- **Last Active**: 2026-08-03
+- **Total Sessions**: 14
+- **Last Active**: 2026-08-05
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~442 | Active |
+| `journal-1.md` | ~482 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 14 | 2026-08-05 | Complete motor-disabled chassis navigation plugin | `7324724` | `main` |
 | 13 | 2026-08-03 | Optimization and constrained arm planners | `0c04837` | `main` |
 | 12 | 2026-08-03 | Distinct KINETIC sampling and roadmap planners | `b7f03a9` | `main` |
 | 11 | 2026-08-03 | Prepared KINETIC IK kernels | `af72dbf` | `main` |

@@ -1,5 +1,5 @@
 version = 1
-composition_roots = ["robotctl"]
+composition_roots = ["robotctl", "rs-navigation-e2e"]
 
 [classes.hardware_module]
 allowed_dependencies = ["hardware_module"]
@@ -53,10 +53,13 @@ path_prefixes = ["tools/"]
 "middleware-qualification" = "integration"
 "middleware-shm" = "protocol_module"
 "middleware-zenoh" = "protocol_module"
+"navigation-ipc" = "protocol_module"
 "motor-damiao" = "hardware_module"
+"navigation-plugin-config" = "integration"
 "proto-generated" = "protocol_module"
 "proto-compat-check" = "tool"
 "robotctl" = "app"
+"rs-navigation-e2e" = "app"
 "ros2-mapping" = "integration"
 "state-estimation-2d" = "application_module"
 "test-support" = "test-support"

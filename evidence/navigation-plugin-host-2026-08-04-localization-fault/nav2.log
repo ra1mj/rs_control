@@ -1,0 +1,161 @@
+valid schema_version=1 plugin_id=chassis_nav.rs_control.navigation profile_id=motor_disabled_host_v1 sha256=ec8784456ae3bb285d888ad57206af8a36926543e6f559ca65f1c85f8dfad1f7
+[INFO] [1785911216.051070411] [controller_server]: 
+	controller_server lifecycle node launched. 
+	Waiting on external lifecycle transitions to activate
+	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[INFO] [1785911216.053159891] [controller_server]: Creating controller server
+[INFO] [1785911216.054027520] [bt_navigator]: 
+	bt_navigator lifecycle node launched. 
+	Waiting on external lifecycle transitions to activate
+	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[INFO] [1785911216.054079054] [bt_navigator]: Creating
+[INFO] [1785911216.056376258] [lifecycle_manager_navigation]: Creating
+[INFO] [1785911216.056866364] [local_costmap.local_costmap]: 
+	local_costmap lifecycle node launched. 
+	Waiting on external lifecycle transitions to activate
+	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[INFO] [1785911216.057133686] [local_costmap.local_costmap]: Creating Costmap
+[INFO] [1785911216.057867762] [lifecycle_manager_navigation]: [34m[1mCreating and initializing lifecycle service clients[0m[0m
+[INFO] [1785911216.058621585] [planner_server]: 
+	planner_server lifecycle node launched. 
+	Waiting on external lifecycle transitions to activate
+	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[INFO] [1785911216.060111939] [planner_server]: Creating
+[INFO] [1785911216.064733484] [global_costmap.global_costmap]: 
+	global_costmap lifecycle node launched. 
+	Waiting on external lifecycle transitions to activate
+	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[INFO] [1785911216.065160823] [global_costmap.global_costmap]: Creating Costmap
+[INFO] [1785911216.066364540] [map_server]: 
+	map_server lifecycle node launched. 
+	Waiting on external lifecycle transitions to activate
+	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[INFO] [1785911216.066448450] [map_server]: Creating
+[INFO] [1785911216.067435242] [lifecycle_manager_navigation]: [34m[1mStarting managed nodes bringup...[0m[0m
+[INFO] [1785911216.067464262] [lifecycle_manager_navigation]: [34m[1mConfiguring map_server[0m[0m
+[INFO] [1785911216.067614884] [map_server]: Configuring
+[INFO] [1785911216.067653644] [map_io]: Loading yaml file: /home/mj/workspaces/qi/chassis_nav/src/chassis_nav_mecanum_sim/assets/localization_map/warehouse_sim_map/0.1.0/maps/occupancy.yaml
+[INFO] [1785911216.067862938] [map_io]: resolution: 0.05
+[INFO] [1785911216.067870619] [map_io]: origin[0]: -7
+[INFO] [1785911216.067876254] [map_io]: origin[1]: -10.5
+[INFO] [1785911216.067880628] [map_io]: origin[2]: 0
+[INFO] [1785911216.067885193] [map_io]: free_thresh: 0.196
+[INFO] [1785911216.067889761] [map_io]: occupied_thresh: 0.65
+[INFO] [1785911216.067894417] [map_io]: mode: trinary
+[INFO] [1785911216.067899202] [map_io]: negate: 0
+[INFO] [1785911216.068057035] [map_io]: Loading image_file: /home/mj/workspaces/qi/chassis_nav/src/chassis_nav_mecanum_sim/assets/localization_map/warehouse_sim_map/0.1.0/maps/occupancy.pgm
+[INFO] [1785911216.075538432] [map_io]: Read map /home/mj/workspaces/qi/chassis_nav/src/chassis_nav_mecanum_sim/assets/localization_map/warehouse_sim_map/0.1.0/maps/occupancy.pgm: 423 X 286 map @ 0.05 m/cell
+[INFO] [1785911216.078250528] [lifecycle_manager_navigation]: [34m[1mConfiguring controller_server[0m[0m
+[INFO] [1785911216.078360441] [controller_server]: Configuring controller interface
+[INFO] [1785911216.078421168] [controller_server]: getting goal checker plugins..
+[INFO] [1785911216.078438935] [controller_server]: Controller frequency set to 20.0000Hz
+[INFO] [1785911216.078450295] [local_costmap.local_costmap]: Configuring
+[INFO] [1785911216.080022452] [local_costmap.local_costmap]: Using plugin "obstacle_layer"
+[INFO] [1785911216.081415527] [local_costmap.local_costmap]: Subscribed to Topics: tracker_cloud
+[INFO] [1785911216.082184716] [local_costmap.local_costmap]: Initialized plugin "obstacle_layer"
+[INFO] [1785911216.082203422] [local_costmap.local_costmap]: Using plugin "inflation_layer"
+[INFO] [1785911216.082471711] [local_costmap.local_costmap]: Initialized plugin "inflation_layer"
+[INFO] [1785911216.084917626] [controller_server]: Created progress_checker : progress_checker of type nav2_controller::SimpleProgressChecker
+[INFO] [1785911216.085140101] [controller_server]: Created goal checker : general_goal_checker of type nav2_controller::SimpleGoalChecker
+[INFO] [1785911216.085192387] [controller_server]: Controller Server has general_goal_checker  goal checkers available.
+[INFO] [1785911216.085655027] [controller_server]: Created controller : FollowPath of type nav2_mppi_controller::MPPIController
+[INFO] [1785911216.085889727] [controller_server]: Controller period is equal to model dt. Control sequence shifting is ON
+[INFO] [1785911216.086379124] [controller_server]: ConstraintCritic instantiated with 1 power and 4.000000 weight.
+[INFO] [1785911216.086390208] [controller_server]: Critic loaded : mppi::critics::ConstraintCritic
+[INFO] [1785911216.086481632] [controller_server]: InflationCostCritic instantiated with 1 power and 300.000000 / 0.023622 weights. Critic will collision check based on footprint cost.
+[INFO] [1785911216.086486786] [controller_server]: Critic loaded : mppi::critics::CostCritic
+[INFO] [1785911216.086534108] [controller_server]: GoalCritic instantiated with 1 power and 5.000000 weight.
+[INFO] [1785911216.086537236] [controller_server]: Critic loaded : mppi::critics::GoalCritic
+[INFO] [1785911216.086584609] [controller_server]: GoalAngleCritic instantiated with 1 power, 3.000000 weight, and 0.500000 angular threshold.
+[INFO] [1785911216.086588256] [controller_server]: Critic loaded : mppi::critics::GoalAngleCritic
+[INFO] [1785911216.086669452] [controller_server]: ReferenceTrajectoryCritic instantiated with 1 power and 14.000000 weight
+[INFO] [1785911216.086672514] [controller_server]: Critic loaded : mppi::critics::PathAlignCritic
+[INFO] [1785911216.086725467] [controller_server]: Critic loaded : mppi::critics::PathFollowCritic
+[INFO] [1785911216.086758876] [controller_server]: TwirlingCritic instantiated with 1 power and 10.000000 weight.
+[INFO] [1785911216.086761798] [controller_server]: Critic loaded : mppi::critics::TwirlingCritic
+[INFO] [1785911216.087431359] [controller_server]: Optimizer reset
+[INFO] [1785911216.088211688] [MPPIController]: Configured MPPI Controller: FollowPath
+[INFO] [1785911216.088220729] [controller_server]: Controller Server has FollowPath  controllers available.
+[INFO] [1785911216.089684002] [lifecycle_manager_navigation]: [34m[1mConfiguring planner_server[0m[0m
+[INFO] [1785911216.089806232] [planner_server]: Configuring
+[INFO] [1785911216.089839597] [global_costmap.global_costmap]: Configuring
+[INFO] [1785911216.092364730] [global_costmap.global_costmap]: Using plugin "static_layer"
+[INFO] [1785911216.093756597] [global_costmap.global_costmap]: Subscribing to the map topic (/map) with transient local durability
+[INFO] [1785911216.094216644] [global_costmap.global_costmap]: Subscribing to updates
+[INFO] [1785911216.094804629] [global_costmap.global_costmap]: Initialized plugin "static_layer"
+[INFO] [1785911216.094813847] [global_costmap.global_costmap]: Using plugin "obstacle_layer"
+[INFO] [1785911216.094910796] [global_costmap.global_costmap]: Subscribed to Topics: tracker_cloud
+[INFO] [1785911216.095509634] [global_costmap.global_costmap]: Initialized plugin "obstacle_layer"
+[INFO] [1785911216.095520595] [global_costmap.global_costmap]: Using plugin "inflation_layer"
+[INFO] [1785911216.095767024] [global_costmap.global_costmap]: Initialized plugin "inflation_layer"
+[INFO] [1785911216.099636010] [planner_server]: Created global planner plugin GridBased of type nav2_smac_planner/SmacPlanner2D
+[INFO] [1785911216.099653824] [planner_server]: Configuring GridBased of type SmacPlanner2D
+[INFO] [1785911216.100115412] [planner_server]: Configured plugin GridBased of type SmacPlanner2D with tolerance 0.10, maximum iterations 500000, max on approach iterations 1000, and not allowing unknown traversal.
+[INFO] [1785911216.100136979] [planner_server]: Planner Server has GridBased  planners available.
+[INFO] [1785911216.102089355] [lifecycle_manager_navigation]: [34m[1mConfiguring bt_navigator[0m[0m
+[INFO] [1785911216.102236150] [bt_navigator]: Configuring
+[INFO] [1785911216.112248369] [lifecycle_manager_navigation]: [34m[1mActivating map_server[0m[0m
+[INFO] [1785911216.112340275] [map_server]: Activating
+[INFO] [1785911216.112600302] [map_server]: Creating bond (map_server) to lifecycle manager.
+[INFO] [1785911216.112809983] [global_costmap.global_costmap]: StaticLayer: Resizing costmap to 423 X 286 at 0.050000 m/pix
+[INFO] [1785911216.224513814] [lifecycle_manager_navigation]: Server map_server connected with bond.
+[INFO] [1785911216.224562342] [lifecycle_manager_navigation]: [34m[1mActivating controller_server[0m[0m
+[INFO] [1785911216.226623746] [controller_server]: Activating
+[INFO] [1785911216.226669634] [local_costmap.local_costmap]: Activating
+[INFO] [1785911216.226683838] [local_costmap.local_costmap]: Checking transform
+[INFO] [1785911216.226768274] [local_costmap.local_costmap]: start
+[WARN] [1785911216.327318566] [controller_server]: Parameter controller_server.verbose not found
+[INFO] [1785911216.328077332] [controller_server]: Optimizer reset
+[INFO] [1785911216.328169876] [MPPIController]: Activated MPPI Controller: FollowPath
+[INFO] [1785911216.328190845] [controller_server]: Creating bond (controller_server) to lifecycle manager.
+[INFO] [1785911216.429843086] [lifecycle_manager_navigation]: Server controller_server connected with bond.
+[INFO] [1785911216.429957701] [lifecycle_manager_navigation]: [34m[1mActivating planner_server[0m[0m
+[INFO] [1785911216.430101497] [planner_server]: Activating
+[INFO] [1785911216.430134320] [global_costmap.global_costmap]: Activating
+[INFO] [1785911216.430140567] [global_costmap.global_costmap]: Checking transform
+[INFO] [1785911216.430210678] [global_costmap.global_costmap]: start
+[INFO] [1785911216.680631239] [planner_server]: Activating plugin GridBased of type SmacPlanner2D
+[INFO] [1785911216.681106366] [planner_server]: Creating bond (planner_server) to lifecycle manager.
+[INFO] [1785911216.782844334] [lifecycle_manager_navigation]: Server planner_server connected with bond.
+[INFO] [1785911216.782888830] [lifecycle_manager_navigation]: [34m[1mActivating bt_navigator[0m[0m
+[INFO] [1785911216.783219118] [bt_navigator]: Activating
+[INFO] [1785911216.786320450] [bt_navigator]: Creating bond (bt_navigator) to lifecycle manager.
+[INFO] [1785911216.887937404] [lifecycle_manager_navigation]: Server bt_navigator connected with bond.
+[INFO] [1785911216.888005326] [lifecycle_manager_navigation]: [34m[1mManaged nodes are active[0m[0m
+[INFO] [1785911216.888016781] [lifecycle_manager_navigation]: [34m[1mCreating bond timer...[0m[0m
+[INFO] [1785911217.017997141] [bt_navigator]: Begin navigating from current location (1.50, -1.50) to (1.50, -3.00)
+[INFO] [1785911217.038542004] [controller_server]: Received a goal, begin computing control effort.
+[WARN] [1785911217.038588875] [controller_server]: No goal checker was specified in parameter 'current_goal_checker'. Server will use only plugin loaded general_goal_checker . This warning will appear once.
+[INFO] [1785911218.088678018] [controller_server]: Passing new path to controller.
+[INFO] [1785911219.138695682] [controller_server]: Passing new path to controller.
+[INFO] [1785911220.138675413] [controller_server]: Passing new path to controller.
+[INFO] [1785911221.188678568] [controller_server]: Passing new path to controller.
+[INFO] [1785911222.188677784] [controller_server]: Passing new path to controller.
+[INFO] [1785911223.238682666] [controller_server]: Passing new path to controller.
+[INFO] [1785911224.288812516] [controller_server]: Passing new path to controller.
+[INFO] [1785911225.288680051] [controller_server]: Passing new path to controller.
+[INFO] [1785911226.338702881] [controller_server]: Passing new path to controller.
+[INFO] [1785911227.388810690] [controller_server]: Passing new path to controller.
+[INFO] [1785911228.388676407] [controller_server]: Passing new path to controller.
+[INFO] [1785911229.438677466] [controller_server]: Passing new path to controller.
+[INFO] [1785911230.438675582] [controller_server]: Passing new path to controller.
+[INFO] [1785911231.488678509] [controller_server]: Passing new path to controller.
+[INFO] [1785911232.488675711] [controller_server]: Passing new path to controller.
+[INFO] [1785911233.538702050] [controller_server]: Passing new path to controller.
+[INFO] [1785911234.588676919] [controller_server]: Passing new path to controller.
+[INFO] [1785911235.588675541] [controller_server]: Passing new path to controller.
+[INFO] [1785911236.638677949] [controller_server]: Passing new path to controller.
+[INFO] [1785911237.638678599] [controller_server]: Passing new path to controller.
+[INFO] [1785911238.688681240] [controller_server]: Passing new path to controller.
+[INFO] [1785911239.688681437] [controller_server]: Passing new path to controller.
+[INFO] [1785911240.738679570] [controller_server]: Passing new path to controller.
+[INFO] [1785911241.738678786] [controller_server]: Passing new path to controller.
+[INFO] [1785911242.788680148] [controller_server]: Passing new path to controller.
+[INFO] [1785911243.838680903] [controller_server]: Passing new path to controller.
+[INFO] [1785911244.838681849] [controller_server]: Passing new path to controller.
+[INFO] [1785911245.888773152] [controller_server]: Passing new path to controller.
+[INFO] [1785911246.888677838] [controller_server]: Passing new path to controller.
+[ERROR] [1785911247.038727241] [controller_server]: Failed to make progress
+[WARN] [1785911247.038789696] [controller_server]: [follow_path] [ActionServer] Aborting handle.
+[WARN] [1785911247.068117050] [bt_navigator]: [navigate_to_pose] [ActionServer] Aborting handle.
+[ERROR] [1785911247.068271294] [bt_navigator]: Goal failed

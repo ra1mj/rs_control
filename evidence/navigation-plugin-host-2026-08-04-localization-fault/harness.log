@@ -1,0 +1,5 @@
+motor_output=forbidden can_transmit=forbidden process_epoch=301 command_id=[2d, 01, 00, 00, 00, 00, 00, 00, f8, db, 19, 00, 66, 66, 66, 66]
+proposal=Accepted motor_output=forbidden
+feedback=Unavailable reason=InjectedLocalizationLoss
+terminal command_id=[2d, 01, 00, 00, 00, 00, 00, 00, f8, db, 19, 00, 66, 66, 66, 66] status=Failed code=3
+stop=ProposalExpired motor_output=forbidden proposal_age_us=101357

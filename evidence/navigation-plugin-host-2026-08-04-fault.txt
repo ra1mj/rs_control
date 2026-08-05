@@ -1,0 +1,17 @@
+command=platform/ros2-humble/navigation-deployment/tests/motor-disabled-e2e.sh fault BRIDGE HARNESS
+result=passed
+motor_output=forbidden
+typed_stop=PeerUnavailable
+rust_harness_remained_alive=true
+stop_latency_observed_ms=6
+stop_latency_limit_ms=100
+nav2_process_fault_result=passed
+nav2_process_fault_proposal_age_us=101473
+nav2_process_fault_observed_ms=167
+nav2_process_fault_rust_processes_remained_alive=true
+localization_fault_result=passed
+localization_action_terminal=Failed
+localization_result_code=3
+localization_stop=ProposalExpired
+localization_proposal_age_us=101357
+localization_rust_harness_remained_alive=true

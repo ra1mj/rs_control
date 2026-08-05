@@ -1,0 +1,9 @@
+[Unit]
+Description=Motor-disabled rs_control and chassis_nav integration
+Requires=rs-control-navigation-harness.service rs-control-navigation-nav2.service rs-control-navigation-bridge.service
+BindsTo=rs-control-navigation-harness.service rs-control-navigation-nav2.service rs-control-navigation-bridge.service
+After=rs-control-navigation-harness.service rs-control-navigation-nav2.service rs-control-navigation-bridge.service
+StopWhenUnneeded=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,8 @@
+[Unit]
+Description=rs_control motor-disabled navigation accounting boundary
+
+[Slice]
+CPUAccounting=yes
+MemoryAccounting=yes
+TasksAccounting=yes
+IOAccounting=yes

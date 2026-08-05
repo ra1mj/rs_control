@@ -1,8 +1,10 @@
 //! Sole conversion and validation owner between semantic and Protobuf messages.
 
 mod mapping;
+mod navigation;
 
 pub use mapping::*;
+pub use navigation::*;
 
 use message_model::{
     AcquisitionTimestamp, AsciiId, ClockState, ClockStatus, CommandEnvelope, CommandEnvelopeFields,

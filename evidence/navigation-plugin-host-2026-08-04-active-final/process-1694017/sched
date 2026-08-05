@@ -1,0 +1,32 @@
+bash (1694017, #threads: 1)
+-------------------------------------------------------------------
+se.exec_start                                :     531995966.807944
+se.vruntime                                  :      10810241.754728
+se.sum_exec_runtime                          :             4.169831
+se.nr_migrations                             :                    3
+nr_switches                                  :                    4
+nr_voluntary_switches                        :                    3
+nr_involuntary_switches                      :                    1
+se.load.weight                               :              1048576
+se.avg.load_sum                              :                43941
+se.avg.runnable_sum                          :             23662970
+se.avg.util_sum                              :             23662970
+se.avg.load_avg                              :                  951
+se.avg.runnable_avg                          :                  500
+se.avg.util_avg                              :                  500
+se.avg.last_update_time                      :      531976074860544
+se.avg.util_est                              :                  514
+uclamp.min                                   :                    0
+uclamp.max                                   :                 1024
+effective uclamp.min                         :                    0
+effective uclamp.max                         :                 1024
+policy                                       :                    0
+prio                                         :                  120
+se.slice                                     :              2800000
+clock-delta                                  :                   13
+mm->numa_scan_seq                            :                    0
+numa_pages_migrated                          :                    0
+numa_preferred_nid                           :                   -1
+total_numa_faults                            :                    0
+current_node=0, numa_group_id=0
+numa_faults node=0 task_private=0 task_shared=0 group_private=0 group_shared=0

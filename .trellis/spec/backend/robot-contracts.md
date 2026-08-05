@@ -625,6 +625,11 @@ The checked-in profile lives at
   SHA-256, pre-decode byte limit, rate/freshness/queue bounds, ROS name/type and
   interface-source SHA-256, explicit QoS, clock/frame policy, authorization and
   loop-suppression origin.
+- A cross-repository runtime manifest is byte-identical in every owner and all
+  digest-bound launch assets are checked into the integration package that
+  installs them (or come from an immutable system source). Validation from a
+  dirty sibling worktree is not provenance; contract tests must still resolve
+  the complete asset set from a clean checkout.
 - The runtime descriptor identity is SHA-256 over
   `proto_generated::FILE_DESCRIPTOR_SET`. The Buf-produced
   `proto/golden/robot-v1.binpb` is the breaking-change baseline; the two
@@ -639,9 +644,14 @@ The checked-in profile lives at
 - A ROS command needs an existing local lease. ROS time checks observation age
   only; local monotonic reception constructs a deadline capped by both route
   TTL and lease expiration.
-- Actions register exact goal/feedback/result Protobuf type names, preserve the
-  16-byte command ID as the ROS UUID, distinguish cancel acceptance from
-  terminal cancellation, and declare bounded feedback/result retention.
+- Actions register exact goal/feedback/result Protobuf type names, distinguish
+  cancel acceptance from terminal cancellation, and declare bounded feedback/
+  result retention. When the ROS client API accepts a caller UUID, the
+  16-byte command ID remains that UUID. When the pinned client generates its
+  own UUID internally (including `rclrs 0.7`), the adapter retains one bounded
+  canonical-command-ID to returned-ROS-UUID binding and validates both sides
+  for feedback, cancellation and terminal results; it never assumes the two
+  byte sequences are equal.
 - ROS, DDS, Zenoh and ros2dds runtime dependencies stay out of
   `protocol_module`; `ros2-mapping` remains an `integration` crate.
 - The checked-in profile pins `zenoh_version`, `ros2dds_version`,
@@ -656,6 +666,9 @@ The checked-in profile lives at
 - External readiness is transport evidence, not command authority. A ready
   route with `local_lease_required` returns `LocalValidationRequired`; only the
   existing local lease and local monotonic deadline path may admit execution.
+  Action discovery alone is not readiness for lifecycle-managed servers. A
+  supervisor may release at most one bounded pending goal only after the
+  action is discoverable and every required lifecycle node reports `active`.
 
 ### 4. Validation & Error Matrix
 
@@ -674,6 +687,8 @@ The checked-in profile lives at
 | Stale/future ROS command stamp | ingress projection | reject observation |
 | Missing/expired lease or zero TTL bound | `CommandEnvelope::from_bridge_ingress` | reject; cap nonzero requested TTL to route maximum |
 | Unknown action/cancel/status enum | `contract-codec` | `CodecError::UnknownEnum` |
+| Feedback/result ROS UUID does not match the active bounded binding | action adapter | reject the event; retain no inferred correlation |
+| Action is discoverable while a required lifecycle node is inactive | supervisor/readiness gate | keep admission closed and retain at most one bounded pending goal |
 | Zero/non-increasing supervisor epoch or evidence from another epoch | `RuntimeGate` | typed epoch error; no report/admission |
 | Ready adapter omits or mismatches profile/descriptor/manifest/bridge identity | `RuntimeGate` | `MissingIdentity` / field-specific `IdentityMismatch` |
 | Adapter, native Zenoh, ROS graph or required ros2dds path is not ready | `RuntimeGate` | route admission is `Closed` with the exact path failure |
@@ -692,8 +707,10 @@ The checked-in profile lives at
 - Bad: infer ROS names from Zenoh keys, put route/QoS fields in robot YAML,
   accept `KEEP_ALL`, copy source monotonic time into a ROS stamp, mint a lease
   from a ROS publisher, load ros2dds into the native router, or emulate
-  `rmw_zenoh` private keys. Never retain readiness across an adapter restart or
-  treat bridge availability as an authority grant.
+  `rmw_zenoh` private keys. Never assume a client-generated ROS UUID equals a
+  canonical command ID, retain readiness across an adapter restart, use action
+  discovery as lifecycle readiness, or treat bridge availability as an
+  authority grant.
 
 ### 6. Tests Required
 
@@ -710,6 +727,10 @@ The checked-in profile lives at
 - Assert IMU unavailable/unknown sentinels, required acquisition/drop behavior,
   frame aliases, UUID correlation, cancel lifecycle/result retention and local
   lease/deadline capping.
+- For a client-generated action UUID, assert the exact bounded canonical/ROS
+  binding, rejection of a mismatched result UUID and release only after the
+  correlated terminal result. Assert that action discovery before lifecycle
+  activation sends no pending goal.
 - Assert exact sensor/command/service/action route policies and exact bridge
   identity pins. Mutate every identity dimension and external component state;
   prove restart invalidation, fail-closed admission, action cancel acceptance
@@ -763,4 +784,22 @@ match gate.admission(report, command_route) {
     RouteAdmission::Available => unreachable!("command routes require local authority"),
     RouteAdmission::Closed(reason) => fail_closed(reason),
 }
+```
+
+#### Wrong action readiness/correlation
+
+```rust
+wait_until_action_is_listed();
+assert_eq!(ros_goal_uuid, canonical_command_id);
+send_goal_before_lifecycle_activation();
+```
+
+#### Correct action readiness/correlation
+
+```rust
+wait_until_action_and_required_lifecycle_nodes_are_active()?;
+let requested = action_client.try_request_goal(pending_goal)?;
+let ros_goal_uuid = requested.goal_id().0;
+active_binding.bind(canonical_command_id, ros_goal_uuid)?;
+let goal_client = requested.await.ok_or(ActionError::Rejected)?;
 ```

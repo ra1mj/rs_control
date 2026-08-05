@@ -1,0 +1,26 @@
+[package]
+name = "rs-navigation-e2e"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+arrayvec.workspace = true
+chassis-mecanum.workspace = true
+chassis-model.workspace = true
+clap.workspace = true
+control-core.workspace = true
+contract-codec = { version = "0.1.0", path = "../../crates/protocol_module/contract-codec", default-features = false }
+message-model.workspace = true
+middleware-api.workspace = true
+navigation-ipc.workspace = true
+navigation-plugin-config.workspace = true
+rustix.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+allocation-counter.workspace = true
+
+[lints]
+workspace = true

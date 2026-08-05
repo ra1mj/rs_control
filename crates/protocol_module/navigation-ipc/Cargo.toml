@@ -1,0 +1,23 @@
+[package]
+name = "navigation-ipc"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+arrayvec.workspace = true
+bytemuck.workspace = true
+contract-codec = { version = "0.1.0", path = "../contract-codec", default-features = false }
+message-model.workspace = true
+middleware-api.workspace = true
+middleware-shm.workspace = true
+rustix.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+allocation-counter.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

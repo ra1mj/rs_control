@@ -1,0 +1,40 @@
+[package]
+name = "rs-navigation-bridge"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.92"
+publish = false
+
+[dependencies]
+clap = { version = "4.6.4", features = ["derive"] }
+builtin_interfaces = { path = "@ROS_PREFIX@/share/builtin_interfaces/rust" }
+contract-codec = { path = "@RS_CONTROL_ROOT@/crates/protocol_module/contract-codec", default-features = false }
+futures = "0.3.32"
+geometry_msgs = { path = "@ROS_PREFIX@/share/geometry_msgs/rust" }
+message-model = { path = "@RS_CONTROL_ROOT@/crates/protocol_module/message-model" }
+middleware-api = { path = "@RS_CONTROL_ROOT@/crates/protocol_module/middleware-api" }
+nav2_msgs = { path = "@ROS_PREFIX@/share/nav2_msgs/rust" }
+nav_msgs = { path = "@ROS_PREFIX@/share/nav_msgs/rust" }
+navigation-ipc = { path = "@RS_CONTROL_ROOT@/crates/protocol_module/navigation-ipc" }
+navigation-plugin-config = { path = "@RS_CONTROL_ROOT@/crates/integration/navigation-plugin-config" }
+rclrs = "=0.7.0"
+rustix = { version = "=1.1.4", default-features = false, features = ["time"] }
+std_msgs = { path = "@ROS_PREFIX@/share/std_msgs/rust" }
+tf2_msgs = { path = "@ROS_PREFIX@/share/tf2_msgs/rust" }
+thiserror = "2.0.19"
+
+[patch.crates-io]
+action_msgs = { path = "@ROS_PREFIX@/share/action_msgs/rust" }
+builtin_interfaces = { path = "@ROS_PREFIX@/share/builtin_interfaces/rust" }
+geometry_msgs = { path = "@ROS_PREFIX@/share/geometry_msgs/rust" }
+nav_msgs = { path = "@ROS_PREFIX@/share/nav_msgs/rust" }
+std_msgs = { path = "@ROS_PREFIX@/share/std_msgs/rust" }
+tf2_msgs = { path = "@ROS_PREFIX@/share/tf2_msgs/rust" }
+unique_identifier_msgs = { path = "@ROS_PREFIX@/share/unique_identifier_msgs/rust" }
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+panic = "abort"
+
+[workspace]

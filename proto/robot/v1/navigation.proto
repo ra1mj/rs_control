@@ -3,6 +3,7 @@ syntax = "proto3";
 package robot.v1;
 
 import "robot/v1/common.proto";
+import "robot/v1/control.proto";
 
 // Canonical 3D odometry estimate with explicit frame ownership.
 message OdometryState {
@@ -42,4 +43,116 @@ message StampedTransform {
 message TransformBatch {
   // Transforms with one common static/dynamic route class.
   repeated StampedTransform transforms = 1;
+}
+
+// Exact map artifact and frame identity used by a navigation action.
+message NavigationMapIdentity {
+  // Stable commissioned/synthetic map ID.
+  string map_id = 1;
+  // Stable map version.
+  string version = 2;
+  // Exactly 32 non-zero SHA-256 bytes for the bound map artifact.
+  bytes artifact_sha256 = 3;
+  // Canonical goal/map frame.
+  string frame_id = 4;
+}
+
+// Concrete payload for the navigate_to_pose_v1 action.
+message NavigateToPoseGoal {
+  // Exact active map identity.
+  NavigationMapIdentity map = 1;
+  // Target pose in map.frame_id, SI units.
+  Pose3 target = 2;
+  // Allowlisted behavior-tree identity, never a filesystem path.
+  string behavior_tree_id = 3;
+}
+
+// Concrete feedback payload for the navigate_to_pose_v1 action.
+message NavigateToPoseFeedback {
+  // Current pose in the goal map frame.
+  Pose3 current_pose = 1;
+  // Elapsed navigation time in nanoseconds.
+  uint64 navigation_time_ns = 2;
+  // Estimated remaining time in nanoseconds.
+  optional uint64 estimated_time_remaining_ns = 3;
+  // Recovery count observed for this goal.
+  uint32 recoveries = 4;
+  // Nonnegative remaining distance in metres.
+  double distance_remaining_m = 5;
+}
+
+// Concrete terminal payload for the navigate_to_pose_v1 action.
+message NavigateToPoseResult {
+  // Exact map used by the action.
+  NavigationMapIdentity map = 1;
+  // Last correlated pose evidence.
+  Pose3 final_pose = 2;
+  // Total navigation time in nanoseconds.
+  uint64 navigation_time_ns = 3;
+  // Total recovery count.
+  uint32 recoveries = 4;
+}
+
+// Why the isolated bridge has no current authority assertion.
+enum NavigationAuthorityUnavailable {
+  NAVIGATION_AUTHORITY_UNAVAILABLE_UNSPECIFIED = 0;
+  NAVIGATION_AUTHORITY_UNAVAILABLE_NO_LEASE = 1;
+  NAVIGATION_AUTHORITY_UNAVAILABLE_LEASE_EXPIRED = 2;
+  NAVIGATION_AUTHORITY_UNAVAILABLE_MISSION_INACTIVE = 3;
+  NAVIGATION_AUTHORITY_UNAVAILABLE_PLUGIN_UNAVAILABLE = 4;
+}
+
+// Ordered bridge-visible authority state; receipt never grants a lease.
+message NavigationAuthorityState {
+  // Source, boot, sequence and freshness metadata.
+  Header header = 1;
+  // Existing locally issued lease, absent when unavailable.
+  ResourceLease lease = 2;
+  // Exactly 16 bytes when a navigation action is active; otherwise empty.
+  bytes active_command_id = 3;
+  // Required only when lease is absent; zero is always rejected.
+  NavigationAuthorityUnavailable unavailable = 4;
+}
+
+// Lifecycle of the isolated ROS navigation bridge.
+enum NavigationComponentState {
+  NAVIGATION_COMPONENT_STATE_UNSPECIFIED = 0;
+  NAVIGATION_COMPONENT_STATE_STOPPED = 1;
+  NAVIGATION_COMPONENT_STATE_STARTING = 2;
+  NAVIGATION_COMPONENT_STATE_READY = 3;
+  NAVIGATION_COMPONENT_STATE_FAILED = 4;
+}
+
+// Exact non-authority readiness gates.
+message NavigationReadiness {
+  bool manifest = 1;
+  bool action_server = 2;
+  bool nav2_lifecycle = 3;
+  bool map = 4;
+  bool localization = 5;
+  bool ipc = 6;
+}
+
+// Saturating navigation bridge counters.
+message NavigationCounters {
+  uint64 accepted_proposals = 1;
+  uint64 authority_rejections = 2;
+  uint64 freshness_rejections = 3;
+  uint64 overwritten_proposals = 4;
+  uint64 accepted_goals = 5;
+  uint64 terminal_results = 6;
+}
+
+// Bounded bridge readiness and diagnostic snapshot.
+message NavigationHealth {
+  Header header = 1;
+  // Supervisor-owned nonzero process epoch.
+  uint64 process_epoch = 2;
+  // Exactly 32 non-zero bytes for the shared plugin manifest.
+  bytes manifest_sha256 = 3;
+  NavigationComponentState component_state = 4;
+  NavigationReadiness readiness = 5;
+  // Nonzero typed fault codes; bounded by the semantic contract.
+  repeated uint32 fault_codes = 6;
+  NavigationCounters counters = 7;
 }

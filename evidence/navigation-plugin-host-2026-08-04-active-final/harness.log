@@ -1,0 +1,3 @@
+motor_output=forbidden can_transmit=forbidden process_epoch=301 command_id=[2d, 01, 00, 00, 00, 00, 00, 00, aa, d8, 19, 00, 66, 66, 66, 66]
+proposal=Accepted motor_output=forbidden
+terminal command_id=[2d, 01, 00, 00, 00, 00, 00, 00, aa, d8, 19, 00, 66, 66, 66, 66] status=Succeeded code=0

@@ -1,0 +1,105 @@
+schema_version: 1
+plugin_id: chassis_nav.rs_control.navigation
+profile_id: motor_disabled_host_v1
+
+compatibility:
+  ros_distribution: humble
+  rmw_implementation: rmw_fastrtps_cpp
+  rclrs_version: 0.7.0
+  nav2_msgs_version: 1.1.20
+  geometry_msgs_version: 4.9.1
+  nav_msgs_version: 4.9.1
+  tf2_msgs_version: 0.25.20
+  protobuf_descriptor_sha256: 757f3637560ad9e1e5c5ad51fdf519fab09ae00ff6a38bb2e3e96d27ab4fc44e
+
+interfaces:
+  navigate_to_pose:
+    ros_type: nav2_msgs/action/NavigateToPose
+    source_sha256: 230afba4c69ab8ae9f680c257aad7b55353ab40dbc027614c51b763f153b18a0
+  controller_proposal:
+    ros_type: geometry_msgs/msg/Twist
+    source_sha256: ed471ef861f65af991b1f64d66ef941dd41dd4c0702f6222512b1a16c62d58b0
+  odometry:
+    ros_type: nav_msgs/msg/Odometry
+  dynamic_tf:
+    ros_type: tf2_msgs/msg/TFMessage
+
+endpoints:
+  navigate_to_pose_action: /navigate_to_pose
+  controller_proposal_topic: /rs_control/navigation/controller_proposal
+  odometry_topic: /rs_control/navigation/odometry
+  dynamic_tf_topic: /tf
+
+frames:
+  map: map
+  odom: odom
+  base: base_link
+  tf_authorities:
+    - parent: map
+      child: odom
+      writer: rs-navigation-e2e
+    - parent: odom
+      child: base_link
+      writer: rs-navigation-e2e
+
+map:
+  id: warehouse_sim_map
+  version: 0.1.0
+  manifest_sha256: 3d0ad97aeb90b265a62218294683b8cfd122f178044319c38b9c880f9e39428e
+  occupancy_yaml_sha256: e5db21f00541a9cfe72005bc35f1499b1902ee3c714c7c022580e459a0185ec7
+  occupancy_image_sha256: 53dd292662261465d2c26dffb323506f02b0cef705ac1d6c208a7ba015c1c13c
+
+nav2_assets:
+  base_parameters_sha256: 149e0c520d8aa3a617d9b8d38fe012db764e2f88a8009737d946d3c4fc09a9ff
+  tuning_parameters_sha256: dbfd5cd89c6ebc4b06808d9a863e7966673e9efe59eea4b094ef2a47f8ae07e8
+  integration_parameters_sha256: 2db3f15e28d69a7dd47e49a8625599995bcf205aa19c84a4989d2af7fc9b31c2
+  navigate_to_pose_bt_sha256: 0285c9eea5191082610970578747f6cac5a69a4ae39d2d838a3c8cfe11fbc5c8
+  navigate_through_poses_bt_sha256: 2ea8c69e25febb22b383350b37258e11940b97e304a71d338c14342013e963f4
+
+ipc:
+  namespace: rs_control.navigation.motor_disabled.v1
+  channels:
+    authority:
+      layout_id: rs-nav-auth-v001
+      mode: ordered
+      capacity: 8
+      freshness_ms: 100
+    action_request:
+      layout_id: rs-nav-act-req01
+      mode: ordered
+      capacity: 8
+      freshness_ms: 1000
+    action_response:
+      layout_id: rs-nav-act-rsp01
+      mode: ordered
+      capacity: 8
+      freshness_ms: 1000
+    controller_proposal:
+      layout_id: rs-nav-prop-v001
+      mode: latest
+      capacity: 3
+      freshness_ms: 100
+    odometry:
+      layout_id: rs-nav-odom-v001
+      mode: latest
+      capacity: 3
+      freshness_ms: 100
+    dynamic_tf:
+      layout_id: rs-nav-tf---v001
+      mode: latest
+      capacity: 3
+      freshness_ms: 100
+    health:
+      layout_id: rs-nav-health001
+      mode: latest
+      capacity: 3
+      freshness_ms: 500
+
+safety:
+  final_constraint_owner: rs_control
+  adapter_can_issue_leases: false
+  motor_output: forbidden
+  can_transmit: forbidden
+  simulation_only: true
+  approved_for_production: false
+  first_resource_run: measurement_only

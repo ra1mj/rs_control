@@ -1,0 +1,4 @@
+# Raw host evidence is byte-sealed by its adjacent SHA256SUMS manifest.
+evidence/navigation-plugin-host-2026-08-04-active-final/** -diff
+evidence/navigation-plugin-host-2026-08-04-ros2-launch-baseline/** -diff
+evidence/navigation-plugin-host-2026-08-04-localization-fault/** -diff

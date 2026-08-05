@@ -45,6 +45,10 @@ tools/ci.sh
 
 `tools/bufw` pins and verifies the Buf CLI for Linux x86_64 and aarch64. Prost uses a vendored `protoc`, so Rust schema generation does not depend on a host installation.
 
+The motor-disabled `chassis_nav` integration, isolated ROS 2 bridge and host
+qualification boundary are documented in
+[docs/navigation-plugin.md](docs/navigation-plugin.md).
+
 The first hardware target is Orange Pi 5 Plus/RK3588 with Ubuntu 22.04 and the
 pinned Rockchip 5.10 PREEMPT_RT baseline. See the
 [platform runbooks](platform/orangepi5plus/README.md) for the guarded build,

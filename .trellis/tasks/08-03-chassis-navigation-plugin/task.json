@@ -1,0 +1,29 @@
+{
+  "id": "chassis-navigation-plugin",
+  "name": "chassis-navigation-plugin",
+  "title": "Integrate chassis navigation plugin",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "mj",
+  "assignee": "mj",
+  "createdAt": "2026-08-03",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "07-29-rust-robot-framework",
+  "relatedFiles": [],
+  "notes": "Host motor-disabled software implementation and validation complete on 2026-08-05; task remains active only for production map/sensors, AArch64 timing, privileged cgroup, and physical-motion qualification.",
+  "meta": {
+    "hostSoftwareComplete": true,
+    "hardwareQualificationPending": true
+  }
+}

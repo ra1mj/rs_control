@@ -1,0 +1,151 @@
+valid schema_version=1 plugin_id=chassis_nav.rs_control.navigation profile_id=motor_disabled_host_v1 sha256=ec8784456ae3bb285d888ad57206af8a36926543e6f559ca65f1c85f8dfad1f7
+[INFO] [1785911206.756514103] [controller_server]: 
+	controller_server lifecycle node launched. 
+	Waiting on external lifecycle transitions to activate
+	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[INFO] [1785911206.758502943] [controller_server]: Creating controller server
+[INFO] [1785911206.759048206] [lifecycle_manager_navigation]: Creating
+[INFO] [1785911206.760641539] [lifecycle_manager_navigation]: [34m[1mCreating and initializing lifecycle service clients[0m[0m
+[INFO] [1785911206.763751633] [planner_server]: 
+	planner_server lifecycle node launched. 
+	Waiting on external lifecycle transitions to activate
+	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[INFO] [1785911206.764310937] [local_costmap.local_costmap]: 
+	local_costmap lifecycle node launched. 
+	Waiting on external lifecycle transitions to activate
+	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[INFO] [1785911206.764574290] [planner_server]: Creating
+[INFO] [1785911206.764755277] [local_costmap.local_costmap]: Creating Costmap
+[INFO] [1785911206.765182313] [bt_navigator]: 
+	bt_navigator lifecycle node launched. 
+	Waiting on external lifecycle transitions to activate
+	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[INFO] [1785911206.765239946] [bt_navigator]: Creating
+[INFO] [1785911206.766953175] [global_costmap.global_costmap]: 
+	global_costmap lifecycle node launched. 
+	Waiting on external lifecycle transitions to activate
+	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[INFO] [1785911206.767184591] [global_costmap.global_costmap]: Creating Costmap
+[INFO] [1785911206.769273820] [map_server]: 
+	map_server lifecycle node launched. 
+	Waiting on external lifecycle transitions to activate
+	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[INFO] [1785911206.769370399] [map_server]: Creating
+[INFO] [1785911206.769418482] [lifecycle_manager_navigation]: [34m[1mStarting managed nodes bringup...[0m[0m
+[INFO] [1785911206.769451057] [lifecycle_manager_navigation]: [34m[1mConfiguring map_server[0m[0m
+[INFO] [1785911206.769614084] [map_server]: Configuring
+[INFO] [1785911206.769655021] [map_io]: Loading yaml file: /home/mj/workspaces/qi/chassis_nav/src/chassis_nav_mecanum_sim/assets/localization_map/warehouse_sim_map/0.1.0/maps/occupancy.yaml
+[INFO] [1785911206.769850038] [map_io]: resolution: 0.05
+[INFO] [1785911206.769857580] [map_io]: origin[0]: -7
+[INFO] [1785911206.769863181] [map_io]: origin[1]: -10.5
+[INFO] [1785911206.769867650] [map_io]: origin[2]: 0
+[INFO] [1785911206.769872228] [map_io]: free_thresh: 0.196
+[INFO] [1785911206.769876814] [map_io]: occupied_thresh: 0.65
+[INFO] [1785911206.769881483] [map_io]: mode: trinary
+[INFO] [1785911206.769886447] [map_io]: negate: 0
+[INFO] [1785911206.770039031] [map_io]: Loading image_file: /home/mj/workspaces/qi/chassis_nav/src/chassis_nav_mecanum_sim/assets/localization_map/warehouse_sim_map/0.1.0/maps/occupancy.pgm
+[INFO] [1785911206.777586397] [map_io]: Read map /home/mj/workspaces/qi/chassis_nav/src/chassis_nav_mecanum_sim/assets/localization_map/warehouse_sim_map/0.1.0/maps/occupancy.pgm: 423 X 286 map @ 0.05 m/cell
+[INFO] [1785911206.779990703] [lifecycle_manager_navigation]: [34m[1mConfiguring controller_server[0m[0m
+[INFO] [1785911206.780113522] [controller_server]: Configuring controller interface
+[INFO] [1785911206.780199627] [controller_server]: getting goal checker plugins..
+[INFO] [1785911206.780238184] [controller_server]: Controller frequency set to 20.0000Hz
+[INFO] [1785911206.780261806] [local_costmap.local_costmap]: Configuring
+[INFO] [1785911206.782789991] [local_costmap.local_costmap]: Using plugin "obstacle_layer"
+[INFO] [1785911206.785018340] [local_costmap.local_costmap]: Subscribed to Topics: tracker_cloud
+[INFO] [1785911206.786472802] [local_costmap.local_costmap]: Initialized plugin "obstacle_layer"
+[INFO] [1785911206.786504499] [local_costmap.local_costmap]: Using plugin "inflation_layer"
+[INFO] [1785911206.786924276] [local_costmap.local_costmap]: Initialized plugin "inflation_layer"
+[INFO] [1785911206.790780795] [controller_server]: Created progress_checker : progress_checker of type nav2_controller::SimpleProgressChecker
+[INFO] [1785911206.790996373] [controller_server]: Created goal checker : general_goal_checker of type nav2_controller::SimpleGoalChecker
+[INFO] [1785911206.791058149] [controller_server]: Controller Server has general_goal_checker  goal checkers available.
+[INFO] [1785911206.791489398] [controller_server]: Created controller : FollowPath of type nav2_mppi_controller::MPPIController
+[INFO] [1785911206.791706475] [controller_server]: Controller period is equal to model dt. Control sequence shifting is ON
+[INFO] [1785911206.792175601] [controller_server]: ConstraintCritic instantiated with 1 power and 4.000000 weight.
+[INFO] [1785911206.792186955] [controller_server]: Critic loaded : mppi::critics::ConstraintCritic
+[INFO] [1785911206.792285256] [controller_server]: InflationCostCritic instantiated with 1 power and 300.000000 / 0.023622 weights. Critic will collision check based on footprint cost.
+[INFO] [1785911206.792290799] [controller_server]: Critic loaded : mppi::critics::CostCritic
+[INFO] [1785911206.792337589] [controller_server]: GoalCritic instantiated with 1 power and 5.000000 weight.
+[INFO] [1785911206.792340717] [controller_server]: Critic loaded : mppi::critics::GoalCritic
+[INFO] [1785911206.792384403] [controller_server]: GoalAngleCritic instantiated with 1 power, 3.000000 weight, and 0.500000 angular threshold.
+[INFO] [1785911206.792387949] [controller_server]: Critic loaded : mppi::critics::GoalAngleCritic
+[INFO] [1785911206.792479025] [controller_server]: ReferenceTrajectoryCritic instantiated with 1 power and 14.000000 weight
+[INFO] [1785911206.792482084] [controller_server]: Critic loaded : mppi::critics::PathAlignCritic
+[INFO] [1785911206.792536887] [controller_server]: Critic loaded : mppi::critics::PathFollowCritic
+[INFO] [1785911206.792571490] [controller_server]: TwirlingCritic instantiated with 1 power and 10.000000 weight.
+[INFO] [1785911206.792574442] [controller_server]: Critic loaded : mppi::critics::TwirlingCritic
+[INFO] [1785911206.793242598] [controller_server]: Optimizer reset
+[INFO] [1785911206.794029853] [MPPIController]: Configured MPPI Controller: FollowPath
+[INFO] [1785911206.794038340] [controller_server]: Controller Server has FollowPath  controllers available.
+[INFO] [1785911206.795621403] [lifecycle_manager_navigation]: [34m[1mConfiguring planner_server[0m[0m
+[INFO] [1785911206.795729923] [planner_server]: Configuring
+[INFO] [1785911206.795749740] [global_costmap.global_costmap]: Configuring
+[INFO] [1785911206.798405265] [global_costmap.global_costmap]: Using plugin "static_layer"
+[INFO] [1785911206.800533300] [global_costmap.global_costmap]: Subscribing to the map topic (/map) with transient local durability
+[INFO] [1785911206.801221517] [global_costmap.global_costmap]: Subscribing to updates
+[INFO] [1785911206.802080602] [global_costmap.global_costmap]: Initialized plugin "static_layer"
+[INFO] [1785911206.802093969] [global_costmap.global_costmap]: Using plugin "obstacle_layer"
+[INFO] [1785911206.802267321] [global_costmap.global_costmap]: Subscribed to Topics: tracker_cloud
+[INFO] [1785911206.803321238] [global_costmap.global_costmap]: Initialized plugin "obstacle_layer"
+[INFO] [1785911206.803340082] [global_costmap.global_costmap]: Using plugin "inflation_layer"
+[INFO] [1785911206.803778902] [global_costmap.global_costmap]: Initialized plugin "inflation_layer"
+[INFO] [1785911206.810574707] [planner_server]: Created global planner plugin GridBased of type nav2_smac_planner/SmacPlanner2D
+[INFO] [1785911206.810623242] [planner_server]: Configuring GridBased of type SmacPlanner2D
+[INFO] [1785911206.811194864] [planner_server]: Configured plugin GridBased of type SmacPlanner2D with tolerance 0.10, maximum iterations 500000, max on approach iterations 1000, and not allowing unknown traversal.
+[INFO] [1785911206.811219382] [planner_server]: Planner Server has GridBased  planners available.
+[INFO] [1785911206.813181954] [lifecycle_manager_navigation]: [34m[1mConfiguring bt_navigator[0m[0m
+[INFO] [1785911206.813427246] [bt_navigator]: Configuring
+[INFO] [1785911206.826367925] [lifecycle_manager_navigation]: [34m[1mActivating map_server[0m[0m
+[INFO] [1785911206.826470275] [map_server]: Activating
+[INFO] [1785911206.826690758] [map_server]: Creating bond (map_server) to lifecycle manager.
+[INFO] [1785911206.938106433] [lifecycle_manager_navigation]: Server map_server connected with bond.
+[INFO] [1785911206.938142463] [lifecycle_manager_navigation]: [34m[1mActivating controller_server[0m[0m
+[INFO] [1785911206.938271462] [controller_server]: Activating
+[INFO] [1785911206.938305262] [local_costmap.local_costmap]: Activating
+[INFO] [1785911206.938318958] [local_costmap.local_costmap]: Checking transform
+[INFO] [1785911206.938387459] [local_costmap.local_costmap]: start
+[INFO] [1785911207.042334361] [global_costmap.global_costmap]: StaticLayer: Resizing costmap to 423 X 286 at 0.050000 m/pix
+[WARN] [1785911207.088922510] [controller_server]: Parameter controller_server.verbose not found
+[INFO] [1785911207.089672306] [controller_server]: Optimizer reset
+[INFO] [1785911207.089765359] [MPPIController]: Activated MPPI Controller: FollowPath
+[INFO] [1785911207.089779807] [controller_server]: Creating bond (controller_server) to lifecycle manager.
+[INFO] [1785911207.201519465] [lifecycle_manager_navigation]: Server controller_server connected with bond.
+[INFO] [1785911207.201561209] [lifecycle_manager_navigation]: [34m[1mActivating planner_server[0m[0m
+[INFO] [1785911207.202002551] [planner_server]: Activating
+[INFO] [1785911207.202037702] [global_costmap.global_costmap]: Activating
+[INFO] [1785911207.202045243] [global_costmap.global_costmap]: Checking transform
+[INFO] [1785911207.202123685] [global_costmap.global_costmap]: start
+[INFO] [1785911207.452572941] [planner_server]: Activating plugin GridBased of type SmacPlanner2D
+[INFO] [1785911207.453013530] [planner_server]: Creating bond (planner_server) to lifecycle manager.
+[INFO] [1785911207.554415572] [lifecycle_manager_navigation]: Server planner_server connected with bond.
+[INFO] [1785911207.554502771] [lifecycle_manager_navigation]: [34m[1mActivating bt_navigator[0m[0m
+[INFO] [1785911207.554699195] [bt_navigator]: Activating
+[INFO] [1785911207.557710475] [bt_navigator]: Creating bond (bt_navigator) to lifecycle manager.
+[INFO] [1785911207.668847058] [lifecycle_manager_navigation]: Server bt_navigator connected with bond.
+[INFO] [1785911207.668905066] [lifecycle_manager_navigation]: [34m[1mManaged nodes are active[0m[0m
+[INFO] [1785911207.668912130] [lifecycle_manager_navigation]: [34m[1mCreating bond timer...[0m[0m
+[INFO] [1785911207.816809544] [bt_navigator]: Begin navigating from current location (1.50, -1.50) to (1.50, -3.00)
+[INFO] [1785911207.837356116] [controller_server]: Received a goal, begin computing control effort.
+[WARN] [1785911207.837399086] [controller_server]: No goal checker was specified in parameter 'current_goal_checker'. Server will use only plugin loaded general_goal_checker . This warning will appear once.
+[INFO] [1785911207.838188126] [controller_server]: Optimizer reset
+[INFO] [1785911208.887487067] [controller_server]: Passing new path to controller.
+[INFO] [1785911209.937489562] [controller_server]: Passing new path to controller.
+[INFO] [1785911210.937507560] [controller_server]: Passing new path to controller.
+[INFO] [1785911211.987488320] [controller_server]: Passing new path to controller.
+[INFO] [1785911212.987486582] [controller_server]: Passing new path to controller.
+[WARN] [1785911213.338812089] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-1.00, -5.05) to (3.98, -0.07). The costmap cannot raytrace for it.
+[WARN] [1785911213.438957550] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-1.00, -5.05) to (3.98, -0.07). The costmap cannot raytrace for it.
+[WARN] [1785911213.538970664] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-1.00, -5.05) to (3.98, -0.07). The costmap cannot raytrace for it.
+[WARN] [1785911213.638912797] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-1.00, -5.10) to (3.98, -0.12). The costmap cannot raytrace for it.
+[WARN] [1785911213.738921082] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-1.00, -5.10) to (3.98, -0.12). The costmap cannot raytrace for it.
+[WARN] [1785911213.838943221] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-1.00, -5.15) to (3.98, -0.17). The costmap cannot raytrace for it.
+[WARN] [1785911213.938920132] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-1.00, -5.15) to (3.98, -0.17). The costmap cannot raytrace for it.
+[INFO] [1785911214.037488425] [controller_server]: Passing new path to controller.
+[WARN] [1785911214.038978844] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-1.00, -5.15) to (3.98, -0.17). The costmap cannot raytrace for it.
+[WARN] [1785911214.138937444] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-1.00, -5.20) to (3.98, -0.22). The costmap cannot raytrace for it.
+[WARN] [1785911214.238965332] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-1.00, -5.20) to (3.98, -0.22). The costmap cannot raytrace for it.
+[WARN] [1785911214.338900618] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-1.00, -5.25) to (3.98, -0.27). The costmap cannot raytrace for it.
+[WARN] [1785911214.438911790] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-1.00, -5.25) to (3.98, -0.27). The costmap cannot raytrace for it.
+[WARN] [1785911214.538897511] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-1.00, -5.25) to (3.98, -0.27). The costmap cannot raytrace for it.
+[INFO] [1785911214.638347789] [controller_server]: Reached the goal!
+[WARN] [1785911214.638894710] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-1.00, -5.30) to (3.98, -0.32). The costmap cannot raytrace for it.
+[INFO] [1785911214.677048212] [bt_navigator]: Goal succeeded

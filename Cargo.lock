@@ -1614,6 +1614,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "navigation-ipc"
+version = "0.1.0"
+dependencies = [
+ "allocation-counter",
+ "arrayvec",
+ "bytemuck",
+ "contract-codec",
+ "message-model",
+ "middleware-api",
+ "middleware-shm",
+ "rustix",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
+name = "navigation-plugin-config"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "proto-generated",
+ "serde",
+ "serde-saphyr",
+ "sha2",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "nb"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2303,6 +2332,25 @@ dependencies = [
  "sha2",
  "thiserror",
  "toml",
+]
+
+[[package]]
+name = "rs-navigation-e2e"
+version = "0.1.0"
+dependencies = [
+ "allocation-counter",
+ "arrayvec",
+ "chassis-mecanum",
+ "chassis-model",
+ "clap",
+ "contract-codec",
+ "control-core",
+ "message-model",
+ "middleware-api",
+ "navigation-ipc",
+ "navigation-plugin-config",
+ "rustix",
+ "thiserror",
 ]
 
 [[package]]

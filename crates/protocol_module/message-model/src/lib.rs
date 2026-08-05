@@ -6,11 +6,13 @@
 mod action;
 mod arm;
 mod messages;
+mod navigation;
 mod numeric;
 
 pub use action::*;
 pub use arm::*;
 pub use messages::*;
+pub use navigation::*;
 pub use numeric::*;
 
 use std::{fmt, str};
@@ -624,6 +626,12 @@ pub enum SemanticError {
     /// Quaternion norm was outside the accepted tolerance.
     #[error("quaternion must be unit length within the configured tolerance")]
     InvalidQuaternion,
+    /// A fixed-width digest or identity used the reserved all-zero sentinel.
+    #[error("field {field} cannot be all zero")]
+    AllZeroIdentity {
+        /// Rejected identity field.
+        field: &'static str,
+    },
     /// Covariance diagonal was negative.
     #[error("covariance diagonal at index {index} must be nonnegative")]
     NegativeCovarianceDiagonal {

@@ -5,10 +5,14 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
+[features]
+default = ["damiao"]
+damiao = ["dep:motor-damiao"]
+
 [dependencies]
 arrayvec.workspace = true
 message-model.workspace = true
-motor-damiao.workspace = true
+motor-damiao = { workspace = true, optional = true }
 prost.workspace = true
 proto-generated.workspace = true
 thiserror.workspace = true

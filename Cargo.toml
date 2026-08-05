@@ -1,11 +1,13 @@
 [workspace]
 members = [
     "apps/robotctl",
+    "apps/rs-navigation-e2e",
     "crates/integration/config-model",
     "crates/integration/cross-language-contract",
     "crates/integration/ros2-mapping",
     "crates/integration/test-support",
     "crates/integration/middleware-qualification",
+    "crates/integration/navigation-plugin-config",
     "crates/hardware_module/hardware-module-core",
     "crates/hardware_module/motor-damiao",
     "crates/hardware_module/transport-socketcan",
@@ -13,6 +15,7 @@ members = [
     "crates/protocol_module/message-model",
     "crates/protocol_module/middleware-api",
     "crates/protocol_module/middleware-local",
+    "crates/protocol_module/navigation-ipc",
     "crates/protocol_module/middleware-shm",
     "crates/protocol_module/middleware-zenoh",
     "crates/protocol_module/proto-generated",
@@ -42,8 +45,9 @@ license = "Apache-2.0"
 [workspace.dependencies]
 allocation-counter = "=0.8.1"
 arrayvec = "0.7.8"
-bytemuck = { version = "=1.25.2", features = ["derive"] }
+bytemuck = { version = "=1.25.2", features = ["derive", "min_const_generics"] }
 cargo_metadata = "0.23.1"
+chassis-mecanum = { version = "0.1.0", path = "crates/application_module/chassis-mecanum" }
 chassis-model = { version = "0.1.0", path = "crates/application_module/chassis-model" }
 clap = { version = "4.6.4", features = ["derive"] }
 config-model = { version = "0.1.0", path = "crates/integration/config-model" }
@@ -60,6 +64,8 @@ middleware-api = { version = "0.1.0", path = "crates/protocol_module/middleware-
 middleware-local = { version = "0.1.0", path = "crates/protocol_module/middleware-local" }
 middleware-shm = { version = "0.1.0", path = "crates/protocol_module/middleware-shm" }
 middleware-zenoh = { version = "0.1.0", path = "crates/protocol_module/middleware-zenoh" }
+navigation-ipc = { version = "0.1.0", path = "crates/protocol_module/navigation-ipc" }
+navigation-plugin-config = { version = "0.1.0", path = "crates/integration/navigation-plugin-config" }
 motor-damiao = { version = "0.1.0", path = "crates/hardware_module/motor-damiao" }
 prost = "0.14.4"
 prost-build = "0.14.4"

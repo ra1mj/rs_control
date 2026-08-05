@@ -1,0 +1,33 @@
+[Unit]
+Description=rs_control motor-disabled navigation authority and fake-output harness
+PartOf=rs-control-navigation.target
+Before=rs-control-navigation-nav2.service rs-control-navigation-bridge.service
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+Slice=rs-control-navigation.slice
+EnvironmentFile=/etc/rs-control/navigation.env
+RuntimeDirectory=rs-control-navigation
+RuntimeDirectoryMode=0700
+ExecStart=/bin/bash -lc 'exec "${RS_CONTROL_BIN}/rs-navigation-e2e" --manifest "${NAV_MANIFEST}" --expected-sha256 "${NAV_MANIFEST_SHA256}" run --ipc-root "${NAV_IPC_ROOT}" --process-epoch "$(date +%%s%%N)"'
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=5
+KillMode=control-group
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX
+ReadWritePaths=/run/rs-control-navigation
+
+[Install]
+WantedBy=rs-control-navigation.target

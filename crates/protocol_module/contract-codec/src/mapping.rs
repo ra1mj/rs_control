@@ -6,18 +6,23 @@ use message_model::{
     ActionGoalIntent, ActionName, ActionResult, ActionStatus, ArmAcceleration, ArmActuatorBinding,
     ArmActuatorOrder, ArmGroupIdentity, ArmJointDescriptor, ArmJointKind, ArmJointOrder,
     ArmPosition, ArmProfileId, ArmTrajectoryPoint, ArmVelocity, AsciiId, ChassisSetpoint,
-    ChassisSetpointIntent, ChassisTrajectoryPoint, ClockState, ClockStatus, CommandIntent,
-    CommandIntentFields, ComponentHealth, Covariance3, Covariance6, CovarianceStatus,
-    ExecuteArmTrajectoryFeedback, ExecuteArmTrajectoryGoal, ExecuteArmTrajectoryResult,
-    ExecuteChassisTrajectoryFeedback, ExecuteChassisTrajectoryGoal, ExecuteChassisTrajectoryResult,
-    Fault, FaultRecoverability, FaultSeverity, Header, HeaderFields, HealthSnapshotRequest,
-    HealthSnapshotResponse, Id128, ImuMeasurement, ImuState, JointState, JointStateAggregate,
-    KinematicGroupId, LifecycleState, MAX_COMPONENT_FAULTS, MAX_HEALTH_COMPONENTS, MAX_JOINTS,
-    MAX_TRAJECTORY_POINTS, MAX_TRANSFORMS, MotorState, MotorStateFields, OdometryState,
-    OdometryStateFields, Pose3, ProtobufTypeName, RegisteredPayload, ResourceId, RotaryMitSetpoint,
-    SemanticError, SourceId, StampedTransform, StampedTransformFields, TemperatureObservation,
-    TransformBatch, Twist2, Twist3, UnitQuaternion, Vector3,
+    ChassisSetpointIntent, ChassisTrajectoryPoint, CommandIntent, CommandIntentFields,
+    ComponentHealth, Covariance3, Covariance6, CovarianceStatus, ExecuteArmTrajectoryFeedback,
+    ExecuteArmTrajectoryGoal, ExecuteArmTrajectoryResult, ExecuteChassisTrajectoryFeedback,
+    ExecuteChassisTrajectoryGoal, ExecuteChassisTrajectoryResult, Fault, FaultRecoverability,
+    FaultSeverity, HealthSnapshotRequest, HealthSnapshotResponse, Id128, ImuMeasurement, ImuState,
+    JointState, JointStateAggregate, LifecycleState, MAX_COMPONENT_FAULTS, MAX_HEALTH_COMPONENTS,
+    MAX_JOINTS, MAX_TRAJECTORY_POINTS, MAX_TRANSFORMS, MotorState, MotorStateFields, OdometryState,
+    OdometryStateFields, Pose3, ProtobufTypeName, RegisteredPayload, StampedTransform,
+    StampedTransformFields, TemperatureObservation, TransformBatch, Twist2, Twist3, UnitQuaternion,
+    Vector3,
 };
+#[cfg(feature = "damiao")]
+use message_model::{
+    ClockState, ClockStatus, Header, HeaderFields, KinematicGroupId, ResourceId, RotaryMitSetpoint,
+    SemanticError, SourceId,
+};
+#[cfg(feature = "damiao")]
 use motor_damiao::{DamiaoFeedback, MitCommand, RuntimeLimits};
 use prost::Message;
 use proto_generated::robot::v1 as wire;
@@ -28,9 +33,11 @@ use crate::{
 };
 
 /// Namespace for Damiao status-nibble fault codes in semantic motor state.
+#[cfg(feature = "damiao")]
 pub const DAMIAO_STATUS_FAULT_BASE: u32 = 0x0001_0000;
 
 /// Verified semantic identity and runtime scaling for one Damiao actuator.
+#[cfg(feature = "damiao")]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DamiaoMitMappingContext {
     profile_id: ArmProfileId,
@@ -39,6 +46,7 @@ pub struct DamiaoMitMappingContext {
     runtime_limits: RuntimeLimits,
 }
 
+#[cfg(feature = "damiao")]
 impl DamiaoMitMappingContext {
     /// Creates an immutable expected mapping context.
     #[must_use]
@@ -62,6 +70,7 @@ impl DamiaoMitMappingContext {
 /// This function does not encode CAN, select a motor ID or bypass the driver's
 /// verified lifecycle. The driver remains responsible for final frame
 /// admission against the same discovered runtime limits.
+#[cfg(feature = "damiao")]
 pub fn arm_mit_to_damiao(
     profile_id: ArmProfileId,
     group_id: KinematicGroupId,
@@ -130,6 +139,7 @@ pub fn arm_mit_to_damiao(
     })
 }
 
+#[cfg(feature = "damiao")]
 fn finite_f32(value: f64, field: &'static str) -> Result<f32, CodecError> {
     let narrowed = value as f32;
     if value.is_finite() && narrowed.is_finite() {
@@ -143,6 +153,7 @@ fn finite_f32(value: f64, field: &'static str) -> Result<f32, CodecError> {
 }
 
 /// Stable process/resource metadata used to map one Damiao sample.
+#[cfg(feature = "damiao")]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DamiaoMotorStateContext {
     source_id: SourceId,
@@ -151,6 +162,7 @@ pub struct DamiaoMotorStateContext {
     valid_for_ns: u64,
 }
 
+#[cfg(feature = "damiao")]
 impl DamiaoMotorStateContext {
     /// Constructs a mapping context with a nonzero local validity window.
     pub fn new(
@@ -196,6 +208,7 @@ impl DamiaoMotorStateContext {
 }
 
 /// Maps validated Damiao feedback into the backend-neutral semantic contract.
+#[cfg(feature = "damiao")]
 pub fn damiao_feedback_to_motor_state(
     feedback: DamiaoFeedback,
     context: DamiaoMotorStateContext,
@@ -769,14 +782,14 @@ fn quaternion_from_wire(value: wire::Quaternion) -> Result<UnitQuaternion, Codec
     UnitQuaternion::new(value.x, value.y, value.z, value.w).map_err(CodecError::from)
 }
 
-fn pose3_to_wire(value: Pose3) -> wire::Pose3 {
+pub(crate) fn pose3_to_wire(value: Pose3) -> wire::Pose3 {
     wire::Pose3 {
         position_m: Some(vector3_to_wire(value.position_m)),
         orientation: Some(quaternion_to_wire(value.orientation)),
     }
 }
 
-fn pose3_from_wire(value: wire::Pose3) -> Result<Pose3, CodecError> {
+pub(crate) fn pose3_from_wire(value: wire::Pose3) -> Result<Pose3, CodecError> {
     Ok(Pose3 {
         position_m: vector3_from_wire(
             value
@@ -1766,7 +1779,9 @@ fn action_status_from_wire(value: i32) -> Result<ActionStatus, CodecError> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "damiao")]
     use allocation_counter::measure;
+    #[cfg(feature = "damiao")]
     use hardware_module_core::{MonoTime, StandardCanId};
     use message_model::{
         AcquisitionTimestamp, ActionCancelDecision, ActionCancelResponse, ActionGoal, AsciiId,
@@ -1776,13 +1791,17 @@ mod tests {
         MotorStateFields, OdometryState, OdometryStateFields, Pose3, RegisteredPayload,
         TemperatureObservation, TimestampDomain, Twist2, Twist3, UnitQuaternion, Vector3,
     };
+    #[cfg(feature = "damiao")]
     use motor_damiao::{DamiaoEscId, DamiaoFeedback, DamiaoStatus};
     use prost::Message;
     use proto_generated::robot::v1 as wire;
 
+    #[cfg(feature = "damiao")]
     use super::{
-        DAMIAO_STATUS_FAULT_BASE, DamiaoMotorStateContext, action_goal_from_wire,
-        action_goal_to_wire, damiao_feedback_to_motor_state, decode_action_cancel_response,
+        DAMIAO_STATUS_FAULT_BASE, DamiaoMotorStateContext, damiao_feedback_to_motor_state,
+    };
+    use super::{
+        action_goal_from_wire, action_goal_to_wire, decode_action_cancel_response,
         decode_chassis_setpoint_intent, decode_imu_state, decode_motor_state,
         decode_odometry_state, encode_action_cancel_response, encode_chassis_setpoint_intent,
         encode_imu_state, encode_motor_state, encode_odometry_state, imu_state_to_wire,
@@ -1845,6 +1864,7 @@ mod tests {
         .unwrap()
     }
 
+    #[cfg(feature = "damiao")]
     fn damiao_context() -> DamiaoMotorStateContext {
         DamiaoMotorStateContext::new(
             AsciiId::parse("motion-rt").unwrap(),
@@ -1855,6 +1875,7 @@ mod tests {
         .unwrap()
     }
 
+    #[cfg(feature = "damiao")]
     fn damiao_feedback(status: DamiaoStatus) -> DamiaoFeedback {
         DamiaoFeedback {
             source_id: StandardCanId::new(0x11).unwrap(),
@@ -1947,6 +1968,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "damiao")]
     fn damiao_mapping_preserves_identity_time_sequence_and_raw_values_without_allocating() {
         let context = damiao_context();
         let feedback = damiao_feedback(DamiaoStatus::Enabled);
@@ -1985,6 +2007,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "damiao")]
     fn damiao_mapping_distinguishes_nonfault_and_fault_statuses() {
         for status in [DamiaoStatus::Disabled, DamiaoStatus::Enabled] {
             let state =

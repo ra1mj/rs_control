@@ -1,0 +1,35 @@
+[Unit]
+Description=Crash-isolated Rust ROS 2 navigation bridge
+PartOf=rs-control-navigation.target
+Requires=rs-control-navigation-harness.service
+After=rs-control-navigation-harness.service
+Before=rs-control-navigation-nav2.service
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+Slice=rs-control-navigation.slice
+EnvironmentFile=/etc/rs-control/navigation.env
+Environment=RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+ExecStartPre=/usr/bin/rm -f /run/rs-control-navigation/nav2.ready
+ExecStart=/bin/bash -lc 'source /opt/ros/humble/setup.bash && exec "${RS_CONTROL_BIN}/rs-navigation-bridge" --manifest "${NAV_MANIFEST}" --expected-sha256 "${NAV_MANIFEST_SHA256}" --ipc-root "${NAV_IPC_ROOT}" --process-epoch "$(date +%%s%%N)" --nav2-ready-file /run/rs-control-navigation/nav2.ready'
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=5
+KillMode=control-group
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/run/rs-control-navigation
+
+[Install]
+WantedBy=rs-control-navigation.target

@@ -1,0 +1,24 @@
+[package]
+name = "navigation-plugin-config"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "rs-navigation-plugin"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+proto-generated.workspace = true
+serde.workspace = true
+serde-saphyr.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

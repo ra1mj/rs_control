@@ -1,0 +1,266 @@
+[INFO] [launch]: All log files can be found below /tmp/rs-navigation-nav2-resource.F7TijDZL/ros-log/2026-08-05-09-59-13-331162-dp-1498991
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [map_server-1]: process started with pid [1499034]
+[INFO] [controller_server-2]: process started with pid [1499036]
+[INFO] [planner_server-3]: process started with pid [1499038]
+[INFO] [bt_navigator-4]: process started with pid [1499040]
+[INFO] [lifecycle_manager-5]: process started with pid [1499042]
+[controller_server-2] [INFO] [1785895153.404988721] [controller_server]: 
+[controller_server-2] 	controller_server lifecycle node launched. 
+[controller_server-2] 	Waiting on external lifecycle transitions to activate
+[controller_server-2] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[planner_server-3] [INFO] [1785895153.406988787] [planner_server]: 
+[planner_server-3] 	planner_server lifecycle node launched. 
+[planner_server-3] 	Waiting on external lifecycle transitions to activate
+[planner_server-3] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[controller_server-2] [INFO] [1785895153.407042813] [controller_server]: Creating controller server
+[planner_server-3] [INFO] [1785895153.408450165] [planner_server]: Creating
+[lifecycle_manager-5] [INFO] [1785895153.408731629] [lifecycle_manager_navigation]: Creating
+[lifecycle_manager-5] [INFO] [1785895153.410266425] [lifecycle_manager_navigation]: [34m[1mCreating and initializing lifecycle service clients[0m[0m
+[controller_server-2] [INFO] [1785895153.410289337] [local_costmap.local_costmap]: 
+[controller_server-2] 	local_costmap lifecycle node launched. 
+[controller_server-2] 	Waiting on external lifecycle transitions to activate
+[controller_server-2] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[controller_server-2] [INFO] [1785895153.410565245] [local_costmap.local_costmap]: Creating Costmap
+[bt_navigator-4] [INFO] [1785895153.410885948] [bt_navigator]: 
+[bt_navigator-4] 	bt_navigator lifecycle node launched. 
+[bt_navigator-4] 	Waiting on external lifecycle transitions to activate
+[bt_navigator-4] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[bt_navigator-4] [INFO] [1785895153.410972394] [bt_navigator]: Creating
+[planner_server-3] [INFO] [1785895153.412810707] [global_costmap.global_costmap]: 
+[planner_server-3] 	global_costmap lifecycle node launched. 
+[planner_server-3] 	Waiting on external lifecycle transitions to activate
+[planner_server-3] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[planner_server-3] [INFO] [1785895153.413205676] [global_costmap.global_costmap]: Creating Costmap
+[map_server-1] [INFO] [1785895153.413730623] [map_server]: 
+[map_server-1] 	map_server lifecycle node launched. 
+[map_server-1] 	Waiting on external lifecycle transitions to activate
+[map_server-1] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[map_server-1] [INFO] [1785895153.413804613] [map_server]: Creating
+[lifecycle_manager-5] [INFO] [1785895153.504052099] [lifecycle_manager_navigation]: [34m[1mStarting managed nodes bringup...[0m[0m
+[lifecycle_manager-5] [INFO] [1785895153.504093794] [lifecycle_manager_navigation]: [34m[1mConfiguring map_server[0m[0m
+[map_server-1] [INFO] [1785895153.653967688] [map_server]: Configuring
+[map_server-1] [INFO] [1785895153.654036839] [map_io]: Loading yaml file: /home/mj/workspaces/qi/chassis_nav/src/chassis_nav_mecanum_sim/assets/localization_map/warehouse_sim_map/0.1.0/maps/occupancy.yaml
+[map_server-1] [INFO] [1785895153.654265980] [map_io]: resolution: 0.05
+[map_server-1] [INFO] [1785895153.654273439] [map_io]: origin[0]: -7
+[map_server-1] [INFO] [1785895153.654278522] [map_io]: origin[1]: -10.5
+[map_server-1] [INFO] [1785895153.654282497] [map_io]: origin[2]: 0
+[map_server-1] [INFO] [1785895153.654286422] [map_io]: free_thresh: 0.196
+[map_server-1] [INFO] [1785895153.654290404] [map_io]: occupied_thresh: 0.65
+[map_server-1] [INFO] [1785895153.654294744] [map_io]: mode: trinary
+[map_server-1] [INFO] [1785895153.654299345] [map_io]: negate: 0
+[map_server-1] [INFO] [1785895153.654444376] [map_io]: Loading image_file: /home/mj/workspaces/qi/chassis_nav/src/chassis_nav_mecanum_sim/assets/localization_map/warehouse_sim_map/0.1.0/maps/occupancy.pgm
+[map_server-1] [INFO] [1785895153.661883706] [map_io]: Read map /home/mj/workspaces/qi/chassis_nav/src/chassis_nav_mecanum_sim/assets/localization_map/warehouse_sim_map/0.1.0/maps/occupancy.pgm: 423 X 286 map @ 0.05 m/cell
+[lifecycle_manager-5] [INFO] [1785895153.664588008] [lifecycle_manager_navigation]: [34m[1mConfiguring controller_server[0m[0m
+[controller_server-2] [INFO] [1785895153.664716137] [controller_server]: Configuring controller interface
+[controller_server-2] [INFO] [1785895153.664790318] [controller_server]: getting goal checker plugins..
+[controller_server-2] [INFO] [1785895153.664806672] [controller_server]: Controller frequency set to 20.0000Hz
+[controller_server-2] [INFO] [1785895153.664819524] [local_costmap.local_costmap]: Configuring
+[controller_server-2] [INFO] [1785895153.666621191] [local_costmap.local_costmap]: Using plugin "obstacle_layer"
+[controller_server-2] [INFO] [1785895153.667986743] [local_costmap.local_costmap]: Subscribed to Topics: tracker_cloud
+[controller_server-2] [INFO] [1785895153.668745752] [local_costmap.local_costmap]: Initialized plugin "obstacle_layer"
+[controller_server-2] [INFO] [1785895153.668755098] [local_costmap.local_costmap]: Using plugin "inflation_layer"
+[controller_server-2] [INFO] [1785895153.668999299] [local_costmap.local_costmap]: Initialized plugin "inflation_layer"
+[controller_server-2] [INFO] [1785895153.671556506] [controller_server]: Created progress_checker : progress_checker of type nav2_controller::SimpleProgressChecker
+[controller_server-2] [INFO] [1785895153.671760240] [controller_server]: Created goal checker : general_goal_checker of type nav2_controller::SimpleGoalChecker
+[controller_server-2] [INFO] [1785895153.671813388] [controller_server]: Controller Server has general_goal_checker  goal checkers available.
+[controller_server-2] [INFO] [1785895153.672248076] [controller_server]: Created controller : FollowPath of type nav2_mppi_controller::MPPIController
+[controller_server-2] [INFO] [1785895153.672476605] [controller_server]: Controller period is equal to model dt. Control sequence shifting is ON
+[controller_server-2] [INFO] [1785895153.672949534] [controller_server]: ConstraintCritic instantiated with 1 power and 4.000000 weight.
+[controller_server-2] [INFO] [1785895153.672958685] [controller_server]: Critic loaded : mppi::critics::ConstraintCritic
+[controller_server-2] [INFO] [1785895153.673065518] [controller_server]: InflationCostCritic instantiated with 1 power and 300.000000 / 0.023622 weights. Critic will collision check based on footprint cost.
+[controller_server-2] [INFO] [1785895153.673070964] [controller_server]: Critic loaded : mppi::critics::CostCritic
+[controller_server-2] [INFO] [1785895153.673125235] [controller_server]: GoalCritic instantiated with 1 power and 5.000000 weight.
+[controller_server-2] [INFO] [1785895153.673128718] [controller_server]: Critic loaded : mppi::critics::GoalCritic
+[controller_server-2] [INFO] [1785895153.673174097] [controller_server]: GoalAngleCritic instantiated with 1 power, 3.000000 weight, and 0.500000 angular threshold.
+[controller_server-2] [INFO] [1785895153.673177682] [controller_server]: Critic loaded : mppi::critics::GoalAngleCritic
+[controller_server-2] [INFO] [1785895153.673267441] [controller_server]: ReferenceTrajectoryCritic instantiated with 1 power and 14.000000 weight
+[controller_server-2] [INFO] [1785895153.673270682] [controller_server]: Critic loaded : mppi::critics::PathAlignCritic
+[controller_server-2] [INFO] [1785895153.673330727] [controller_server]: Critic loaded : mppi::critics::PathFollowCritic
+[controller_server-2] [INFO] [1785895153.673367609] [controller_server]: TwirlingCritic instantiated with 1 power and 10.000000 weight.
+[controller_server-2] [INFO] [1785895153.673370729] [controller_server]: Critic loaded : mppi::critics::TwirlingCritic
+[controller_server-2] [INFO] [1785895153.674070343] [controller_server]: Optimizer reset
+[controller_server-2] [INFO] [1785895153.674869521] [MPPIController]: Configured MPPI Controller: FollowPath
+[controller_server-2] [INFO] [1785895153.674878163] [controller_server]: Controller Server has FollowPath  controllers available.
+[lifecycle_manager-5] [INFO] [1785895153.676554078] [lifecycle_manager_navigation]: [34m[1mConfiguring planner_server[0m[0m
+[planner_server-3] [INFO] [1785895153.676671286] [planner_server]: Configuring
+[planner_server-3] [INFO] [1785895153.676706132] [global_costmap.global_costmap]: Configuring
+[planner_server-3] [INFO] [1785895153.679390921] [global_costmap.global_costmap]: Using plugin "static_layer"
+[planner_server-3] [INFO] [1785895153.681514724] [global_costmap.global_costmap]: Subscribing to the map topic (/map) with transient local durability
+[planner_server-3] [INFO] [1785895153.682152894] [global_costmap.global_costmap]: Subscribing to updates
+[planner_server-3] [INFO] [1785895153.683013401] [global_costmap.global_costmap]: Initialized plugin "static_layer"
+[planner_server-3] [INFO] [1785895153.683030076] [global_costmap.global_costmap]: Using plugin "obstacle_layer"
+[planner_server-3] [INFO] [1785895153.683207818] [global_costmap.global_costmap]: Subscribed to Topics: tracker_cloud
+[planner_server-3] [INFO] [1785895153.684260065] [global_costmap.global_costmap]: Initialized plugin "obstacle_layer"
+[planner_server-3] [INFO] [1785895153.684275855] [global_costmap.global_costmap]: Using plugin "inflation_layer"
+[planner_server-3] [INFO] [1785895153.684710082] [global_costmap.global_costmap]: Initialized plugin "inflation_layer"
+[planner_server-3] [INFO] [1785895153.688794096] [planner_server]: Created global planner plugin GridBased of type nav2_smac_planner/SmacPlanner2D
+[planner_server-3] [INFO] [1785895153.688811722] [planner_server]: Configuring GridBased of type SmacPlanner2D
+[planner_server-3] [INFO] [1785895153.689269650] [planner_server]: Configured plugin GridBased of type SmacPlanner2D with tolerance 0.10, maximum iterations 500000, max on approach iterations 1000, and not allowing unknown traversal.
+[planner_server-3] [INFO] [1785895153.689295619] [planner_server]: Planner Server has GridBased  planners available.
+[lifecycle_manager-5] [INFO] [1785895153.692086666] [lifecycle_manager_navigation]: [34m[1mConfiguring bt_navigator[0m[0m
+[bt_navigator-4] [INFO] [1785895153.692215557] [bt_navigator]: Configuring
+[lifecycle_manager-5] [INFO] [1785895153.708991047] [lifecycle_manager_navigation]: [34m[1mActivating map_server[0m[0m
+[map_server-1] [INFO] [1785895153.709057625] [map_server]: Activating
+[map_server-1] [INFO] [1785895153.709330182] [map_server]: Creating bond (map_server) to lifecycle manager.
+[planner_server-3] [INFO] [1785895153.709437000] [global_costmap.global_costmap]: StaticLayer: Resizing costmap to 423 X 286 at 0.050000 m/pix
+[lifecycle_manager-5] [INFO] [1785895153.810994091] [lifecycle_manager_navigation]: Server map_server connected with bond.
+[lifecycle_manager-5] [INFO] [1785895153.811024421] [lifecycle_manager_navigation]: [34m[1mActivating controller_server[0m[0m
+[controller_server-2] [INFO] [1785895153.811284995] [controller_server]: Activating
+[controller_server-2] [INFO] [1785895153.811313335] [local_costmap.local_costmap]: Activating
+[controller_server-2] [INFO] [1785895153.811321428] [local_costmap.local_costmap]: Checking transform
+[controller_server-2] [INFO] [1785895153.811408661] [local_costmap.local_costmap]: start
+[controller_server-2] [WARN] [1785895153.911823258] [controller_server]: Parameter controller_server.verbose not found
+[controller_server-2] [INFO] [1785895153.912278712] [controller_server]: Optimizer reset
+[controller_server-2] [INFO] [1785895153.912343100] [MPPIController]: Activated MPPI Controller: FollowPath
+[controller_server-2] [INFO] [1785895153.912353295] [controller_server]: Creating bond (controller_server) to lifecycle manager.
+[lifecycle_manager-5] [INFO] [1785895154.014100610] [lifecycle_manager_navigation]: Server controller_server connected with bond.
+[lifecycle_manager-5] [INFO] [1785895154.014134277] [lifecycle_manager_navigation]: [34m[1mActivating planner_server[0m[0m
+[planner_server-3] [INFO] [1785895154.014492051] [planner_server]: Activating
+[planner_server-3] [INFO] [1785895154.014517012] [global_costmap.global_costmap]: Activating
+[planner_server-3] [INFO] [1785895154.014523708] [global_costmap.global_costmap]: Checking transform
+[planner_server-3] [INFO] [1785895154.014603022] [global_costmap.global_costmap]: start
+[planner_server-3] [INFO] [1785895154.264995501] [planner_server]: Activating plugin GridBased of type SmacPlanner2D
+[planner_server-3] [INFO] [1785895154.265490867] [planner_server]: Creating bond (planner_server) to lifecycle manager.
+[lifecycle_manager-5] [INFO] [1785895154.367102893] [lifecycle_manager_navigation]: Server planner_server connected with bond.
+[lifecycle_manager-5] [INFO] [1785895154.367138583] [lifecycle_manager_navigation]: [34m[1mActivating bt_navigator[0m[0m
+[bt_navigator-4] [INFO] [1785895154.367414393] [bt_navigator]: Activating
+[bt_navigator-4] [INFO] [1785895154.371352083] [bt_navigator]: Creating bond (bt_navigator) to lifecycle manager.
+[lifecycle_manager-5] [INFO] [1785895154.472873032] [lifecycle_manager_navigation]: Server bt_navigator connected with bond.
+[lifecycle_manager-5] [INFO] [1785895154.472905420] [lifecycle_manager_navigation]: [34m[1mManaged nodes are active[0m[0m
+[lifecycle_manager-5] [INFO] [1785895154.472911330] [lifecycle_manager_navigation]: [34m[1mCreating bond timer...[0m[0m
+[bt_navigator-4] [INFO] [1785895154.610154307] [bt_navigator]: Begin navigating from current location (1.50, -1.50) to (1.50, -3.00)
+[controller_server-2] [INFO] [1785895154.630820254] [controller_server]: Received a goal, begin computing control effort.
+[controller_server-2] [WARN] [1785895154.630867464] [controller_server]: No goal checker was specified in parameter 'current_goal_checker'. Server will use only plugin loaded general_goal_checker . This warning will appear once.
+[controller_server-2] [INFO] [1785895155.680960243] [controller_server]: Passing new path to controller.
+[controller_server-2] [INFO] [1785895156.730956925] [controller_server]: Passing new path to controller.
+[controller_server-2] [INFO] [1785895157.730952665] [controller_server]: Passing new path to controller.
+[controller_server-2] [INFO] [1785895158.780957066] [controller_server]: Passing new path to controller.
+[controller_server-2] [INFO] [1785895159.780953557] [controller_server]: Passing new path to controller.
+[controller_server-2] [INFO] [1785895160.830976736] [controller_server]: Passing new path to controller.
+[controller_server-2] [INFO] [1785895161.880971766] [controller_server]: Passing new path to controller.
+[controller_server-2] [INFO] [1785895162.880958779] [controller_server]: Passing new path to controller.
+[controller_server-2] [INFO] [1785895163.930954926] [controller_server]: Passing new path to controller.
+[controller_server-2] [INFO] [1785895164.930955934] [controller_server]: Passing new path to controller.
+[controller_server-2] [INFO] [1785895165.980953922] [controller_server]: Passing new path to controller.
+[controller_server-2] [INFO] [1785895167.030954353] [controller_server]: Passing new path to controller.
+[controller_server-2] [INFO] [1785895168.030956212] [controller_server]: Passing new path to controller.
+[controller_server-2] [INFO] [1785895169.080955355] [controller_server]: Passing new path to controller.
+[controller_server-2] [INFO] [1785895170.080968205] [controller_server]: Passing new path to controller.
+[controller_server-2] [INFO] [1785895171.130951124] [controller_server]: Passing new path to controller.
+[controller_server-2] [INFO] [1785895172.130954916] [controller_server]: Passing new path to controller.
+[controller_server-2] [INFO] [1785895173.180953874] [controller_server]: Passing new path to controller.
+[controller_server-2] [WARN] [1785895174.111572008] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.05) to (4.18, -0.07). The costmap cannot raytrace for it.
+[controller_server-2] [INFO] [1785895174.180954170] [controller_server]: Passing new path to controller.
+[controller_server-2] [WARN] [1785895174.211518362] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.05) to (4.18, -0.07). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895174.311509220] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.05) to (4.18, -0.07). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895174.411510215] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.05) to (4.18, -0.07). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895174.511515294] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.05) to (4.18, -0.07). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895174.611519614] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.05) to (4.18, -0.07). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895174.711508524] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.05) to (4.18, -0.07). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895174.811508712] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.05) to (4.18, -0.07). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895174.911508498] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.05) to (4.18, -0.07). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895175.011508383] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.05) to (4.18, -0.07). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895175.111577845] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.05) to (4.18, -0.07). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895175.211552853] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.05) to (4.18, -0.07). The costmap cannot raytrace for it.
+[controller_server-2] [INFO] [1785895175.230958439] [controller_server]: Passing new path to controller.
+[controller_server-2] [WARN] [1785895175.311513126] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.05) to (4.18, -0.07). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895175.411507338] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.05) to (4.18, -0.07). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895175.511507702] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.05) to (4.18, -0.07). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895175.611508889] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.10) to (4.18, -0.12). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895175.711510869] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.10) to (4.18, -0.12). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895175.811519011] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.10) to (4.18, -0.12). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895175.911510081] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.10) to (4.18, -0.12). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895176.011507749] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.10) to (4.18, -0.12). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895176.111508833] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.10) to (4.18, -0.12). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895176.211507766] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.10) to (4.18, -0.12). The costmap cannot raytrace for it.
+[controller_server-2] [INFO] [1785895176.230958670] [controller_server]: Passing new path to controller.
+[controller_server-2] [WARN] [1785895176.311521103] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.10) to (4.18, -0.12). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895176.411507982] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.10) to (4.18, -0.12). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895176.511511886] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.10) to (4.18, -0.12). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895176.611518390] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.10) to (4.18, -0.12). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895176.711513341] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.10) to (4.18, -0.12). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895176.811508994] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.10) to (4.18, -0.12). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895176.911517048] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.10) to (4.18, -0.12). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895177.011509882] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.10) to (4.18, -0.12). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895177.111516832] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.10) to (4.18, -0.12). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895177.211503073] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.10) to (4.18, -0.12). The costmap cannot raytrace for it.
+[controller_server-2] [INFO] [1785895177.280953906] [controller_server]: Passing new path to controller.
+[controller_server-2] [WARN] [1785895177.311506025] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.10) to (4.18, -0.12). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895177.411511945] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.10) to (4.18, -0.12). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895177.511513485] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.10) to (4.18, -0.12). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895177.611508911] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.15) to (4.18, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895177.711508146] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.80, -5.15) to (4.18, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895177.811513523] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.85, -5.15) to (4.13, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895177.911511804] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.85, -5.15) to (4.13, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895178.011511337] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.85, -5.15) to (4.13, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895178.111505214] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.85, -5.15) to (4.13, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895178.211505178] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.85, -5.15) to (4.13, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895178.311507032] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.85, -5.15) to (4.13, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [INFO] [1785895178.330957509] [controller_server]: Passing new path to controller.
+[controller_server-2] [WARN] [1785895178.411510657] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.85, -5.15) to (4.13, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895178.511508129] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.85, -5.15) to (4.13, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895178.611506339] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.85, -5.15) to (4.13, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895178.711503509] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.85, -5.15) to (4.13, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895178.811511173] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.85, -5.15) to (4.13, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895178.911512979] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.85, -5.15) to (4.13, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895179.011508319] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.85, -5.15) to (4.13, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895179.111512895] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.85, -5.15) to (4.13, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895179.211499496] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.85, -5.15) to (4.13, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895179.311505049] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.85, -5.15) to (4.13, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [INFO] [1785895179.330952803] [controller_server]: Passing new path to controller.
+[controller_server-2] [WARN] [1785895179.411554093] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.85, -5.15) to (4.13, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895179.511533634] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.90, -5.15) to (4.08, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895179.611517170] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.90, -5.15) to (4.08, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895179.711568101] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.90, -5.15) to (4.08, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895179.811502509] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.90, -5.15) to (4.08, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895179.911516082] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.90, -5.15) to (4.08, -0.17). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895180.011508801] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.90, -5.20) to (4.08, -0.22). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895180.111504046] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.90, -5.20) to (4.08, -0.22). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895180.211502010] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.90, -5.20) to (4.08, -0.22). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895180.311511655] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.90, -5.20) to (4.08, -0.22). The costmap cannot raytrace for it.
+[controller_server-2] [INFO] [1785895180.381092515] [controller_server]: Passing new path to controller.
+[controller_server-2] [WARN] [1785895180.411506072] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.90, -5.20) to (4.08, -0.22). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895180.511516499] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.90, -5.20) to (4.08, -0.22). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895180.611555106] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.90, -5.20) to (4.08, -0.22). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895180.711512340] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.90, -5.20) to (4.08, -0.22). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895180.811504765] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.90, -5.20) to (4.08, -0.22). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895180.911511324] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.90, -5.20) to (4.08, -0.22). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895181.011510452] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.90, -5.20) to (4.08, -0.22). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895181.111506987] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.90, -5.20) to (4.08, -0.22). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895181.211501592] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.90, -5.20) to (4.08, -0.22). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895181.311519033] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.90, -5.20) to (4.08, -0.22). The costmap cannot raytrace for it.
+[controller_server-2] [INFO] [1785895181.380953144] [controller_server]: Passing new path to controller.
+[controller_server-2] [WARN] [1785895181.411583348] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.90, -5.20) to (4.08, -0.22). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895181.511642369] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.20) to (4.03, -0.22). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895181.611512298] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.20) to (4.03, -0.22). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895181.711509872] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.20) to (4.03, -0.22). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895181.811516352] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.20) to (4.03, -0.22). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895181.911588302] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.20) to (4.03, -0.22). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895182.011510381] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.25) to (4.03, -0.27). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895182.111522632] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.25) to (4.03, -0.27). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895182.211509537] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.25) to (4.03, -0.27). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895182.311516834] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.25) to (4.03, -0.27). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895182.411512057] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.25) to (4.03, -0.27). The costmap cannot raytrace for it.
+[controller_server-2] [INFO] [1785895182.430955625] [controller_server]: Passing new path to controller.
+[controller_server-2] [WARN] [1785895182.511515977] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.25) to (4.03, -0.27). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895182.611510898] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.25) to (4.03, -0.27). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895182.711515350] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.25) to (4.03, -0.27). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895182.811509609] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.25) to (4.03, -0.27). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895182.911595924] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.25) to (4.03, -0.27). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895183.011616466] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.25) to (4.03, -0.27). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895183.111588909] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.25) to (4.03, -0.27). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895183.211519930] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.25) to (4.03, -0.27). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895183.311556500] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.25) to (4.03, -0.27). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895183.411590194] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.25) to (4.03, -0.27). The costmap cannot raytrace for it.
+[controller_server-2] [INFO] [1785895183.480958275] [controller_server]: Passing new path to controller.
+[controller_server-2] [WARN] [1785895183.511511663] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.25) to (4.03, -0.27). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895183.611653997] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.25) to (4.03, -0.27). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895183.711511743] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.30) to (4.03, -0.32). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895183.811528043] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.30) to (4.03, -0.32). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895183.911517918] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.30) to (4.03, -0.32). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895184.011509293] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.30) to (4.03, -0.32). The costmap cannot raytrace for it.
+[controller_server-2] [WARN] [1785895184.111510974] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.30) to (4.03, -0.32). The costmap cannot raytrace for it.
+[controller_server-2] [INFO] [1785895184.181769569] [controller_server]: Reached the goal!
+[controller_server-2] [WARN] [1785895184.211511920] [local_costmap.local_costmap]: Sensor origin at (0.00, 0.00) is out of map bounds (-0.95, -5.30) to (4.03, -0.32). The costmap cannot raytrace for it.
+[bt_navigator-4] [INFO] [1785895184.220359261] [bt_navigator]: Goal succeeded

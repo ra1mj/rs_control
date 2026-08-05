@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chassis-nav.invalid/schemas/rs-control-navigation-plugin-v1.json",
+  "title": "rs_control navigation plugin manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "plugin_id", "profile_id", "compatibility",
+    "interfaces", "endpoints", "frames", "map", "nav2_assets", "ipc",
+    "safety"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "plugin_id": {"const": "chassis_nav.rs_control.navigation"},
+    "profile_id": {"const": "motor_disabled_host_v1"},
+    "compatibility": {"$ref": "#/$defs/compatibility"},
+    "interfaces": {"$ref": "#/$defs/interfaces"},
+    "endpoints": {"$ref": "#/$defs/endpoints"},
+    "frames": {"$ref": "#/$defs/frames"},
+    "map": {"$ref": "#/$defs/map"},
+    "nav2_assets": {"$ref": "#/$defs/nav2Assets"},
+    "ipc": {"$ref": "#/$defs/ipc"},
+    "safety": {"$ref": "#/$defs/safety"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "rosName": {
+      "type": "string",
+      "pattern": "^/(?:[A-Za-z_][A-Za-z0-9_]*/)*[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "frame": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ros_distribution", "rmw_implementation", "rclrs_version",
+        "nav2_msgs_version", "geometry_msgs_version", "nav_msgs_version",
+        "tf2_msgs_version", "protobuf_descriptor_sha256"
+      ],
+      "properties": {
+        "ros_distribution": {"const": "humble"},
+        "rmw_implementation": {"const": "rmw_fastrtps_cpp"},
+        "rclrs_version": {"const": "0.7.0"},
+        "nav2_msgs_version": {"const": "1.1.20"},
+        "geometry_msgs_version": {"const": "4.9.1"},
+        "nav_msgs_version": {"const": "4.9.1"},
+        "tf2_msgs_version": {"const": "0.25.20"},
+        "protobuf_descriptor_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "interfaceWithSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ros_type", "source_sha256"],
+      "properties": {
+        "ros_type": {"type": "string", "minLength": 1},
+        "source_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "interface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ros_type"],
+      "properties": {"ros_type": {"type": "string", "minLength": 1}}
+    },
+    "interfaces": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["navigate_to_pose", "controller_proposal", "odometry", "dynamic_tf"],
+      "properties": {
+        "navigate_to_pose": {"$ref": "#/$defs/interfaceWithSource"},
+        "controller_proposal": {"$ref": "#/$defs/interfaceWithSource"},
+        "odometry": {"$ref": "#/$defs/interface"},
+        "dynamic_tf": {"$ref": "#/$defs/interface"}
+      }
+    },
+    "endpoints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "navigate_to_pose_action", "controller_proposal_topic",
+        "odometry_topic", "dynamic_tf_topic"
+      ],
+      "properties": {
+        "navigate_to_pose_action": {"const": "/navigate_to_pose"},
+        "controller_proposal_topic": {"const": "/rs_control/navigation/controller_proposal"},
+        "odometry_topic": {"const": "/rs_control/navigation/odometry"},
+        "dynamic_tf_topic": {"const": "/tf"}
+      }
+    },
+    "tfAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parent", "child", "writer"],
+      "properties": {
+        "parent": {"$ref": "#/$defs/frame"},
+        "child": {"$ref": "#/$defs/frame"},
+        "writer": {"type": "string", "minLength": 1}
+      }
+    },
+    "frames": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["map", "odom", "base", "tf_authorities"],
+      "properties": {
+        "map": {"const": "map"},
+        "odom": {"const": "odom"},
+        "base": {"const": "base_link"},
+        "tf_authorities": {
+          "type": "array", "minItems": 2, "maxItems": 2,
+          "items": {"$ref": "#/$defs/tfAuthority"}
+        }
+      }
+    },
+    "map": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "version", "manifest_sha256", "occupancy_yaml_sha256",
+        "occupancy_image_sha256"
+      ],
+      "properties": {
+        "id": {"const": "warehouse_sim_map"},
+        "version": {"const": "0.1.0"},
+        "manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "occupancy_yaml_sha256": {"$ref": "#/$defs/sha256"},
+        "occupancy_image_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "nav2Assets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "base_parameters_sha256", "tuning_parameters_sha256",
+        "integration_parameters_sha256", "navigate_to_pose_bt_sha256",
+        "navigate_through_poses_bt_sha256"
+      ],
+      "properties": {
+        "base_parameters_sha256": {"$ref": "#/$defs/sha256"},
+        "tuning_parameters_sha256": {"$ref": "#/$defs/sha256"},
+        "integration_parameters_sha256": {"$ref": "#/$defs/sha256"},
+        "navigate_to_pose_bt_sha256": {"$ref": "#/$defs/sha256"},
+        "navigate_through_poses_bt_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["layout_id", "mode", "capacity", "freshness_ms"],
+      "properties": {
+        "layout_id": {"type": "string", "pattern": "^[A-Za-z0-9_-]{16}$"},
+        "mode": {"enum": ["ordered", "latest"]},
+        "capacity": {"type": "integer", "minimum": 1, "maximum": 8},
+        "freshness_ms": {"type": "integer", "minimum": 1, "maximum": 1000}
+      }
+    },
+    "channels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority", "action_request", "action_response",
+        "controller_proposal", "odometry", "dynamic_tf", "health"
+      ],
+      "properties": {
+        "authority": {"$ref": "#/$defs/channel"},
+        "action_request": {"$ref": "#/$defs/channel"},
+        "action_response": {"$ref": "#/$defs/channel"},
+        "controller_proposal": {"$ref": "#/$defs/channel"},
+        "odometry": {"$ref": "#/$defs/channel"},
+        "dynamic_tf": {"$ref": "#/$defs/channel"},
+        "health": {"$ref": "#/$defs/channel"}
+      }
+    },
+    "ipc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "channels"],
+      "properties": {
+        "namespace": {"const": "rs_control.navigation.motor_disabled.v1"},
+        "channels": {"$ref": "#/$defs/channels"}
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "final_constraint_owner", "adapter_can_issue_leases", "motor_output",
+        "can_transmit", "simulation_only", "approved_for_production",
+        "first_resource_run"
+      ],
+      "properties": {
+        "final_constraint_owner": {"const": "rs_control"},
+        "adapter_can_issue_leases": {"const": false},
+        "motor_output": {"const": "forbidden"},
+        "can_transmit": {"const": "forbidden"},
+        "simulation_only": {"const": true},
+        "approved_for_production": {"const": false},
+        "first_resource_run": {"const": "measurement_only"}
+      }
+    }
+  }
+}

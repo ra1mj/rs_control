@@ -74,6 +74,9 @@ console lines are not qualification evidence.
 
 - Never overwrite or append to an existing evidence directory.
 - Record missing measurements explicitly and retain raw observations.
+- Record the workload phase and the exact event that opened sampling. Startup,
+  idle and active-control snapshots are distinct evidence and must not be
+  relabeled as one another.
 - A sealed manifest hashes the complete expected file set and offline
   verification re-derives the verdict.
 - Host research remains labeled as host research even when its console output

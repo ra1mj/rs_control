@@ -1,5 +1,5 @@
 version = 1
-composition_roots = ["robotctl", "rs-navigation-e2e"]
+composition_roots = ["btctl", "robotctl", "rs-navigation-e2e"]
 
 [classes.hardware_module]
 allowed_dependencies = ["hardware_module"]
@@ -36,6 +36,7 @@ path_prefixes = ["tools/"]
 "arm-control" = "application_module"
 "arm-model" = "application_module"
 "rl-policy-control" = "application_module"
+"btctl" = "app"
 "chassis-mecanum" = "application_module"
 "chassis-model" = "application_module"
 "chassis-omni" = "application_module"

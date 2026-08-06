@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "apps/btctl",
     "apps/robotctl",
     "apps/rs-navigation-e2e",
     "crates/integration/config-model",

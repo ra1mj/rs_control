@@ -3,9 +3,15 @@
 use arrayvec::ArrayVec;
 use message_model::{ActionCancelDecision, ActionStatus, Id128};
 
+use crate::behavior_tree::{
+    BehaviorTreeActivationSnapshot, BehaviorTreeActivationState, BehaviorTreeNodeParticipation,
+    BehaviorTreeNodeSnapshot, BehaviorTreeNodeType, BehaviorTreeSnapshot,
+};
+
 use super::{
     CancelScopeId, GuardId, MAX_MISSION_ACTION_INVOCATIONS, MAX_MISSION_ACTIVE_ACTIVATIONS,
-    MAX_MISSION_CHILDREN, MissionAction, MissionIr, MissionNodeId, MissionNodeKind,
+    MAX_MISSION_CHILDREN, MAX_MISSION_NODES, MissionAction, MissionIr, MissionNodeId,
+    MissionNodeKind,
 };
 
 /// Maximum simultaneous activation frames.
@@ -13,7 +19,7 @@ pub const MAX_ACTIVE_ACTIVATIONS: usize = MAX_MISSION_ACTIVE_ACTIVATIONS;
 /// Maximum command identities retained for one run.
 pub const MAX_ACTION_INVOCATIONS: usize = MAX_MISSION_ACTION_INVOCATIONS;
 /// Maximum effects emitted by one serialized event.
-pub const MAX_MISSION_EFFECTS: usize = MAX_ACTIVE_ACTIVATIONS + 1;
+pub const MAX_MISSION_EFFECTS: usize = MAX_ACTIVE_ACTIVATIONS * 2 + 1;
 
 /// Generation-tagged activation identity.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -168,7 +174,7 @@ pub enum MissionEffect<'ir> {
     },
     /// Scheduler must return a correlated `DeadlineElapsed`.
     ArmDeadline {
-        /// Timeout wrapper activation.
+        /// Deadline-bearing action or Timeout-wrapper activation.
         activation: MissionActivationId,
         /// Relative finite deadline.
         timeout_ns: u64,
@@ -322,6 +328,7 @@ pub struct MissionRuntime<'ir> {
     state: MissionRuntimeState,
     slots: [ActivationSlot; MAX_ACTIVE_ACTIVATIONS],
     used_commands: ArrayVec<Id128, MAX_ACTION_INVOCATIONS>,
+    last_outcomes: [Option<MissionOutcome>; MAX_MISSION_NODES],
     root_activation: Option<MissionActivationId>,
 }
 
@@ -334,6 +341,7 @@ impl<'ir> MissionRuntime<'ir> {
             state: MissionRuntimeState::Idle,
             slots: [EMPTY_SLOT; MAX_ACTIVE_ACTIVATIONS],
             used_commands: ArrayVec::new_const(),
+            last_outcomes: [None; MAX_MISSION_NODES],
             root_activation: None,
         }
     }
@@ -346,6 +354,14 @@ impl<'ir> MissionRuntime<'ir> {
 
     /// Applies one serialized event and returns ordered effects.
     pub fn dispatch(&mut self, event: MissionEvent) -> MissionStep<'ir> {
+        self.advance(event)
+    }
+
+    /// Advances the behavior tree with one externally correlated event.
+    ///
+    /// This is an additive spelling for the public behavior-tree facade.
+    /// It is equivalent to [`Self::dispatch`].
+    pub fn advance(&mut self, event: MissionEvent) -> MissionStep<'ir> {
         let mut step = MissionStep::new();
         match (self.state, event) {
             (MissionRuntimeState::Idle, MissionEvent::Start) => {
@@ -418,6 +434,65 @@ impl<'ir> MissionRuntime<'ir> {
         step
     }
 
+    /// Captures the bounded live participation state without allocating.
+    #[must_use]
+    pub fn snapshot(&self) -> BehaviorTreeSnapshot {
+        let mut activations = ArrayVec::new();
+        for (slot_index, slot) in self.slots.iter().enumerate() {
+            let Some(activation) = slot.activation else {
+                continue;
+            };
+            let node = self
+                .ir
+                .node(activation.node_id)
+                .expect("validated IR node remains available");
+            activations
+                .try_push(BehaviorTreeActivationSnapshot::new(
+                    MissionActivationId {
+                        slot: u8::try_from(slot_index).expect("activation capacity fits u8"),
+                        generation: slot.generation,
+                    },
+                    activation.parent,
+                    activation.node_id,
+                    node.name(),
+                    BehaviorTreeNodeType::from_mission(node.kind()),
+                    snapshot_activation_state(activation.phase),
+                    activation.phase.command_id(),
+                ))
+                .expect("live activation count is bounded by slot capacity");
+        }
+
+        let mut nodes = ArrayVec::new();
+        for (node_index, node) in self.ir.nodes().iter().enumerate() {
+            let active_count = activations
+                .iter()
+                .filter(|activation| activation.node_id() == node.id())
+                .count();
+            let participation = if active_count == 0 {
+                match self.last_outcomes[node_index] {
+                    Some(outcome) => BehaviorTreeNodeParticipation::Terminal(outcome),
+                    None => BehaviorTreeNodeParticipation::Inactive,
+                }
+            } else {
+                BehaviorTreeNodeParticipation::Active {
+                    activation_count: u8::try_from(active_count)
+                        .expect("active count fits fixed activation capacity"),
+                }
+            };
+            nodes
+                .try_push(BehaviorTreeNodeSnapshot::new(
+                    node.id(),
+                    node.name(),
+                    BehaviorTreeNodeType::from_mission(node.kind()),
+                    participation,
+                    self.last_outcomes[node_index],
+                ))
+                .expect("validated node count is bounded by snapshot capacity");
+        }
+
+        BehaviorTreeSnapshot::new(self.state, nodes, activations)
+    }
+
     fn allocate_activation(
         &mut self,
         node_id: MissionNodeId,
@@ -434,6 +509,11 @@ impl<'ir> MissionRuntime<'ir> {
             slot: u8::try_from(slot_index).expect("activation capacity fits u8"),
             generation,
         };
+        let node_index = self
+            .ir
+            .node_index(node_id)
+            .expect("validated runtime only activates known nodes");
+        self.last_outcomes[node_index] = None;
         self.slots[slot_index] = ActivationSlot {
             generation,
             activation: Some(Activation::new(node_id, parent)),
@@ -500,6 +580,10 @@ impl<'ir> MissionRuntime<'ir> {
                     activation: id,
                     node_id: activation.node_id,
                     action,
+                });
+                step.push(MissionEffect::ArmDeadline {
+                    activation: id,
+                    timeout_ns: action.timeout_ns(),
                 });
             }
             MissionNodeKind::Sequence(children) | MissionNodeKind::Selector(children) => {
@@ -890,6 +974,11 @@ impl<'ir> MissionRuntime<'ir> {
         let Some(activation) = self.activation(id) else {
             return;
         };
+        let node_index = self
+            .ir
+            .node_index(activation.node_id)
+            .expect("validated runtime only completes known nodes");
+        self.last_outcomes[node_index] = Some(outcome);
         self.clear_activation(id);
         let Some(parent) = activation.parent else {
             self.root_activation = None;
@@ -1112,6 +1201,21 @@ impl<'ir> MissionRuntime<'ir> {
         self.root_activation = None;
         self.state = MissionRuntimeState::Faulted(fault);
         step.push(MissionEffect::RuntimeFault(fault));
+    }
+}
+
+fn snapshot_activation_state(phase: ActivationPhase) -> BehaviorTreeActivationState {
+    match phase {
+        ActivationPhase::Entering => BehaviorTreeActivationState::Entering,
+        ActivationPhase::WaitingDispatch => BehaviorTreeActivationState::WaitingDispatch,
+        ActivationPhase::WaitingAcceptance(_) => {
+            BehaviorTreeActivationState::WaitingAcknowledgement
+        }
+        ActivationPhase::RunningAction(_) => BehaviorTreeActivationState::Running,
+        ActivationPhase::CancelRequested(_) => BehaviorTreeActivationState::CancelRequested,
+        ActivationPhase::Canceling(_) => BehaviorTreeActivationState::Canceling,
+        ActivationPhase::WaitingGuard => BehaviorTreeActivationState::WaitingCondition,
+        ActivationPhase::WaitingChildren => BehaviorTreeActivationState::WaitingChildren,
     }
 }
 

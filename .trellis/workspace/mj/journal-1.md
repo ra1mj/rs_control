@@ -480,3 +480,36 @@ Implemented the fail-closed Nav2 IPC bridge, Rust-only authority and motion limi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 15: Behavior-tree navigation participation
+
+**Date**: 2026-08-10
+**Task**: Behavior-tree navigation participation
+**Branch**: `main`
+
+### Summary
+
+Added behavior-tree-driven motor-disabled navigation participation, a read-only btctl view, exact action acknowledgement, final Nav2 fault handling, and a synchronized chassis_nav manifest change (21a23bb).
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0b6fd08` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

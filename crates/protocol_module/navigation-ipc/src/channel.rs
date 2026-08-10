@@ -5,14 +5,15 @@ use message_model::{
 };
 use middleware_shm::{
     ChannelName, MemoryPolicy, ShmChannelConfig, ShmEventPublisher, ShmEventSubscriber,
-    ShmLatestPublisher, ShmLatestSubscriber, ShmNamespace,
+    ShmLatestObserver, ShmLatestPublisher, ShmLatestSubscriber, ShmNamespace,
 };
 
 use crate::{
     ActionRequestRepr, ActionResponseRepr, NavigationActionRequest, NavigationActionRequestCodec,
     NavigationActionResponse, NavigationActionResponseCodec, NavigationAuthorityCodec,
     NavigationAuthorityRepr, NavigationHealthCodec, NavigationHealthRepr, NavigationIpcError,
-    NavigationOdometryCodec, NavigationOdometryRepr, NavigationProposalCodec,
+    NavigationOdometryCodec, NavigationOdometryRepr, NavigationParticipationCodec,
+    NavigationParticipationRepr, NavigationParticipationSnapshot, NavigationProposalCodec,
     NavigationProposalRepr, NavigationTfBatch, NavigationTfCodec, NavigationTfRepr,
 };
 
@@ -30,6 +31,8 @@ pub const ODOMETRY_CHANNEL: &str = "navigation.odometry.v1";
 pub const DYNAMIC_TF_CHANNEL: &str = "navigation.dynamic-tf.v1";
 /// Stable local file name for bridge health.
 pub const HEALTH_CHANNEL: &str = "navigation.health.v1";
+/// Stable local file name for the latest command-participation snapshot.
+pub const PARTICIPATION_CHANNEL: &str = "navigation.participation.v1";
 
 /// Authority ordered publisher endpoint.
 pub type AuthorityPublisher = ShmEventPublisher<NavigationAuthorityState, NavigationAuthorityCodec>;
@@ -64,6 +67,15 @@ pub type DynamicTfSubscriber = ShmLatestSubscriber<NavigationTfBatch, Navigation
 pub type HealthPublisher = ShmLatestPublisher<NavigationHealth, NavigationHealthCodec>;
 /// Latest bridge-health subscriber endpoint.
 pub type HealthSubscriber = ShmLatestSubscriber<NavigationHealth, NavigationHealthCodec>;
+/// Latest movement-participation publisher endpoint.
+pub type ParticipationPublisher =
+    ShmLatestPublisher<NavigationParticipationSnapshot, NavigationParticipationCodec>;
+/// Latest movement-participation subscriber endpoint.
+pub type ParticipationSubscriber =
+    ShmLatestSubscriber<NavigationParticipationSnapshot, NavigationParticipationCodec>;
+/// Read-only diagnostic observer that never claims a subscriber lease.
+pub type ParticipationObserver =
+    ShmLatestObserver<NavigationParticipationSnapshot, NavigationParticipationCodec>;
 
 /// Exact motor-disabled navigation shared-memory namespace.
 #[derive(Clone, Debug)]
@@ -105,6 +117,10 @@ impl NavigationIpcNamespace {
             .create_latest::<NavigationTfRepr>(channel(DYNAMIC_TF_CHANNEL)?, latest_config()?)?;
         self.inner
             .create_latest::<NavigationHealthRepr>(channel(HEALTH_CHANNEL)?, latest_config()?)?;
+        self.inner.create_latest::<NavigationParticipationRepr>(
+            channel(PARTICIPATION_CHANNEL)?,
+            latest_config()?,
+        )?;
         Ok(())
     }
 
@@ -239,6 +255,39 @@ impl NavigationIpcNamespace {
             channel(HEALTH_CHANNEL)?,
             latest_config()?,
             NavigationHealthCodec::default(),
+        )?)
+    }
+
+    /// Claims the sole authority-owner participation publisher endpoint.
+    pub fn attach_participation_publisher(
+        &self,
+    ) -> Result<ParticipationPublisher, NavigationIpcError> {
+        Ok(self.inner.attach_latest_publisher(
+            channel(PARTICIPATION_CHANNEL)?,
+            latest_config()?,
+            NavigationParticipationCodec::default(),
+        )?)
+    }
+
+    /// Attaches the sole diagnostic participation subscriber endpoint.
+    pub fn attach_participation_subscriber(
+        &self,
+    ) -> Result<ParticipationSubscriber, NavigationIpcError> {
+        Ok(self.inner.attach_latest_subscriber(
+            channel(PARTICIPATION_CHANNEL)?,
+            latest_config()?,
+            NavigationParticipationCodec::default(),
+        )?)
+    }
+
+    /// Attaches a read-only observer without changing shared endpoint state.
+    pub fn attach_participation_observer(
+        &self,
+    ) -> Result<ParticipationObserver, NavigationIpcError> {
+        Ok(self.inner.attach_latest_observer(
+            channel(PARTICIPATION_CHANNEL)?,
+            latest_config()?,
+            NavigationParticipationCodec::default(),
         )?)
     }
 }

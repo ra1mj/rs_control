@@ -8,6 +8,14 @@ license.workspace = true
 [dependencies]
 clap.workspace = true
 control-core.workspace = true
+navigation-ipc.workspace = true
+
+[dev-dependencies]
+arrayvec.workspace = true
+message-model.workspace = true
+middleware-api.workspace = true
+rustix.workspace = true
+tempfile.workspace = true
 
 [lints]
 workspace = true

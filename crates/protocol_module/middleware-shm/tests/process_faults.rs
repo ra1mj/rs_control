@@ -2,21 +2,35 @@ use std::{
     env, fs,
     path::{Path, PathBuf},
     process::{Child, Command, ExitStatus, Stdio},
+    sync::{Mutex, MutexGuard},
     thread,
     time::{Duration, Instant},
 };
 
 use bytemuck::{Pod, Zeroable};
-use middleware_api::{
-    EventPublishError, EventPublisher, EventSubscriber, LatestPublisher, LatestSubscriber,
-};
+use middleware_api::{EventPublishError, EventPublisher, EventSubscriber};
+#[cfg(feature = "fault-injection")]
+use middleware_api::{LatestPublisher, LatestSubscriber};
 use middleware_shm::{
-    ChannelName, EndpointRole, IdentityCodec, MemoryPolicy, ShmChannelConfig, ShmError,
-    ShmNamespace, ShmPayload,
+    ChannelName, IdentityCodec, MemoryPolicy, ShmChannelConfig, ShmNamespace, ShmPayload,
 };
+#[cfg(feature = "fault-injection")]
+use middleware_shm::{EndpointRole, ShmError};
 use tempfile::TempDir;
 
 const TIMEOUT: Duration = Duration::from_secs(5);
+
+// The parent scenarios each launch a copy of this test binary and deliberately
+// exercise kernel-lock reclamation. Keep those parent traces separate so one
+// killed peer is fully reaped before another trace begins its lock lifecycle.
+// The child-only `process_peer` entrypoint must remain ungated.
+static PROCESS_FAULT_SCENARIO_LOCK: Mutex<()> = Mutex::new(());
+
+fn process_fault_scenario_guard() -> MutexGuard<'static, ()> {
+    PROCESS_FAULT_SCENARIO_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Pod, Zeroable)]
@@ -134,6 +148,7 @@ fn process_peer() {
 
 #[test]
 fn normal_event_crosses_a_real_process_boundary() {
+    let _scenario_guard = process_fault_scenario_guard();
     let temp = TempDir::new().unwrap();
     let root = temp.path().join("shm");
     let namespace = ShmNamespace::new(&root).unwrap();
@@ -166,6 +181,7 @@ fn normal_event_crosses_a_real_process_boundary() {
 
 #[test]
 fn killed_consumer_never_blocks_producer_and_replacement_skips_backlog() {
+    let _scenario_guard = process_fault_scenario_guard();
     let temp = TempDir::new().unwrap();
     let root = temp.path().join("shm");
     let namespace = ShmNamespace::new(&root).unwrap();
@@ -238,6 +254,7 @@ fn killed_consumer_never_blocks_producer_and_replacement_skips_backlog() {
 #[cfg(feature = "fault-injection")]
 #[test]
 fn sigkill_reclaims_corrupt_pid_writer_and_odd_slot_is_never_exposed() {
+    let _scenario_guard = process_fault_scenario_guard();
     let temp = TempDir::new().unwrap();
     let root = temp.path().join("shm");
     let namespace = ShmNamespace::new(&root).unwrap();

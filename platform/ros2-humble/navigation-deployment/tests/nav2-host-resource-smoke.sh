@@ -49,7 +49,7 @@ cleanup() {
 trap cleanup EXIT
 
 manifest="${rs_control_root}/config/navigation/rs_control_navigation_plugin.yaml"
-digest="ec8784456ae3bb285d888ad57206af8a36926543e6f559ca65f1c85f8dfad1f7"
+digest="798fb5358dc3b9375b1102c92db75cf558491d8db1841785e3c2286bcda4b8ca"
 map_root="${chassis_source}/src/chassis_nav_mecanum_sim/assets/localization_map/warehouse_sim_map/0.1.0"
 bringup_root="${chassis_source}/src/chassis_nav_bringup"
 export RS_CONTROL_BIN="$(dirname "${harness_bin}")"
@@ -149,7 +149,7 @@ cp "${runtime_dir}/synthetic-tracker.log" \
   echo "nav2_profile=map_server,controller_server,planner_server,bt_navigator,lifecycle_manager"
   echo "nav2_supervisor=direct_shell_no_ros2_launch"
   echo "production_slam_process=not_run"
-  echo "obstacle_input=test_only_fresh_empty_pointcloud"
+  echo "obstacle_input=test_only_fresh_range_filtered_pointcloud"
   echo "initial_pose_map=1.5,-1.5,0.0"
   echo "goal_pose_map=1.5,-3.0,0.0"
   echo "snapshot_phase=active_controller"

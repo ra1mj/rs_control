@@ -4,17 +4,19 @@ set -euo pipefail
 mode="${1:-}"
 bridge_bin="${2:-}"
 harness_bin="${3:-}"
+btctl_bin="${4:-}"
 case "${mode}" in
-  success|cancel|fault|nav2-fault) ;;
-  *) echo "usage: motor-disabled-e2e.sh success|cancel|fault|nav2-fault BRIDGE_BIN HARNESS_BIN" >&2; exit 2 ;;
+  success|rejected|cancel|fault|nav2-fault) ;;
+  *) echo "usage: motor-disabled-e2e.sh success|rejected|cancel|fault|nav2-fault BRIDGE_BIN HARNESS_BIN [BTCTL_BIN]" >&2; exit 2 ;;
 esac
 [[ "${bridge_bin}" == /* && -x "${bridge_bin}" ]] || exit 2
 [[ "${harness_bin}" == /* && -x "${harness_bin}" ]] || exit 2
+[[ -z "${btctl_bin}" || ( "${btctl_bin}" == /* && -x "${btctl_bin}" ) ]] || exit 2
 
 test_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 rs_control_root="$(cd "${test_dir}/../../../.." && pwd -P)"
 manifest="${rs_control_root}/config/navigation/rs_control_navigation_plugin.yaml"
-digest="ec8784456ae3bb285d888ad57206af8a36926543e6f559ca65f1c85f8dfad1f7"
+digest="798fb5358dc3b9375b1102c92db75cf558491d8db1841785e3c2286bcda4b8ca"
 runtime_dir="$(mktemp -d --tmpdir rs-navigation-e2e.XXXXXXXX)"
 server_pid=""
 bridge_pid=""
@@ -33,11 +35,36 @@ cleanup() {
 }
 trap cleanup EXIT
 
+assert_live_participation() {
+  local inspect_output
+  for _ in $(seq 1 750); do
+    if inspect_output="$("${btctl_bin}" inspect --ipc-root "${runtime_dir}/ipc" 2>/dev/null)" \
+      && grep -Fqx 'participant id=tree.root state=active reason=executing' <<<"${inspect_output}" \
+      && grep -Fqx 'participant id=tree.navigate_to_pose state=active reason=executing' <<<"${inspect_output}" \
+      && grep -Fqx 'participant id=navigation.action state=active reason=executing' <<<"${inspect_output}" \
+      && grep -Fqx 'participant id=navigation.bridge state=active reason=executing' <<<"${inspect_output}" \
+      && grep -Fqx 'participant id=control.authority state=active reason=authority_available' <<<"${inspect_output}" \
+      && grep -Fqx 'participant id=control.proposal state=active reason=proposal_accepted' <<<"${inspect_output}" \
+      && grep -Fqx 'participant id=control.final_limiter state=active reason=final_limited' <<<"${inspect_output}" \
+      && grep -Fqx 'participant id=control.mecanum state=active reason=final_limited' <<<"${inspect_output}" \
+      && grep -Fqx 'participant id=output.fake_sink state=active reason=fake_output_applied' <<<"${inspect_output}"; then
+      return 0
+    fi
+    sleep 0.02
+  done
+  return 1
+}
+
 export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 default_domain=$((100 + BASHPID % 100))
 export ROS_DOMAIN_ID="${RS_NAVIGATION_ROS_DOMAIN_ID:-${default_domain}}"
 export ROS_LOG_DIR="${runtime_dir}/ros-log"
 mkdir "${ROS_LOG_DIR}"
+if [[ "${mode}" == "rejected" ]]; then
+  export RS_NAVIGATION_FAKE_NAV2_REJECT_GOALS=1
+else
+  unset RS_NAVIGATION_FAKE_NAV2_REJECT_GOALS
+fi
 python3 "${test_dir}/fake_nav2_action_server.py" >"${runtime_dir}/server.log" 2>&1 &
 server_pid=$!
 for _ in $(seq 1 200); do
@@ -78,6 +105,10 @@ grep -Fq 'motor_output=forbidden can_transmit=forbidden' \
   >"${runtime_dir}/bridge.log" 2>&1 &
 bridge_pid=$!
 
+if [[ -n "${btctl_bin}" && "${mode}" != "rejected" ]]; then
+  assert_live_participation
+fi
+
 if [[ "${mode}" == "fault" ]]; then
   for _ in $(seq 1 300); do
     grep -Fq 'status=Succeeded' "${runtime_dir}/harness.log" && break
@@ -105,7 +136,11 @@ if [[ "${mode}" == "fault" ]]; then
 fi
 
 if [[ "${mode}" == "nav2-fault" ]]; then
-  for _ in $(seq 1 300); do
+  # The fake server is already graph-visible before the bridge starts, but the
+  # bridge's own action client still needs an independent DDS discovery round.
+  # Keep this startup-only observation window separate from the 200 ms runtime
+  # proposal-expiry bound asserted below.
+  for _ in $(seq 1 750); do
     grep -Fq 'proposal=Accepted' "${runtime_dir}/harness.log" && break
     sleep 0.02
   done
@@ -148,6 +183,9 @@ wait "${harness_pid}"
 harness_pid=""
 if [[ "${mode}" == "success" ]]; then
   grep -Fq 'status=Succeeded' "${runtime_dir}/harness.log"
+elif [[ "${mode}" == "rejected" ]]; then
+  grep -Fq 'status=Rejected' "${runtime_dir}/harness.log"
+  ! grep -Fq 'proposal=Accepted' "${runtime_dir}/harness.log"
 else
   grep -Fq 'decision=Accepted' "${runtime_dir}/harness.log"
   grep -Fq 'status=Cancelled' "${runtime_dir}/harness.log"

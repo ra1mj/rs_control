@@ -8,12 +8,14 @@ mod action;
 mod channel;
 mod codec;
 mod guard;
+mod participation;
 mod wire;
 
 pub use action::*;
 pub use channel::*;
 pub use codec::*;
 pub use guard::*;
+pub use participation::*;
 
 #[cfg(test)]
 mod tests;
@@ -45,6 +47,9 @@ pub enum NavigationIpcError {
     /// A navigation action carried the wrong registered action or payload type.
     #[error("unexpected navigation action identity in {0}")]
     ActionIdentity(&'static str),
+    /// A fixed navigation participation snapshot was malformed.
+    #[error("invalid navigation participation snapshot: {0}")]
+    Participation(&'static str),
     /// A transform batch does not match the declared dynamic TF ownership.
     #[error("invalid navigation TF batch: {0}")]
     TransformOwnership(&'static str),

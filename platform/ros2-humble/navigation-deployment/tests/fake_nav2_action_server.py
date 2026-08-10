@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
+import os
 import time
 
 import rclpy
 from geometry_msgs.msg import Twist
 from nav2_msgs.action import NavigateToPose
-from rclpy.action import ActionServer, CancelResponse
+from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
@@ -13,6 +14,7 @@ from rclpy.node import Node
 class FakeNav2(Node):
     def __init__(self):
         super().__init__("rs_control_fake_nav2")
+        self._reject_goals = os.environ.get("RS_NAVIGATION_FAKE_NAV2_REJECT_GOALS") == "1"
         self._proposal = self.create_publisher(
             Twist, "/rs_control/navigation/controller_proposal", 1
         )
@@ -21,9 +23,13 @@ class FakeNav2(Node):
             NavigateToPose,
             "/navigate_to_pose",
             execute_callback=self._execute,
+            goal_callback=self._goal,
             cancel_callback=lambda _: CancelResponse.ACCEPT,
             callback_group=ReentrantCallbackGroup(),
         )
+
+    def _goal(self, _goal_request):
+        return GoalResponse.REJECT if self._reject_goals else GoalResponse.ACCEPT
 
     def _execute(self, goal_handle):
         feedback = NavigateToPose.Feedback()

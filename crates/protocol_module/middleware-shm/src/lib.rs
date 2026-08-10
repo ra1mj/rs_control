@@ -18,7 +18,8 @@ pub use contract::{
     ChannelName, IdentityCodec, MemoryPolicy, ShmChannelConfig, ShmCodec, ShmPayload,
 };
 pub use endpoint::{
-    ShmDiagnostics, ShmEventPublisher, ShmEventSubscriber, ShmLatestPublisher, ShmLatestSubscriber,
+    ShmDiagnostics, ShmEventPublisher, ShmEventSubscriber, ShmLatestObserver, ShmLatestPublisher,
+    ShmLatestSubscriber,
 };
 pub use error::{ContractError, EndpointRole, LayoutError, LayoutField, ShmError};
 pub use namespace::ShmNamespace;

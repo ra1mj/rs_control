@@ -1,14 +1,14 @@
 use bytemuck::{Pod, Zeroable};
 use contract_codec::{
-    decode_action_cancel_request, decode_action_cancel_response, decode_action_feedback,
-    decode_action_goal_intent, decode_action_result, decode_navigate_to_pose_feedback,
-    decode_navigate_to_pose_goal, decode_navigate_to_pose_result, encode_action_cancel_request,
-    encode_action_cancel_response, encode_action_feedback, encode_action_goal_intent,
-    encode_action_result,
+    decode_action_ack, decode_action_cancel_request, decode_action_cancel_response,
+    decode_action_feedback, decode_action_goal_intent, decode_action_result,
+    decode_navigate_to_pose_feedback, decode_navigate_to_pose_goal, decode_navigate_to_pose_result,
+    encode_action_ack, encode_action_cancel_request, encode_action_cancel_response,
+    encode_action_feedback, encode_action_goal_intent, encode_action_result,
 };
 use message_model::{
-    ActionCancelRequest, ActionCancelResponse, ActionFeedback, ActionGoalIntent, ActionResult,
-    Header,
+    ActionAck, ActionCancelRequest, ActionCancelResponse, ActionFeedback, ActionGoalIntent,
+    ActionResult, Header,
 };
 use middleware_shm::{ShmCodec, ShmPayload};
 
@@ -52,8 +52,11 @@ pub struct ActionResponseRepr {
 }
 
 impl ShmPayload for ActionResponseRepr {
-    const SCHEMA_ID: [u8; 16] = *b"rs-nav-act-rsp01";
-    const SCHEMA_VERSION: u32 = 1;
+    // Goal acknowledgement adds a distinct response variant. Bump both the
+    // fixed identity and schema version so an older bridge never consumes a
+    // layout whose action lifecycle it cannot represent.
+    const SCHEMA_ID: [u8; 16] = *b"rs-nav-act-rsp02";
+    const SCHEMA_VERSION: u32 = 2;
 }
 
 /// Ordered request delivered from the Rust authority owner to the ROS bridge.
@@ -135,6 +138,9 @@ impl PartialEq for NavigationActionRequest {
 /// Ordered response delivered from the ROS bridge to the Rust owner.
 #[derive(Clone, Debug, PartialEq)]
 pub enum NavigationActionResponseKind {
+    /// Exact action-server goal admission decision; feedback follows only
+    /// after an accepted acknowledgement.
+    Acknowledgement(ActionAck),
     /// Nonterminal executing/canceling feedback.
     Feedback(ActionFeedback),
     /// Cancellation acceptance/rejection; not terminal evidence.
@@ -151,6 +157,16 @@ pub struct NavigationActionResponse {
 }
 
 impl NavigationActionResponse {
+    /// Admits the exact goal acceptance or rejection decision.
+    pub fn acknowledgement(value: ActionAck) -> Result<Self, NavigationIpcError> {
+        let value = value.validate()?;
+        let bytes = encode_action_ack(&value)?;
+        Ok(Self {
+            repr: response_repr(4, &bytes)?,
+            kind: NavigationActionResponseKind::Acknowledgement(value),
+        })
+    }
+
     /// Validates status, payload identity and concrete navigation feedback.
     pub fn feedback(value: ActionFeedback) -> Result<Self, NavigationIpcError> {
         let value = value.validate()?;
@@ -196,6 +212,7 @@ impl NavigationActionResponse {
 
     fn header(&self) -> Header {
         match &self.kind {
+            NavigationActionResponseKind::Acknowledgement(value) => value.header,
             NavigationActionResponseKind::Feedback(value) => value.header,
             NavigationActionResponseKind::Cancel(value) => value.header,
             NavigationActionResponseKind::Result(value) => value.header,
@@ -297,6 +314,7 @@ impl ShmCodec<NavigationActionResponse> for NavigationActionResponseCodec {
             1 => NavigationActionResponse::feedback(decode_action_feedback(bytes)?)?,
             2 => NavigationActionResponse::cancel(decode_action_cancel_response(bytes)?)?,
             3 => NavigationActionResponse::result(decode_action_result(bytes)?)?,
+            4 => NavigationActionResponse::acknowledgement(decode_action_ack(bytes)?)?,
             _ => {
                 return Err(NavigationIpcError::InvalidRepresentation(
                     "action response tag",

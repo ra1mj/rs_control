@@ -278,8 +278,14 @@ dependencies = [
 name = "btctl"
 version = "0.1.0"
 dependencies = [
+ "arrayvec",
  "clap",
  "control-core",
+ "message-model",
+ "middleware-api",
+ "navigation-ipc",
+ "rustix",
+ "tempfile",
 ]
 
 [[package]]

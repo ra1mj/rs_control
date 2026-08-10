@@ -70,7 +70,7 @@ ipc:
       capacity: 8
       freshness_ms: 1000
     action_response:
-      layout_id: rs-nav-act-rsp01
+      layout_id: rs-nav-act-rsp02
       mode: ordered
       capacity: 8
       freshness_ms: 1000
@@ -94,6 +94,11 @@ ipc:
       mode: latest
       capacity: 3
       freshness_ms: 500
+    participation:
+      layout_id: rs-nav-part-v001
+      mode: latest
+      capacity: 3
+      freshness_ms: 250
 
 safety:
   final_constraint_owner: rs_control

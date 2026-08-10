@@ -30,6 +30,13 @@ use navigation_plugin_config::NavigationPluginManifest;
 use rclrs::*;
 use rustix::time::{clock_gettime, ClockId};
 
+// rclrs sends an action goal request even if the client has not yet discovered
+// a late-starting server. That request then has no response to correlate. Hold
+// the already-admitted local request briefly after client/server readiness so
+// the bridge's own DDS endpoint has completed discovery before its one exact
+// goal request is sent.
+const ACTION_CLIENT_DISCOVERY_SETTLE_NS: u64 = 500_000_000;
+
 #[derive(Debug, Parser)]
 #[command(name = "rs-navigation-bridge", version)]
 struct Cli {
@@ -116,6 +123,8 @@ fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
     let mut executor = context.create_basic_executor();
     let node = executor.create_node("rs_navigation_bridge")?;
     let action_client = node.create_action_client::<NavigateToPose>("/navigate_to_pose")?;
+    let action_client_created_ns = monotonic_ns();
+    let ros_clock = node.get_clock();
     let odometry_publisher = node.create_publisher::<nav_msgs::msg::Odometry>(
         "/rs_control/navigation/odometry".keep_last(1),
     )?;
@@ -183,6 +192,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
     let action_timer_metrics = Arc::clone(&metrics);
     let nav2_ready_file = cli.nav2_ready_file.clone();
     let mut pending_goal: Option<NavigationActionRequest> = None;
+    let mut nav2_ready_since_ns = None;
     let _action_timer = node.create_timer_repeating(Duration::from_millis(10), move || {
         while let Some(sample) = action_request_subscriber.try_receive() {
             match sample.value.kind() {
@@ -227,23 +237,41 @@ fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
         let Some(request) = pending_goal.take() else {
             return;
         };
-        if nav2_ready_file
-            .as_ref()
-            .is_some_and(|path| !path.is_file())
-        {
+        let now = monotonic_ns();
+        let ready_since_ns = match nav2_ready_file.as_ref() {
+            Some(path) if !path.is_file() => {
+                pending_goal = Some(request);
+                return;
+            }
+            Some(_) => *nav2_ready_since_ns.get_or_insert(now),
+            None => action_client_created_ns,
+        };
+        if !goal_dispatch_ready(now, ready_since_ns) {
             pending_goal = Some(request);
             return;
         }
         let NavigationActionRequestKind::Goal(intent) = request.kind() else {
             return;
         };
+        let command_id = intent.intent().command_id();
         let Ok(goal) = decode_navigate_to_pose_goal(intent.goal().value()) else {
+            reject_action(
+                &action_timer_state,
+                command_id,
+                10,
+                "invalid NavigateToPose goal payload",
+            );
             return;
         };
         if goal.behavior_tree_id.as_str() != "navigate_to_pose_fail_closed" {
+            reject_action(
+                &action_timer_state,
+                command_id,
+                11,
+                "unexpected NavigateToPose behavior tree identifier",
+            );
             return;
         }
-        let command_id = intent.intent().command_id();
         let Ok(mut state) = action_timer_state.lock() else {
             pending_goal = Some(request);
             return;
@@ -266,22 +294,24 @@ fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
         let response_metrics = Arc::clone(&action_timer_metrics);
         drop(action_commands.run(async move {
             let Some(goal_client) = requested.await else {
-                finish_action(
+                acknowledge_action(
                     &response_state,
                     &response_metrics,
                     binding,
-                    ActionStatus::Rejected,
+                    false,
                     1,
                     "Nav2 rejected the goal",
                 );
                 return;
             };
-            if let Ok(mut metrics) = response_metrics.lock() {
-                metrics.action_server = true;
-                metrics.nav2_lifecycle = true;
-                metrics.counters.accepted_goals =
-                    metrics.counters.accepted_goals.saturating_add(1);
-            }
+            acknowledge_action(
+                &response_state,
+                &response_metrics,
+                binding,
+                true,
+                0,
+                "Nav2 accepted the goal",
+            );
             let mut events = goal_client.stream();
             while let Some(event) = events.next().await {
                 match event {
@@ -323,15 +353,26 @@ fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
     })?;
 
     let feedback_metrics = Arc::clone(&metrics);
+    let feedback_clock = ros_clock.clone();
     let _feedback_timer = node.create_timer_repeating(Duration::from_millis(20), move || {
+        // The IPC timestamps stay in their local monotonic clock domain.  ROS
+        // TF consumers instead require a timestamp from the bridge's ROS clock
+        // so it can be compared to sensor messages in the ROS graph.
+        let Ok(rclrs_stamp) = feedback_clock.now().to_ros_msg() else {
+            return;
+        };
+        let ros_stamp = builtin_interfaces::msg::Time {
+            sec: rclrs_stamp.sec,
+            nanosec: rclrs_stamp.nanosec,
+        };
         if let Some(sample) = odometry_subscriber.try_read_latest() {
-            let _ = odometry_publisher.publish(odometry_to_ros(sample.value));
+            let _ = odometry_publisher.publish(odometry_to_ros(sample.value, ros_stamp.clone()));
             if let Ok(mut metrics) = feedback_metrics.lock() {
                 metrics.odometry = true;
             }
         }
         if let Some(sample) = tf_subscriber.try_read_latest() {
-            let _ = tf_publisher.publish(tf_to_ros(sample.value.into_batch()));
+            let _ = tf_publisher.publish(tf_to_ros(sample.value.into_batch(), ros_stamp));
             if let Ok(mut metrics) = feedback_metrics.lock() {
                 metrics.tf = true;
             }
@@ -382,6 +423,57 @@ fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
         return Err(format!("executor stopped with {} errors", errors.len()).into());
     }
     Ok(())
+}
+
+fn goal_dispatch_ready(now_monotonic_ns: u64, ready_since_monotonic_ns: u64) -> bool {
+    now_monotonic_ns.saturating_sub(ready_since_monotonic_ns) >= ACTION_CLIENT_DISCOVERY_SETTLE_NS
+}
+
+fn acknowledge_action(
+    shared: &Arc<Mutex<ActionState>>,
+    metrics: &Arc<Mutex<BridgeMetrics>>,
+    binding: GoalBinding,
+    accepted: bool,
+    result_code: u32,
+    detail: &str,
+) {
+    if let Ok(mut state) = shared.lock() {
+        let response = state.correlation.acknowledgement(
+            binding,
+            accepted,
+            result_code,
+            detail.to_owned(),
+            monotonic_ns(),
+        );
+        if let Ok(response) = response {
+            state.publish(response);
+            if accepted {
+                if let Ok(mut metrics) = metrics.lock() {
+                    metrics.action_server = true;
+                    metrics.nav2_lifecycle = true;
+                    metrics.counters.accepted_goals =
+                        metrics.counters.accepted_goals.saturating_add(1);
+                }
+            }
+        }
+    }
+}
+
+fn reject_action(
+    shared: &Arc<Mutex<ActionState>>,
+    command_id: Id128,
+    result_code: u32,
+    detail: &str,
+) {
+    if let Ok(mut state) = shared.lock() {
+        let response =
+            state
+                .correlation
+                .rejection(command_id, result_code, detail.to_owned(), monotonic_ns());
+        if let Ok(response) = response {
+            state.publish(response);
+        }
+    }
 }
 
 fn finish_action(
@@ -448,12 +540,15 @@ fn bridge_header(
     })
 }
 
-fn odometry_to_ros(value: OdometryState) -> nav_msgs::msg::Odometry {
+fn odometry_to_ros(
+    value: OdometryState,
+    stamp: builtin_interfaces::msg::Time,
+) -> nav_msgs::msg::Odometry {
     let pose = value.pose();
     let [qx, qy, qz, qw] = pose.orientation.components();
     let twist = value.twist();
     nav_msgs::msg::Odometry {
-        header: ros_header(value.parent_frame_id().as_str()),
+        header: ros_header(value.parent_frame_id().as_str(), stamp),
         child_frame_id: value.child_frame_id().as_str().to_owned(),
         pose: geometry_msgs::msg::PoseWithCovariance {
             pose: geometry_msgs::msg::Pose {
@@ -489,7 +584,10 @@ fn odometry_to_ros(value: OdometryState) -> nav_msgs::msg::Odometry {
     }
 }
 
-fn tf_to_ros(value: TransformBatch) -> tf2_msgs::msg::TFMessage {
+fn tf_to_ros(
+    value: TransformBatch,
+    stamp: builtin_interfaces::msg::Time,
+) -> tf2_msgs::msg::TFMessage {
     tf2_msgs::msg::TFMessage {
         transforms: value
             .transforms()
@@ -497,7 +595,7 @@ fn tf_to_ros(value: TransformBatch) -> tf2_msgs::msg::TFMessage {
             .map(|transform| {
                 let [x, y, z, w] = transform.rotation().components();
                 geometry_msgs::msg::TransformStamped {
-                    header: ros_header(transform.parent_frame_id().as_str()),
+                    header: ros_header(transform.parent_frame_id().as_str(), stamp.clone()),
                     child_frame_id: transform.child_frame_id().as_str().to_owned(),
                     transform: geometry_msgs::msg::Transform {
                         translation: geometry_msgs::msg::Vector3 {
@@ -513,9 +611,9 @@ fn tf_to_ros(value: TransformBatch) -> tf2_msgs::msg::TFMessage {
     }
 }
 
-fn ros_header(frame_id: &str) -> std_msgs::msg::Header {
+fn ros_header(frame_id: &str, stamp: builtin_interfaces::msg::Time) -> std_msgs::msg::Header {
     std_msgs::msg::Header {
-        stamp: builtin_interfaces::msg::Time::default(),
+        stamp,
         frame_id: frame_id.to_owned(),
     }
 }

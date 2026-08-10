@@ -1,12 +1,13 @@
 //! Operator-facing behavior-tree inspection utility with no hardware access.
 
-use std::{error::Error, fmt::Write as _, io, process::ExitCode};
+use std::{error::Error, fmt::Write as _, fs, io, path::PathBuf, process::ExitCode};
 
 use clap::{Parser, Subcommand};
 use control_core::{
     BehaviorTreeActivationId, BehaviorTreeCommandId, BehaviorTreeEffect, BehaviorTreeEvent,
     BehaviorTreeRuntime, representative_automatic_project,
 };
+use navigation_ipc::NavigationIpcNamespace;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -23,6 +24,12 @@ struct Cli {
 enum Command {
     /// Render the checked example tree and replay deterministic startup events.
     Example,
+    /// Read the latest navigation participation snapshot without mutating IPC.
+    Inspect {
+        /// Existing absolute navigation IPC namespace.
+        #[arg(long)]
+        ipc_root: PathBuf,
+    },
 }
 
 fn main() -> ExitCode {
@@ -38,7 +45,52 @@ fn main() -> ExitCode {
 fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
     match cli.command {
         Command::Example => run_example(),
+        Command::Inspect { ipc_root } => run_inspect(ipc_root),
     }
+}
+
+fn run_inspect(ipc_root: PathBuf) -> Result<(), Box<dyn Error>> {
+    if !ipc_root.is_absolute() {
+        return Err("--ipc-root must be absolute".into());
+    }
+    let metadata = fs::metadata(&ipc_root).map_err(|error| {
+        io::Error::new(
+            error.kind(),
+            format!("navigation IPC namespace is missing: {ipc_root:?}"),
+        )
+    })?;
+    if !metadata.is_dir() {
+        return Err("--ipc-root must name an existing directory".into());
+    }
+    let ipc = NavigationIpcNamespace::new(&ipc_root)?;
+    let mut observer = ipc.attach_participation_observer()?;
+    let sample = observer.try_observe_latest().ok_or_else(|| {
+        io::Error::other(
+            "no current navigation participation snapshot (missing, stale, or invalid)",
+        )
+    })?;
+    let snapshot = sample.value;
+    let header = snapshot.header();
+    println!(
+        "snapshot generation={} source={} boot={} sequence={} process_epoch={} command={}",
+        sample.generation,
+        header.source_id(),
+        id128_text(header.boot_id()),
+        header.sequence(),
+        snapshot.process_epoch(),
+        snapshot
+            .command_id()
+            .map_or_else(|| "-".to_owned(), id128_text),
+    );
+    for participant in snapshot.participants() {
+        println!(
+            "participant id={} state={} reason={}",
+            participant.id(),
+            participant.state().as_str(),
+            participant.reason().as_str(),
+        );
+    }
+    Ok(())
 }
 
 fn run_example() -> Result<(), Box<dyn Error>> {

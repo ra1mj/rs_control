@@ -1,12 +1,12 @@
 use allocation_counter::measure;
 use arrayvec::ArrayVec;
 use message_model::{
-    AsciiId, ChassisSetpointIntent, ClockState, ClockStatus, CommandIntent, CommandIntentFields,
-    Covariance6, DataQuality, Header, HeaderFields, Id128, NavigationAuthority,
-    NavigationAuthorityState, NavigationComponentState, NavigationCounters, NavigationHealth,
-    NavigationReadiness, OdometryState, OdometryStateFields, Pose3, ResourceLease,
-    ResourceLeaseFields, Sha256Identity, StampedTransform, StampedTransformFields, TransformBatch,
-    Twist2, Twist3, UnitQuaternion, Vector3,
+    ActionAck, ActionStatus, AsciiId, ChassisSetpointIntent, ClockState, ClockStatus,
+    CommandIntent, CommandIntentFields, Covariance6, DataQuality, Header, HeaderFields, Id128,
+    NavigationAuthority, NavigationAuthorityState, NavigationComponentState, NavigationCounters,
+    NavigationHealth, NavigationReadiness, OdometryState, OdometryStateFields, Pose3,
+    ResourceLease, ResourceLeaseFields, Sha256Identity, StampedTransform, StampedTransformFields,
+    TransformBatch, Twist2, Twist3, UnitQuaternion, Vector3,
 };
 use middleware_api::{
     EventPublishError, EventPublisher, LatestPublish, LatestPublisher, LatestSubscriber,
@@ -17,9 +17,12 @@ use middleware_shm::{
 use tempfile::TempDir;
 
 use crate::{
+    NavigationActionResponse, NavigationActionResponseCodec, NavigationActionResponseKind,
     NavigationAuthorityCodec, NavigationGuardError, NavigationIpcNamespace,
-    NavigationOdometryCodec, NavigationProposalCodec, NavigationSourceGuard, NavigationTfBatch,
-    NavigationTfCodec, ODOMETRY_CHANNEL, PROPOSAL_CHANNEL, wire::monotonic_now_ns,
+    NavigationOdometryCodec, NavigationParticipant, NavigationParticipantReason,
+    NavigationParticipantState, NavigationParticipationCodec, NavigationParticipationSnapshot,
+    NavigationProposalCodec, NavigationSourceGuard, NavigationTfBatch, NavigationTfCodec,
+    ODOMETRY_CHANNEL, PARTICIPATION_CHANNEL, PROPOSAL_CHANNEL, wire::monotonic_now_ns,
 };
 
 const TEST_NOW: u64 = 500;
@@ -293,4 +296,80 @@ fn ordered_authority_queue_is_bounded_and_health_is_fixed() {
     assert!(codec.decode(repr).unwrap().readiness.all_ready());
 
     assert_eq!(PROPOSAL_CHANNEL, "navigation.proposal.v1");
+}
+
+#[test]
+fn action_ack_and_participation_snapshot_are_typed_fresh_and_fixed() {
+    let acknowledgement = NavigationActionResponse::acknowledgement(ActionAck {
+        header: header("navigation-bridge", 6, 1, 100, None),
+        command_id: token(9),
+        status: ActionStatus::Accepted,
+        result_code: 0,
+        detail: "accepted".to_owned(),
+    })
+    .unwrap();
+    let mut action_codec = NavigationActionResponseCodec::new(fixed_now);
+    let action_repr = action_codec.encode(&acknowledgement);
+    let decoded = action_codec.decode(action_repr).unwrap();
+    assert!(matches!(
+        decoded.kind(),
+        NavigationActionResponseKind::Acknowledgement(value) if value.accepted()
+    ));
+
+    let mut participants = ArrayVec::new();
+    participants.push(NavigationParticipant::new(
+        id("tree.navigate_to_pose"),
+        NavigationParticipantState::Active,
+        NavigationParticipantReason::Executing,
+    ));
+    participants.push(NavigationParticipant::new(
+        id("control.fake_sink"),
+        NavigationParticipantState::Inactive,
+        NavigationParticipantReason::ProposalUnavailable,
+    ));
+    let snapshot = NavigationParticipationSnapshot::new(
+        header("rs-navigation-e2e", 4, 2, 100, None),
+        7,
+        Some(token(9)),
+        participants,
+    )
+    .unwrap();
+    let mut codec = NavigationParticipationCodec::new(fixed_now);
+    let repr = codec.encode(&snapshot);
+    assert_eq!(codec.decode(repr).unwrap(), snapshot);
+    assert!(
+        NavigationParticipationCodec::new(|| 1_000_000_100)
+            .decode(repr)
+            .is_err()
+    );
+    assert_eq!(PARTICIPATION_CHANNEL, "navigation.participation.v1");
+}
+
+#[test]
+fn participation_channel_attaches_as_one_latest_diagnostic_snapshot() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path().join("navigation-ipc");
+    let namespace = NavigationIpcNamespace::new(&root).unwrap();
+    namespace.create_layouts().unwrap();
+    let mut publisher = namespace.attach_participation_publisher().unwrap();
+    let mut observer = namespace.attach_participation_observer().unwrap();
+    let now = monotonic_now_ns();
+    let mut participants = ArrayVec::new();
+    participants.push(NavigationParticipant::new(
+        id("tree.navigate_to_pose"),
+        NavigationParticipantState::Pending,
+        NavigationParticipantReason::WaitingAcknowledgement,
+    ));
+    let snapshot = NavigationParticipationSnapshot::new(
+        header("rs-navigation-e2e", 4, 1, now, None),
+        7,
+        Some(token(9)),
+        participants,
+    )
+    .unwrap();
+    assert!(matches!(
+        publisher.try_publish_without_subscriber(snapshot.clone()),
+        LatestPublish::Published { .. }
+    ));
+    assert_eq!(observer.try_observe_latest().unwrap().value, snapshot);
 }

@@ -18,7 +18,7 @@ pub const PLUGIN_ID: &str = "chassis_nav.rs_control.navigation";
 /// Motor-disabled host profile identity.
 pub const PROFILE_ID: &str = "motor_disabled_host_v1";
 
-const EXPECTED_CHANNELS: [(ChannelRole, ChannelMode, u32, u64); 7] = [
+const EXPECTED_CHANNELS: [(ChannelRole, ChannelMode, u32, u64); 8] = [
     (ChannelRole::Authority, ChannelMode::Ordered, 8, 100),
     (ChannelRole::ActionRequest, ChannelMode::Ordered, 8, 1_000),
     (ChannelRole::ActionResponse, ChannelMode::Ordered, 8, 1_000),
@@ -26,6 +26,7 @@ const EXPECTED_CHANNELS: [(ChannelRole, ChannelMode, u32, u64); 7] = [
     (ChannelRole::Odometry, ChannelMode::Latest, 3, 100),
     (ChannelRole::DynamicTf, ChannelMode::Latest, 3, 100),
     (ChannelRole::Health, ChannelMode::Latest, 3, 500),
+    (ChannelRole::Participation, ChannelMode::Latest, 3, 250),
 ];
 
 /// One immutable, validated plugin configuration.
@@ -299,6 +300,8 @@ pub enum ChannelRole {
     DynamicTf,
     /// Bridge health state.
     Health,
+    /// Latest read-only movement-participation snapshot.
+    Participation,
 }
 
 /// Borrowed immutable channel configuration.
@@ -462,6 +465,7 @@ struct Channels {
     odometry: RawChannel,
     dynamic_tf: RawChannel,
     health: RawChannel,
+    participation: RawChannel,
 }
 
 impl Channels {
@@ -474,6 +478,7 @@ impl Channels {
             ChannelRole::Odometry => &self.odometry,
             ChannelRole::DynamicTf => &self.dynamic_tf,
             ChannelRole::Health => &self.health,
+            ChannelRole::Participation => &self.participation,
         }
     }
 }
@@ -904,6 +909,24 @@ mod tests {
                 // slots while exposing one logical newest value.
                 capacity: 3,
                 freshness_ms: 100,
+            }
+        );
+        assert_eq!(
+            manifest.channel(ChannelRole::ActionResponse),
+            ChannelContract {
+                layout_id: "rs-nav-act-rsp02",
+                mode: ChannelMode::Ordered,
+                capacity: 8,
+                freshness_ms: 1_000,
+            }
+        );
+        assert_eq!(
+            manifest.channel(ChannelRole::Participation),
+            ChannelContract {
+                layout_id: "rs-nav-part-v001",
+                mode: ChannelMode::Latest,
+                capacity: 3,
+                freshness_ms: 250,
             }
         );
     }

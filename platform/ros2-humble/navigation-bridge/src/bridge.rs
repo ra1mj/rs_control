@@ -1,11 +1,12 @@
 use contract_codec::{encode_navigate_to_pose_feedback, encode_navigate_to_pose_result};
 use geometry_msgs::msg::{Pose, PoseStamped, Quaternion, Twist};
 use message_model::{
-    ActionCancelDecision, ActionCancelResponse, ActionFeedback, ActionResult, ActionStatus,
-    AsciiId, ChassisSetpointIntent, ClockState, ClockStatus, CommandIntent, CommandIntentFields,
-    DataQuality, Header, HeaderFields, Id128, NavigateToPoseFeedback, NavigateToPoseGoal,
-    NavigateToPoseResult, NavigationAuthority, NavigationAuthorityState, NavigationMapIdentity,
-    Pose3, RegisteredPayload, SemanticError, Twist2, UnitQuaternion, Vector3,
+    ActionAck, ActionCancelDecision, ActionCancelResponse, ActionFeedback, ActionResult,
+    ActionStatus, AsciiId, ChassisSetpointIntent, ClockState, ClockStatus, CommandIntent,
+    CommandIntentFields, DataQuality, Header, HeaderFields, Id128, NavigateToPoseFeedback,
+    NavigateToPoseGoal, NavigateToPoseResult, NavigationAuthority, NavigationAuthorityState,
+    NavigationMapIdentity, Pose3, RegisteredPayload, SemanticError, Twist2, UnitQuaternion,
+    Vector3,
 };
 use nav2_msgs::action::{NavigateToPose_Feedback, NavigateToPose_Goal};
 use navigation_ipc::{
@@ -51,6 +52,8 @@ pub enum CorrelationError {
     UnknownCommand,
     #[error("the ROS goal UUID does not match the canonical command ID binding")]
     WrongRosGoal,
+    #[error("the navigation goal has not been accepted")]
+    GoalNotAcknowledged,
     #[error(transparent)]
     Mapping(#[from] MappingError),
     #[error(transparent)]
@@ -74,6 +77,7 @@ struct ActiveGoal {
     binding: GoalBinding,
     map: NavigationMapIdentity,
     last_feedback: NavigateToPoseFeedback,
+    acknowledged: bool,
     canceling: bool,
 }
 
@@ -121,6 +125,7 @@ impl ActionCorrelation {
                 recoveries: 0,
                 distance_remaining_m: 0.0,
             },
+            acknowledged: false,
             canceling: false,
         });
         Ok(binding)
@@ -146,6 +151,9 @@ impl ActionCorrelation {
     ) -> Result<NavigationActionResponse, CorrelationError> {
         let semantic = feedback_from_ros(value)?;
         let active = self.active_mut(binding)?;
+        if !active.acknowledged {
+            return Err(CorrelationError::GoalNotAcknowledged);
+        }
         active.last_feedback = semantic;
         let status = if active.canceling {
             ActionStatus::Canceling
@@ -173,6 +181,9 @@ impl ActionCorrelation {
         detail: String,
         now_monotonic_ns: u64,
     ) -> Result<NavigationActionResponse, CorrelationError> {
+        if !self.active_ref(binding)?.acknowledged {
+            return Err(CorrelationError::GoalNotAcknowledged);
+        }
         if accepted {
             self.active_mut(binding)?.canceling = true;
         } else {
@@ -192,6 +203,54 @@ impl ActionCorrelation {
         Ok(NavigationActionResponse::cancel(value)?)
     }
 
+    /// Records the exact Nav2 goal-admission decision before feedback.
+    pub fn acknowledgement(
+        &mut self,
+        binding: GoalBinding,
+        accepted: bool,
+        result_code: u32,
+        detail: String,
+        now_monotonic_ns: u64,
+    ) -> Result<NavigationActionResponse, CorrelationError> {
+        let _ = self.active_ref(binding)?;
+        let value = ActionAck {
+            header: self.header(now_monotonic_ns)?,
+            command_id: binding.command_id,
+            status: if accepted {
+                ActionStatus::Accepted
+            } else {
+                ActionStatus::Rejected
+            },
+            result_code,
+            detail,
+        };
+        let response = NavigationActionResponse::acknowledgement(value)?;
+        if accepted {
+            self.active_mut(binding)?.acknowledged = true;
+        } else {
+            self.active = None;
+        }
+        Ok(response)
+    }
+
+    /// Rejects a goal that could not reach ROS admission/binding.
+    pub fn rejection(
+        &mut self,
+        command_id: Id128,
+        result_code: u32,
+        detail: String,
+        now_monotonic_ns: u64,
+    ) -> Result<NavigationActionResponse, CorrelationError> {
+        let value = ActionAck {
+            header: self.header(now_monotonic_ns)?,
+            command_id,
+            status: ActionStatus::Rejected,
+            result_code,
+            detail,
+        };
+        Ok(NavigationActionResponse::acknowledgement(value)?)
+    }
+
     pub fn finish(
         &mut self,
         binding: GoalBinding,
@@ -201,6 +260,9 @@ impl ActionCorrelation {
         now_monotonic_ns: u64,
     ) -> Result<NavigationActionResponse, CorrelationError> {
         let active = *self.active_ref(binding)?;
+        if !active.acknowledged {
+            return Err(CorrelationError::GoalNotAcknowledged);
+        }
         let semantic = NavigateToPoseResult {
             map: active.map,
             final_pose: active.last_feedback.current_pose,

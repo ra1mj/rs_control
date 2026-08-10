@@ -10,7 +10,7 @@ use middleware_api::{
 use crate::{
     ChannelName, EndpointRole, ShmChannelConfig, ShmCodec, ShmError, ShmNamespace,
     layout::ChannelKind,
-    mapping::{MappedRegion, RawDiagnostics, SlotRead, ValueMarker},
+    mapping::{MappedRegion, RawDiagnostics, ReadOnlyMappedRegion, SlotRead, ValueMarker},
     namespace::{AttachedRegion, probe_endpoint},
 };
 
@@ -59,6 +59,15 @@ pub struct ShmLatestSubscriber<T, C: ShmCodec<T>> {
     _value: ValueMarker<T>,
 }
 
+/// Read-only diagnostic observer for a latest-value mapping.
+///
+/// It does not claim the consumer endpoint or mutate shared channel metadata.
+pub struct ShmLatestObserver<T, C: ShmCodec<T>> {
+    region: ReadOnlyMappedRegion,
+    codec: C,
+    _value: ValueMarker<T>,
+}
+
 /// Single-producer ordered-event endpoint.
 pub struct ShmEventPublisher<T, C: ShmCodec<T>> {
     region: MappedRegion,
@@ -102,6 +111,20 @@ impl ShmNamespace {
         Ok(ShmLatestSubscriber::new(attached, codec))
     }
 
+    /// Validates and maps a latest-value channel for read-only diagnostics.
+    ///
+    /// Unlike a subscriber, this does not claim an endpoint lease, alter
+    /// producer liveness, or update any shared consumption/diagnostic field.
+    pub fn attach_latest_observer<T, C: ShmCodec<T>>(
+        &self,
+        name: ChannelName,
+        config: ShmChannelConfig,
+        codec: C,
+    ) -> Result<ShmLatestObserver<T, C>, ShmError> {
+        let attached = self.attach_latest_observer_region::<C::Repr>(name, config)?;
+        Ok(ShmLatestObserver::new(attached, codec))
+    }
+
     /// Validates the region and claims the sole ordered-event publisher lease.
     pub fn attach_event_publisher<T, C: ShmCodec<T>>(
         &self,
@@ -124,6 +147,27 @@ impl ShmNamespace {
         let attached =
             self.attach::<C::Repr>(ChannelKind::Ordered, name, config, EndpointRole::Subscriber)?;
         Ok(ShmEventSubscriber::new(attached, codec))
+    }
+}
+
+impl<T, C: ShmCodec<T>> ShmLatestObserver<T, C> {
+    fn new(region: ReadOnlyMappedRegion, codec: C) -> Self {
+        Self {
+            region,
+            codec,
+            _value: ValueMarker::default(),
+        }
+    }
+
+    /// Returns the newest complete value without changing shared metadata.
+    pub fn try_observe_latest(&mut self) -> Option<LatestSample<T>> {
+        let SlotRead::Value { generation, value } = self.region.observe_latest::<C::Repr>() else {
+            return None;
+        };
+        self.codec
+            .decode(value)
+            .ok()
+            .map(|value| LatestSample { generation, value })
     }
 }
 
@@ -179,6 +223,23 @@ impl<T, C: ShmCodec<T>> LatestPublisher<T> for ShmLatestPublisher<T, C> {
 
     fn counters(&self) -> ChannelCounters {
         self.region.counters()
+    }
+}
+
+impl<T, C: ShmCodec<T>> ShmLatestPublisher<T, C> {
+    /// Publishes a diagnostic latest value even when no subscriber is leased.
+    ///
+    /// This bypass is intentionally not part of [`LatestPublisher`]: normal
+    /// ports retain their explicit disconnected result. It is reserved for
+    /// best-effort diagnostic state whose absence, delivery and counters are
+    /// never an input to safety, authority, or command execution.
+    pub fn try_publish_without_subscriber(&mut self, value: T) -> LatestPublish {
+        let repr = self.codec.encode(&value);
+        let (generation, overwritten) = self.region.publish_latest(&repr);
+        LatestPublish::Published {
+            generation,
+            overwritten,
+        }
     }
 }
 
@@ -431,6 +492,29 @@ mod tests {
                 expected_generation
             );
         }
+    }
+
+    #[test]
+    fn latest_observer_reads_without_claiming_or_consuming() {
+        let (_temp, namespace, config) = setup();
+        let name = ChannelName::new("observer").unwrap();
+        namespace.create_latest::<Payload>(name, config).unwrap();
+        let mut publisher = namespace
+            .attach_latest_publisher(name, config, IdentityCodec::<Payload>::new())
+            .unwrap();
+        let mut observer = namespace
+            .attach_latest_observer(name, config, IdentityCodec::<Payload>::new())
+            .unwrap();
+        assert!(matches!(
+            publisher.try_publish_without_subscriber(Payload {
+                generation: 7,
+                value: 11,
+            }),
+            LatestPublish::Published { generation: 1, .. }
+        ));
+        assert_eq!(observer.try_observe_latest().unwrap().value.value, 11);
+        assert_eq!(observer.try_observe_latest().unwrap().value.value, 11);
+        assert_eq!(publisher.counters().consumed, 0);
     }
 
     #[test]

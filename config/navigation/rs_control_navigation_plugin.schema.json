@@ -159,7 +159,7 @@
       "additionalProperties": false,
       "required": [
         "authority", "action_request", "action_response",
-        "controller_proposal", "odometry", "dynamic_tf", "health"
+        "controller_proposal", "odometry", "dynamic_tf", "health", "participation"
       ],
       "properties": {
         "authority": {"$ref": "#/$defs/channel"},
@@ -168,7 +168,8 @@
         "controller_proposal": {"$ref": "#/$defs/channel"},
         "odometry": {"$ref": "#/$defs/channel"},
         "dynamic_tf": {"$ref": "#/$defs/channel"},
-        "health": {"$ref": "#/$defs/channel"}
+        "health": {"$ref": "#/$defs/channel"},
+        "participation": {"$ref": "#/$defs/channel"}
       }
     },
     "ipc": {

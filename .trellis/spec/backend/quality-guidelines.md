@@ -30,6 +30,12 @@ Individual commands use the pinned `rust-toolchain.toml`, committed `Cargo.lock`
 - New dependency class/edge: architecture-policy positive case and rejection fixture.
 - New CLI behavior: process-level integration test with exit status and stable stdout/stderr assertions.
 - Realtime/hardware behavior: host unit tests are necessary but never sufficient; target-board stress and safety gates remain mandatory.
+- A process-backed fault test that launches sibling copies of its own test
+  binary and exercises kernel-lock reclamation serializes its parent scenarios
+  with a test-local mutex, while leaving the child-only entrypoint ungated.
+  It uses a unique private temporary namespace and reaps every child before
+  another scenario begins. Do not weaken lock assertions or hide this class of
+  race behind an unbounded retry.
 
 ## Review Checklist
 

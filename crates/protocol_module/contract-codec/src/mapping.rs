@@ -2,20 +2,20 @@
 
 use arrayvec::ArrayVec;
 use message_model::{
-    ActionCancelDecision, ActionCancelRequest, ActionCancelResponse, ActionFeedback, ActionGoal,
-    ActionGoalIntent, ActionName, ActionResult, ActionStatus, ArmAcceleration, ArmActuatorBinding,
-    ArmActuatorOrder, ArmGroupIdentity, ArmJointDescriptor, ArmJointKind, ArmJointOrder,
-    ArmPosition, ArmProfileId, ArmTrajectoryPoint, ArmVelocity, AsciiId, ChassisSetpoint,
-    ChassisSetpointIntent, ChassisTrajectoryPoint, CommandIntent, CommandIntentFields,
-    ComponentHealth, Covariance3, Covariance6, CovarianceStatus, ExecuteArmTrajectoryFeedback,
-    ExecuteArmTrajectoryGoal, ExecuteArmTrajectoryResult, ExecuteChassisTrajectoryFeedback,
-    ExecuteChassisTrajectoryGoal, ExecuteChassisTrajectoryResult, Fault, FaultRecoverability,
-    FaultSeverity, HealthSnapshotRequest, HealthSnapshotResponse, Id128, ImuMeasurement, ImuState,
-    JointState, JointStateAggregate, LifecycleState, MAX_COMPONENT_FAULTS, MAX_HEALTH_COMPONENTS,
-    MAX_JOINTS, MAX_TRAJECTORY_POINTS, MAX_TRANSFORMS, MotorState, MotorStateFields, OdometryState,
-    OdometryStateFields, Pose3, ProtobufTypeName, RegisteredPayload, StampedTransform,
-    StampedTransformFields, TemperatureObservation, TransformBatch, Twist2, Twist3, UnitQuaternion,
-    Vector3,
+    ActionAck, ActionCancelDecision, ActionCancelRequest, ActionCancelResponse, ActionFeedback,
+    ActionGoal, ActionGoalIntent, ActionName, ActionResult, ActionStatus, ArmAcceleration,
+    ArmActuatorBinding, ArmActuatorOrder, ArmGroupIdentity, ArmJointDescriptor, ArmJointKind,
+    ArmJointOrder, ArmPosition, ArmProfileId, ArmTrajectoryPoint, ArmVelocity, AsciiId,
+    ChassisSetpoint, ChassisSetpointIntent, ChassisTrajectoryPoint, CommandIntent,
+    CommandIntentFields, ComponentHealth, Covariance3, Covariance6, CovarianceStatus,
+    ExecuteArmTrajectoryFeedback, ExecuteArmTrajectoryGoal, ExecuteArmTrajectoryResult,
+    ExecuteChassisTrajectoryFeedback, ExecuteChassisTrajectoryGoal, ExecuteChassisTrajectoryResult,
+    Fault, FaultRecoverability, FaultSeverity, HealthSnapshotRequest, HealthSnapshotResponse,
+    Id128, ImuMeasurement, ImuState, JointState, JointStateAggregate, LifecycleState,
+    MAX_COMPONENT_FAULTS, MAX_HEALTH_COMPONENTS, MAX_JOINTS, MAX_TRAJECTORY_POINTS, MAX_TRANSFORMS,
+    MotorState, MotorStateFields, OdometryState, OdometryStateFields, Pose3, ProtobufTypeName,
+    RegisteredPayload, StampedTransform, StampedTransformFields, TemperatureObservation,
+    TransformBatch, Twist2, Twist3, UnitQuaternion, Vector3,
 };
 #[cfg(feature = "damiao")]
 use message_model::{
@@ -1151,6 +1151,52 @@ pub fn action_goal_intent_from_wire(
     ))
 }
 
+/// Encodes a correlated goal-admission decision.
+pub fn encode_action_ack(value: &ActionAck) -> Result<Vec<u8>, CodecError> {
+    value.clone().validate()?;
+    Ok(action_ack_to_wire(value).encode_to_vec())
+}
+
+/// Decodes and validates a correlated goal-admission decision.
+pub fn decode_action_ack(bytes: &[u8]) -> Result<ActionAck, CodecError> {
+    action_ack_from_wire(wire::ActionAck::decode(bytes)?)
+}
+
+/// Converts a semantic goal-admission decision to its wire DTO.
+#[must_use]
+pub fn action_ack_to_wire(value: &ActionAck) -> wire::ActionAck {
+    wire::ActionAck {
+        header: Some(header_to_wire(&value.header)),
+        command_id: value.command_id.as_bytes().to_vec(),
+        status: action_status_to_wire(value.status) as i32,
+        result_code: value.result_code,
+        detail: value.detail.clone(),
+        // This local action boundary uses ActionAck exclusively for goal
+        // admission.  Terminal payloads travel in ActionResult instead.
+        result_type: String::new(),
+        result: Vec::new(),
+    }
+}
+
+/// Converts and validates a wire goal-admission decision.
+pub fn action_ack_from_wire(value: wire::ActionAck) -> Result<ActionAck, CodecError> {
+    if !value.result_type.is_empty() || !value.result.is_empty() {
+        return Err(CodecError::InvalidField {
+            field: "action_ack.result",
+            reason: "admission acknowledgement must not carry terminal payload",
+        });
+    }
+    ActionAck {
+        header: header_from_wire(value.header.ok_or(CodecError::MissingField("header"))?)?,
+        command_id: Id128::from_slice(&value.command_id)?,
+        status: action_status_from_wire(value.status)?,
+        result_code: value.result_code,
+        detail: value.detail,
+    }
+    .validate()
+    .map_err(CodecError::from)
+}
+
 /// Converts a semantic action feedback to its wire DTO.
 pub fn encode_action_feedback(value: &ActionFeedback) -> Result<Vec<u8>, CodecError> {
     value.clone().validate()?;
@@ -1784,11 +1830,11 @@ mod tests {
     #[cfg(feature = "damiao")]
     use hardware_module_core::{MonoTime, StandardCanId};
     use message_model::{
-        AcquisitionTimestamp, ActionCancelDecision, ActionCancelResponse, ActionGoal, AsciiId,
-        ChassisSetpointIntent, ClockState, ClockStatus, CommandEnvelope, CommandEnvelopeFields,
-        CommandIntent, CommandIntentFields, Covariance3, Covariance6, CovarianceStatus,
-        DataQuality, Header, HeaderFields, Id128, ImuMeasurement, ImuState, MotorState,
-        MotorStateFields, OdometryState, OdometryStateFields, Pose3, RegisteredPayload,
+        AcquisitionTimestamp, ActionAck, ActionCancelDecision, ActionCancelResponse, ActionGoal,
+        ActionStatus, AsciiId, ChassisSetpointIntent, ClockState, ClockStatus, CommandEnvelope,
+        CommandEnvelopeFields, CommandIntent, CommandIntentFields, Covariance3, Covariance6,
+        CovarianceStatus, DataQuality, Header, HeaderFields, Id128, ImuMeasurement, ImuState,
+        MotorState, MotorStateFields, OdometryState, OdometryStateFields, Pose3, RegisteredPayload,
         TemperatureObservation, TimestampDomain, Twist2, Twist3, UnitQuaternion, Vector3,
     };
     #[cfg(feature = "damiao")]
@@ -1801,11 +1847,12 @@ mod tests {
         DAMIAO_STATUS_FAULT_BASE, DamiaoMotorStateContext, damiao_feedback_to_motor_state,
     };
     use super::{
-        action_goal_from_wire, action_goal_to_wire, decode_action_cancel_response,
-        decode_chassis_setpoint_intent, decode_imu_state, decode_motor_state,
-        decode_odometry_state, encode_action_cancel_response, encode_chassis_setpoint_intent,
-        encode_imu_state, encode_motor_state, encode_odometry_state, imu_state_to_wire,
-        motor_state_to_wire, trajectory_goal_from_wire,
+        action_ack_from_wire, action_ack_to_wire, action_goal_from_wire, action_goal_to_wire,
+        decode_action_ack, decode_action_cancel_response, decode_chassis_setpoint_intent,
+        decode_imu_state, decode_motor_state, decode_odometry_state, encode_action_ack,
+        encode_action_cancel_response, encode_chassis_setpoint_intent, encode_imu_state,
+        encode_motor_state, encode_odometry_state, imu_state_to_wire, motor_state_to_wire,
+        trajectory_goal_from_wire,
     };
 
     fn header(frame: Option<&str>) -> Header {
@@ -2209,5 +2256,30 @@ mod tests {
             decode_action_cancel_response(&encode_action_cancel_response(&value)).unwrap(),
             value
         );
+    }
+
+    #[test]
+    fn action_ack_is_exact_admission_evidence_without_terminal_payload() {
+        let value = ActionAck {
+            header: header(None),
+            command_id: Id128::new([5; 16]).unwrap(),
+            status: ActionStatus::Accepted,
+            result_code: 0,
+            detail: "accepted".to_owned(),
+        };
+        assert_eq!(
+            decode_action_ack(&encode_action_ack(&value).unwrap()).unwrap(),
+            value
+        );
+
+        let invalid_status = ActionAck {
+            status: ActionStatus::Executing,
+            ..value.clone()
+        };
+        assert!(encode_action_ack(&invalid_status).is_err());
+
+        let mut wire = action_ack_to_wire(&value);
+        wire.result_type = "robot.v1.NavigateToPoseResult".to_owned();
+        assert!(action_ack_from_wire(wire).is_err());
     }
 }

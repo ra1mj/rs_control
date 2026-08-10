@@ -10,7 +10,7 @@ use std::{
     sync::atomic::{AtomicU8, AtomicU32, AtomicU64, Ordering, fence},
 };
 
-use memmap2::{MmapMut, MmapOptions};
+use memmap2::{Mmap, MmapMut, MmapOptions};
 use middleware_api::ChannelCounters;
 
 use crate::{
@@ -141,6 +141,18 @@ impl Header {
 /// Validated mapping that owns both the file and its shared lifetime lock.
 pub(crate) struct MappedRegion {
     map: MmapMut,
+    layout: LayoutDescriptor,
+    _region_file: File,
+    _region_lock: File,
+}
+
+/// Read-only validated mapping used by unprivileged diagnostic observers.
+///
+/// Unlike a subscriber endpoint, this mapping never claims a consumer lease,
+/// updates consumption metadata, or records decode diagnostics in shared
+/// memory. It is intentionally limited to latest-value observation.
+pub(crate) struct ReadOnlyMappedRegion {
+    map: Mmap,
     layout: LayoutDescriptor,
     _region_file: File,
     _region_lock: File,
@@ -552,6 +564,114 @@ impl MappedRegion {
     }
 }
 
+impl ReadOnlyMappedRegion {
+    pub(crate) fn attach(
+        region_file: File,
+        region_lock: File,
+        layout: LayoutDescriptor,
+        policy: MemoryPolicy,
+    ) -> Result<Self, ShmError> {
+        let region = Self {
+            map: map_file_read_only(&region_file, layout, policy)?,
+            layout,
+            _region_file: region_file,
+            _region_lock: region_lock,
+        };
+        region.layout.validate_observed(region.observed_layout())?;
+        Ok(region)
+    }
+
+    /// Reads the current complete latest generation without updating shared
+    /// consumer state. The caller owns any local decode error handling.
+    pub(crate) fn observe_latest<R: ShmPayload>(&self) -> SlotRead<R> {
+        let generation = self.header().producer.head.load(Ordering::Acquire);
+        if generation == 0 {
+            return SlotRead::Empty;
+        }
+        for _ in 0..READ_ATTEMPTS {
+            if let Some(value) = self.read_slot(generation) {
+                return SlotRead::Value { generation, value };
+            }
+        }
+        SlotRead::Raced
+    }
+
+    fn observed_layout(&self) -> LayoutSnapshot {
+        let header = self.header();
+        let magic = header.identity.ready_magic.load(Ordering::Acquire);
+        let mut schema_id = [0; 16];
+        schema_id.copy_from_slice(&header.identity.schema_id);
+        LayoutSnapshot {
+            magic,
+            version: header.identity.version,
+            endian: header.identity.endian,
+            atomic_width: header.identity.atomic_width,
+            channel_kind: header.identity.channel_kind,
+            capacity: header.identity.capacity,
+            schema_id,
+            schema_version: header.identity.schema_version,
+            payload_size: header.identity.payload_size,
+            payload_alignment: header.identity.payload_alignment,
+            slot_stride: header.identity.slot_stride,
+            slots_offset: header.metadata.slots_offset,
+            versions_offset: header.metadata.versions_offset,
+            total_length: header.metadata.total_length,
+        }
+    }
+
+    fn read_slot<R: ShmPayload>(&self, generation: u64) -> Option<R> {
+        let snapshot = self.layout.snapshot();
+        let index = ((generation - 1) % u64::from(snapshot.capacity)) as usize;
+        let expected = generation.wrapping_mul(2);
+        let version = self.version(index);
+        if version.load(Ordering::Acquire) != expected {
+            return None;
+        }
+        let mut value = MaybeUninit::<R>::uninit();
+        let destination = value.as_mut_ptr().cast::<u8>();
+        for offset in 0..size_of::<R>() {
+            let byte = self.slot_byte(index, offset).load(Ordering::Relaxed);
+            // SAFETY: destination points to size_of::<R>() writable bytes and
+            // offset stays in that range. R: Pod permits every byte pattern.
+            unsafe { destination.add(offset).write(byte) };
+        }
+        fence(Ordering::Acquire);
+        if version.load(Ordering::Acquire) != expected {
+            return None;
+        }
+        // SAFETY: every byte was initialized and R: Pod accepts all patterns.
+        Some(unsafe { value.assume_init() })
+    }
+
+    fn header(&self) -> &Header {
+        // SAFETY: map_file_read_only checked the exact length, shared region
+        // lock prevents removal, and attach validates the initialized layout
+        // before typed reads.
+        unsafe { &*self.map.as_ptr().cast::<Header>() }
+    }
+
+    fn slot_byte(&self, index: usize, payload_offset: usize) -> &AtomicU8 {
+        let stride = self.layout.snapshot().slot_stride as usize;
+        let base = self.layout.snapshot().slots_offset as usize;
+        // SAFETY: index < capacity and payload_offset < payload size in
+        // callers; the checked layout locates initialized atomics in-map.
+        unsafe {
+            &*self
+                .map
+                .as_ptr()
+                .add(base + index * stride + payload_offset)
+                .cast()
+        }
+    }
+
+    fn version(&self, index: usize) -> &AtomicU64 {
+        let base = self.layout.snapshot().versions_offset as usize;
+        // SAFETY: layout construction guarantees AtomicU64 alignment and
+        // bounds for every capacity-bounded index.
+        unsafe { &*self.map.as_ptr().add(base).cast::<AtomicU64>().add(index) }
+    }
+}
+
 fn map_file(
     file: &File,
     layout: LayoutDescriptor,
@@ -566,6 +686,34 @@ fn map_file(
     // before typed access. Arbitrary same-UID mutation is outside this boundary.
     let map = unsafe { options.map_mut(file) }.map_err(|source| ShmError::Io {
         operation: "map region",
+        source,
+    })?;
+    for offset in (0..length).step_by(PAGE_BYTES) {
+        black_box(map[offset]);
+    }
+    if length != 0 {
+        black_box(map[length - 1]);
+    }
+    if policy == MemoryPolicy::LockRequired {
+        map.lock()
+            .map_err(|source| ShmError::MemoryLock { source })?;
+    }
+    Ok(map)
+}
+
+fn map_file_read_only(
+    file: &File,
+    layout: LayoutDescriptor,
+    policy: MemoryPolicy,
+) -> Result<Mmap, ShmError> {
+    let length = layout.snapshot().total_length as usize;
+    let mut options = MmapOptions::new();
+    options.len(length).populate();
+    // SAFETY: this observer owns a shared region-lifetime lock and maps the
+    // exact immutable file extent. It performs atomic loads only and exposes
+    // no pointer outside this module.
+    let map = unsafe { options.map(file) }.map_err(|source| ShmError::Io {
+        operation: "map read-only region",
         source,
     })?;
     for offset in (0..length).step_by(PAGE_BYTES) {

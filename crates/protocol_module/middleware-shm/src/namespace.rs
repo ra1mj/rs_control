@@ -10,7 +10,7 @@ use std::{
 use crate::{
     ChannelName, EndpointRole, ShmChannelConfig, ShmError, ShmPayload,
     layout::{ChannelKind, LayoutDescriptor},
-    mapping::MappedRegion,
+    mapping::{MappedRegion, ReadOnlyMappedRegion},
 };
 
 /// Owner-only runtime directory containing fixed shared-memory channel files.
@@ -229,6 +229,40 @@ impl ShmNamespace {
             peer_lock_path,
         })
     }
+
+    /// Validates a latest-value layout for a read-only diagnostic mapping.
+    ///
+    /// This is intentionally separate from `attach`: observers do not claim
+    /// endpoint locks and never modify shared process metadata.
+    pub(crate) fn attach_latest_observer_region<R: ShmPayload>(
+        &self,
+        name: ChannelName,
+        config: ShmChannelConfig,
+    ) -> Result<ReadOnlyMappedRegion, ShmError> {
+        let layout = LayoutDescriptor::for_payload::<R>(ChannelKind::Latest, config)?;
+        let paths = ChannelPaths::new(&self.root, name);
+        if !paths.region.exists() {
+            return Err(ShmError::NotFound {
+                name: name.to_string(),
+            });
+        }
+        let region_lock =
+            open_existing_read_only_regular(&paths.region_lock, "open read-only region lock")?;
+        try_lock_region_shared(&region_lock, name)?;
+        let region_file = open_existing_read_only_regular(&paths.region, "open read-only region")?;
+        let observed = region_file
+            .metadata()
+            .map_err(|source| ShmError::Io {
+                operation: "inspect read-only region",
+                source,
+            })?
+            .len();
+        let expected = layout.snapshot().total_length;
+        if observed != expected {
+            return Err(ShmError::FileLength { expected, observed });
+        }
+        ReadOnlyMappedRegion::attach(region_file, region_lock, layout, config.memory_policy())
+    }
 }
 
 pub(crate) fn probe_endpoint(path: &Path) -> Result<Option<File>, ShmError> {
@@ -285,6 +319,15 @@ fn open_existing_regular(path: &Path, operation: &'static str) -> Result<File, S
     let file = OpenOptions::new()
         .read(true)
         .write(true)
+        .open(path)
+        .map_err(|source| ShmError::Io { operation, source })?;
+    require_regular(&file, path)?;
+    Ok(file)
+}
+
+fn open_existing_read_only_regular(path: &Path, operation: &'static str) -> Result<File, ShmError> {
+    let file = OpenOptions::new()
+        .read(true)
         .open(path)
         .map_err(|source| ShmError::Io { operation, source })?;
     require_regular(&file, path)?;

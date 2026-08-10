@@ -328,6 +328,42 @@ impl ActionStatus {
     }
 }
 
+/// Correlated admission decision emitted before action feedback or completion.
+///
+/// This is deliberately narrower than [`ActionResult`]: it records only
+/// whether the remote action server accepted the submitted goal.  Terminal
+/// evidence remains an [`ActionResult`], so a rejected goal cannot be
+/// mistaken for a completed execution.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ActionAck {
+    /// Response metadata.
+    pub header: Header,
+    /// Canonical command ID/ROS UUID correlation identity.
+    pub command_id: Id128,
+    /// Admission status: exactly `Accepted` or `Rejected`.
+    pub status: ActionStatus,
+    /// Stable machine-readable acceptance or rejection code.
+    pub result_code: u32,
+    /// Human-readable diagnostic detail not consumed by safety logic.
+    pub detail: String,
+}
+
+impl ActionAck {
+    /// Rejects statuses that do not represent a goal admission decision.
+    pub fn validate(self) -> Result<Self, SemanticError> {
+        if !matches!(self.status, ActionStatus::Accepted | ActionStatus::Rejected) {
+            return Err(SemanticError::InvalidActionStatus { context: "ack" });
+        }
+        Ok(self)
+    }
+
+    /// Returns whether the remote action server accepted the goal.
+    #[must_use]
+    pub const fn accepted(&self) -> bool {
+        matches!(self.status, ActionStatus::Accepted)
+    }
+}
+
 /// Typed action goal under a local command envelope.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ActionGoal {

@@ -11,6 +11,7 @@ use crate::bridge::{
     feedback_from_ros, goal_to_ros, ActionCorrelation, AdmissionError, BridgeAdmission,
     CorrelationError, GoalBinding,
 };
+use crate::{goal_dispatch_ready, ros_header, ACTION_CLIENT_DISCOVERY_SETTLE_NS};
 
 fn id(value: &str) -> AsciiId<64> {
     AsciiId::parse(value).unwrap()
@@ -54,6 +55,17 @@ fn authority(now: u64, active: bool) -> NavigationAuthorityState {
             active_command_id: active.then_some(token(3)),
         },
     }
+}
+
+#[test]
+fn ros_header_preserves_adapter_clock_stamp() {
+    let expected = builtin_interfaces::msg::Time {
+        sec: 1_786_330_000,
+        nanosec: 123_456_789,
+    };
+    let header = ros_header("map", expected.clone());
+    assert_eq!(header.frame_id, "map");
+    assert_eq!(header.stamp, expected);
 }
 
 #[test]
@@ -167,6 +179,21 @@ fn action_correlation_is_bounded_and_preserves_canonical_id() {
         Err(CorrelationError::WrongRosGoal)
     ));
 
+    assert!(matches!(
+        correlation.feedback(binding, NavigateToPose_Feedback::default(), 10),
+        Err(CorrelationError::GoalNotAcknowledged)
+    ));
+
+    let acknowledgement = correlation
+        .acknowledgement(binding, true, 0, "accepted".to_owned(), 10)
+        .unwrap();
+    let NavigationActionResponseKind::Acknowledgement(acknowledgement) = acknowledgement.kind()
+    else {
+        panic!("expected action acknowledgement");
+    };
+    assert!(acknowledgement.accepted());
+    assert_eq!(acknowledgement.command_id, token(3));
+
     let feedback = correlation
         .feedback(
             binding,
@@ -223,4 +250,47 @@ fn action_correlation_is_bounded_and_preserves_canonical_id() {
     assert_eq!(result.command_id, token(3));
     assert_eq!(result.status, ActionStatus::Cancelled);
     assert!(correlation.is_idle());
+}
+
+#[test]
+fn rejected_admission_clears_binding_before_any_feedback() {
+    let pose = Pose3 {
+        position_m: Vector3::new(1.0, -2.0, 0.0).unwrap(),
+        orientation: UnitQuaternion::new(0.0, 0.0, 0.0, 1.0).unwrap(),
+    };
+    let goal = NavigateToPoseGoal {
+        map: NavigationMapIdentity::new(
+            id("warehouse_sim_map"),
+            id("0.1.0"),
+            Sha256Identity::new([4; 32], "map").unwrap(),
+            id("map"),
+        ),
+        target: pose,
+        behavior_tree_id: id("navigate_to_pose_fail_closed"),
+    };
+    let mut correlation = ActionCorrelation::new(token(8));
+    let binding = correlation.bind(token(3), [9; 16], goal).unwrap();
+    let acknowledgement = correlation
+        .acknowledgement(binding, false, 7, "rejected".to_owned(), 10)
+        .unwrap();
+    let NavigationActionResponseKind::Acknowledgement(acknowledgement) = acknowledgement.kind()
+    else {
+        panic!("expected action acknowledgement");
+    };
+    assert!(!acknowledgement.accepted());
+    assert_eq!(acknowledgement.result_code, 7);
+    assert!(correlation.is_idle());
+}
+
+#[test]
+fn action_dispatch_waits_for_the_bridge_clients_own_discovery_window() {
+    assert!(!goal_dispatch_ready(500, 500));
+    assert!(!goal_dispatch_ready(
+        500 + ACTION_CLIENT_DISCOVERY_SETTLE_NS - 1,
+        500
+    ));
+    assert!(goal_dispatch_ready(
+        500 + ACTION_CLIENT_DISCOVERY_SETTLE_NS,
+        500
+    ));
 }

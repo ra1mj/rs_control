@@ -8,7 +8,9 @@ license.workspace = true
 [dependencies]
 clap.workspace = true
 control-core.workspace = true
+crossterm.workspace = true
 navigation-ipc.workspace = true
+ratatui.workspace = true
 
 [dev-dependencies]
 arrayvec.workspace = true

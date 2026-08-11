@@ -9,7 +9,8 @@ use message_model::{
     TransformBatch, Twist2, Twist3, UnitQuaternion, Vector3,
 };
 use middleware_api::{
-    EventPublishError, EventPublisher, LatestPublish, LatestPublisher, LatestSubscriber,
+    ChannelCounters, EventPublishError, EventPublisher, LatestPublish, LatestPublisher,
+    LatestSubscriber,
 };
 use middleware_shm::{
     ChannelName, MemoryPolicy, ShmChannelConfig, ShmCodec, ShmError, ShmNamespace,
@@ -17,12 +18,14 @@ use middleware_shm::{
 use tempfile::TempDir;
 
 use crate::{
-    NavigationActionResponse, NavigationActionResponseCodec, NavigationActionResponseKind,
-    NavigationAuthorityCodec, NavigationGuardError, NavigationIpcNamespace,
-    NavigationOdometryCodec, NavigationParticipant, NavigationParticipantReason,
-    NavigationParticipantState, NavigationParticipationCodec, NavigationParticipationSnapshot,
-    NavigationProposalCodec, NavigationSourceGuard, NavigationTfBatch, NavigationTfCodec,
-    ODOMETRY_CHANNEL, PARTICIPATION_CHANNEL, PROPOSAL_CHANNEL, wire::monotonic_now_ns,
+    AUTHORITY_CHANNEL, NavigationActionResponse, NavigationActionResponseCodec,
+    NavigationActionResponseKind, NavigationAuthorityCodec, NavigationGuardError,
+    NavigationIpcNamespace, NavigationOdometryCodec, NavigationParticipant,
+    NavigationParticipantReason, NavigationParticipantState, NavigationParticipationCodec,
+    NavigationParticipationSnapshot, NavigationProposalCodec, NavigationShmDiagnostics,
+    NavigationSourceGuard, NavigationTfBatch, NavigationTfCodec,
+    NavigationTransportChannelSnapshot, NavigationTransportDiagnosticsSnapshot, ODOMETRY_CHANNEL,
+    PARTICIPATION_CHANNEL, PROPOSAL_CHANNEL, TRANSPORT_DIAGNOSTICS_CHANNEL, wire::monotonic_now_ns,
 };
 
 const TEST_NOW: u64 = 500;
@@ -372,4 +375,51 @@ fn participation_channel_attaches_as_one_latest_diagnostic_snapshot() {
         LatestPublish::Published { .. }
     ));
     assert_eq!(observer.try_observe_latest().unwrap().value, snapshot);
+}
+
+#[test]
+fn transport_diagnostics_channel_is_fresh_and_read_only() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path().join("navigation-ipc");
+    let namespace = NavigationIpcNamespace::new(&root).unwrap();
+    namespace.create_layouts().unwrap();
+    let mut publisher = namespace.attach_transport_diagnostics_publisher().unwrap();
+    let mut observer = namespace.attach_transport_diagnostics_observer().unwrap();
+    let now = monotonic_now_ns();
+    let mut channels = ArrayVec::new();
+    channels.push(NavigationTransportChannelSnapshot::new(
+        id(AUTHORITY_CHANNEL),
+        ChannelCounters {
+            published: 10,
+            consumed: 9,
+            overwritten: 0,
+            full: 1,
+            disconnected: 2,
+        },
+        NavigationShmDiagnostics {
+            attach_rejected: 3,
+            read_races: 4,
+            decode_rejected: 5,
+            reclaimed_endpoints: 6,
+            skipped_backlog: 7,
+        },
+    ));
+    let snapshot = NavigationTransportDiagnosticsSnapshot::new(
+        header("rs-navigation-e2e", 4, 1, now, None),
+        7,
+        Some(token(9)),
+        channels,
+    )
+    .unwrap();
+    assert!(matches!(
+        publisher.try_publish_without_subscriber(snapshot.clone()),
+        LatestPublish::Published { .. }
+    ));
+    let before = publisher.counters();
+    assert_eq!(observer.try_observe_latest().unwrap().value, snapshot);
+    assert_eq!(publisher.counters(), before);
+    assert_eq!(
+        TRANSPORT_DIAGNOSTICS_CHANNEL,
+        "navigation.transport-diagnostics.v1"
+    );
 }

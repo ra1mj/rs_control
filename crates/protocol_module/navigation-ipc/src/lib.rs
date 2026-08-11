@@ -7,6 +7,7 @@
 mod action;
 mod channel;
 mod codec;
+mod diagnostics;
 mod guard;
 mod participation;
 mod wire;
@@ -14,6 +15,7 @@ mod wire;
 pub use action::*;
 pub use channel::*;
 pub use codec::*;
+pub use diagnostics::*;
 pub use guard::*;
 pub use participation::*;
 
@@ -50,6 +52,9 @@ pub enum NavigationIpcError {
     /// A fixed navigation participation snapshot was malformed.
     #[error("invalid navigation participation snapshot: {0}")]
     Participation(&'static str),
+    /// A fixed navigation transport diagnostic snapshot was malformed.
+    #[error("invalid navigation transport diagnostics snapshot: {0}")]
+    TransportDiagnostics(&'static str),
     /// A transform batch does not match the declared dynamic TF ownership.
     #[error("invalid navigation TF batch: {0}")]
     TransformOwnership(&'static str),

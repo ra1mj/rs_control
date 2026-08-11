@@ -19,13 +19,17 @@ use message_model::{
     RegisteredPayload, ResourceId, Sha256Identity, Twist2, UnitQuaternion, Vector3,
 };
 use middleware_api::{
-    EventPublishError, EventPublisher, EventSubscriber, LatestPublisher, LatestSubscriber,
+    ChannelCounters, EventPublishError, EventPublisher, EventSubscriber, LatestPublisher,
+    LatestSubscriber,
 };
 use navigation_ipc::{
-    NAVIGATE_TO_POSE_ACTION, NAVIGATE_TO_POSE_GOAL_TYPE, NavigationActionRequest,
+    ACTION_REQUEST_CHANNEL, ACTION_RESPONSE_CHANNEL, AUTHORITY_CHANNEL, DYNAMIC_TF_CHANNEL,
+    HEALTH_CHANNEL, NAVIGATE_TO_POSE_ACTION, NAVIGATE_TO_POSE_GOAL_TYPE, NavigationActionRequest,
     NavigationActionResponseKind, NavigationIpcNamespace, NavigationParticipant,
     NavigationParticipantReason, NavigationParticipantState, NavigationParticipationSnapshot,
-    ParticipationPublisher,
+    NavigationShmDiagnostics, NavigationTransportChannelSnapshot,
+    NavigationTransportDiagnosticsSnapshot, ODOMETRY_CHANNEL, PARTICIPATION_CHANNEL,
+    PROPOSAL_CHANNEL, ParticipationPublisher, TransportDiagnosticsPublisher,
 };
 use navigation_plugin_config::NavigationPluginManifest;
 use rs_navigation_e2e::{MAX_PROPOSAL_TTL_NS, MotorDisabledHarness, StopReason};
@@ -314,6 +318,47 @@ impl NavigationParticipation {
     }
 }
 
+fn publish_transport_diagnostics(
+    publisher: &mut TransportDiagnosticsPublisher,
+    now: u64,
+    process_epoch: u64,
+    boot_id: Id128,
+    command_id: Id128,
+    sequence: &mut u64,
+    observations: [(&'static str, ChannelCounters, NavigationShmDiagnostics); 8],
+) {
+    *sequence = sequence.saturating_add(1);
+    let Ok(header) = local_header(
+        AsciiId::parse("rs-navigation-e2e").expect("static diagnostic source"),
+        boot_id,
+        *sequence,
+        now,
+        PARTICIPATION_VALID_FOR_NS,
+    ) else {
+        return;
+    };
+    let mut channels = ArrayVec::new();
+    for (channel_id, counters, diagnostics) in observations {
+        channels
+            .try_push(NavigationTransportChannelSnapshot::new(
+                AsciiId::parse(channel_id).expect("static navigation channel ID"),
+                counters,
+                diagnostics,
+            ))
+            .expect("fixed navigation channel set fits its bounded snapshot");
+    }
+    let Ok(snapshot) = NavigationTransportDiagnosticsSnapshot::new(
+        header,
+        process_epoch,
+        Some(command_id),
+        channels,
+    ) else {
+        return;
+    };
+    // Transport observation is best effort and cannot affect navigation work.
+    let _ = publisher.try_publish_without_subscriber(snapshot);
+}
+
 fn replace_stage(slot: &mut ParticipantStage, next: ParticipantStage) -> bool {
     let changed = *slot != next;
     *slot = next;
@@ -568,6 +613,7 @@ fn run_ipc(
     let mut tf_publisher = ipc.attach_dynamic_tf_publisher()?;
     let mut health_subscriber = ipc.attach_health_subscriber()?;
     let mut participation_publisher = ipc.attach_participation_publisher()?;
+    let mut transport_diagnostics_publisher = ipc.attach_transport_diagnostics_publisher()?;
 
     let goal = canonical_goal(manifest)?;
     let goal_payload = RegisteredPayload::new(
@@ -625,6 +671,7 @@ fn run_ipc(
     )?;
     participation_dirty |= participation.update_tree(&runtime);
     let mut last_participation_publish_ns = 0_u64;
+    let mut transport_diagnostics_sequence = 0_u64;
 
     println!(
         "motor_output=forbidden can_transmit=forbidden process_epoch={process_epoch} command_id={:02x?}",
@@ -965,6 +1012,56 @@ fn run_ipc(
             || now.saturating_sub(last_participation_publish_ns) >= PARTICIPATION_PERIOD_NS
         {
             participation.publish_best_effort(&mut participation_publisher, now);
+            publish_transport_diagnostics(
+                &mut transport_diagnostics_publisher,
+                now,
+                process_epoch,
+                authority_boot,
+                command_id,
+                &mut transport_diagnostics_sequence,
+                [
+                    (
+                        AUTHORITY_CHANNEL,
+                        authority_publisher.counters(),
+                        authority_publisher.diagnostics().into(),
+                    ),
+                    (
+                        ACTION_REQUEST_CHANNEL,
+                        action_request_publisher.counters(),
+                        action_request_publisher.diagnostics().into(),
+                    ),
+                    (
+                        ACTION_RESPONSE_CHANNEL,
+                        action_response_subscriber.counters(),
+                        action_response_subscriber.diagnostics().into(),
+                    ),
+                    (
+                        PROPOSAL_CHANNEL,
+                        proposal_subscriber.counters(),
+                        proposal_subscriber.diagnostics().into(),
+                    ),
+                    (
+                        ODOMETRY_CHANNEL,
+                        odometry_publisher.counters(),
+                        odometry_publisher.diagnostics().into(),
+                    ),
+                    (
+                        DYNAMIC_TF_CHANNEL,
+                        tf_publisher.counters(),
+                        tf_publisher.diagnostics().into(),
+                    ),
+                    (
+                        HEALTH_CHANNEL,
+                        health_subscriber.counters(),
+                        health_subscriber.diagnostics().into(),
+                    ),
+                    (
+                        PARTICIPATION_CHANNEL,
+                        participation_publisher.counters(),
+                        participation_publisher.diagnostics().into(),
+                    ),
+                ],
+            );
             last_participation_publish_ns = now;
             participation_dirty = false;
         }

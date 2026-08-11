@@ -15,6 +15,8 @@ use crate::{
     NavigationOdometryCodec, NavigationOdometryRepr, NavigationParticipationCodec,
     NavigationParticipationRepr, NavigationParticipationSnapshot, NavigationProposalCodec,
     NavigationProposalRepr, NavigationTfBatch, NavigationTfCodec, NavigationTfRepr,
+    NavigationTransportDiagnosticsCodec, NavigationTransportDiagnosticsRepr,
+    NavigationTransportDiagnosticsSnapshot,
 };
 
 /// Stable local file name for authority events.
@@ -33,6 +35,8 @@ pub const DYNAMIC_TF_CHANNEL: &str = "navigation.dynamic-tf.v1";
 pub const HEALTH_CHANNEL: &str = "navigation.health.v1";
 /// Stable local file name for the latest command-participation snapshot.
 pub const PARTICIPATION_CHANNEL: &str = "navigation.participation.v1";
+/// Stable local file name for the latest transport diagnostic snapshot.
+pub const TRANSPORT_DIAGNOSTICS_CHANNEL: &str = "navigation.transport-diagnostics.v1";
 
 /// Authority ordered publisher endpoint.
 pub type AuthorityPublisher = ShmEventPublisher<NavigationAuthorityState, NavigationAuthorityCodec>;
@@ -76,6 +80,12 @@ pub type ParticipationSubscriber =
 /// Read-only diagnostic observer that never claims a subscriber lease.
 pub type ParticipationObserver =
     ShmLatestObserver<NavigationParticipationSnapshot, NavigationParticipationCodec>;
+/// Latest transport diagnostics publisher endpoint.
+pub type TransportDiagnosticsPublisher =
+    ShmLatestPublisher<NavigationTransportDiagnosticsSnapshot, NavigationTransportDiagnosticsCodec>;
+/// Read-only transport diagnostics observer that never claims a subscriber lease.
+pub type TransportDiagnosticsObserver =
+    ShmLatestObserver<NavigationTransportDiagnosticsSnapshot, NavigationTransportDiagnosticsCodec>;
 
 /// Exact motor-disabled navigation shared-memory namespace.
 #[derive(Clone, Debug)]
@@ -121,6 +131,11 @@ impl NavigationIpcNamespace {
             channel(PARTICIPATION_CHANNEL)?,
             latest_config()?,
         )?;
+        self.inner
+            .create_latest::<NavigationTransportDiagnosticsRepr>(
+                channel(TRANSPORT_DIAGNOSTICS_CHANNEL)?,
+                latest_config()?,
+            )?;
         Ok(())
     }
 
@@ -288,6 +303,28 @@ impl NavigationIpcNamespace {
             channel(PARTICIPATION_CHANNEL)?,
             latest_config()?,
             NavigationParticipationCodec::default(),
+        )?)
+    }
+
+    /// Claims the sole transport diagnostic publisher endpoint.
+    pub fn attach_transport_diagnostics_publisher(
+        &self,
+    ) -> Result<TransportDiagnosticsPublisher, NavigationIpcError> {
+        Ok(self.inner.attach_latest_publisher(
+            channel(TRANSPORT_DIAGNOSTICS_CHANNEL)?,
+            latest_config()?,
+            NavigationTransportDiagnosticsCodec::default(),
+        )?)
+    }
+
+    /// Attaches a read-only transport observer without changing endpoint state.
+    pub fn attach_transport_diagnostics_observer(
+        &self,
+    ) -> Result<TransportDiagnosticsObserver, NavigationIpcError> {
+        Ok(self.inner.attach_latest_observer(
+            channel(TRANSPORT_DIAGNOSTICS_CHANNEL)?,
+            latest_config()?,
+            NavigationTransportDiagnosticsCodec::default(),
         )?)
     }
 }

@@ -2,10 +2,11 @@ use std::{path::Path, process::Command};
 
 use arrayvec::ArrayVec;
 use message_model::{AsciiId, ClockState, ClockStatus, DataQuality, Header, HeaderFields, Id128};
-use middleware_api::LatestPublisher;
+use middleware_api::{ChannelCounters, LatestPublisher};
 use navigation_ipc::{
     NavigationIpcNamespace, NavigationParticipant, NavigationParticipantReason,
-    NavigationParticipantState, NavigationParticipationSnapshot,
+    NavigationParticipantState, NavigationParticipationSnapshot, NavigationShmDiagnostics,
+    NavigationTransportChannelSnapshot, NavigationTransportDiagnosticsSnapshot,
 };
 use rustix::time::{ClockId, clock_gettime};
 
@@ -181,6 +182,167 @@ fn inspect_rejects_stale_or_incompatible_participation_data() {
         String::from_utf8(incompatible_output.stderr)
             .expect("CLI writes UTF-8")
             .contains("region length mismatch")
+    );
+}
+
+#[test]
+fn observe_tree_nodes_and_transport_are_read_only() {
+    let temporary = tempfile::tempdir().expect("temporary namespace");
+    let root = temporary.path().join("navigation-ipc");
+    let namespace = NavigationIpcNamespace::new(&root).expect("namespace");
+    namespace.create_layouts().expect("layouts");
+    let mut participation_publisher = namespace
+        .attach_participation_publisher()
+        .expect("participation publisher");
+    let mut transport_publisher = namespace
+        .attach_transport_diagnostics_publisher()
+        .expect("transport publisher");
+    let now = monotonic_ns();
+
+    let mut participants = ArrayVec::new();
+    participants.push(NavigationParticipant::new(
+        AsciiId::parse("tree.root").expect("static ID"),
+        NavigationParticipantState::Active,
+        NavigationParticipantReason::Executing,
+    ));
+    participants.push(NavigationParticipant::new(
+        AsciiId::parse("tree.navigate_to_pose").expect("static ID"),
+        NavigationParticipantState::Pending,
+        NavigationParticipantReason::WaitingAcknowledgement,
+    ));
+    participants.push(NavigationParticipant::new(
+        AsciiId::parse("control.proposal").expect("static ID"),
+        NavigationParticipantState::Active,
+        NavigationParticipantReason::ProposalAccepted,
+    ));
+    let participation = NavigationParticipationSnapshot::new(
+        header(now),
+        7,
+        Some(Id128::new([9; 16]).expect("nonzero command")),
+        participants,
+    )
+    .expect("participation snapshot");
+    let _ = participation_publisher.try_publish_without_subscriber(participation);
+
+    let mut channels = ArrayVec::new();
+    channels.push(NavigationTransportChannelSnapshot::new(
+        AsciiId::parse("navigation.authority.v1").expect("static channel"),
+        ChannelCounters {
+            published: 12,
+            consumed: 11,
+            overwritten: 1,
+            full: 2,
+            disconnected: 3,
+        },
+        NavigationShmDiagnostics {
+            attach_rejected: 4,
+            read_races: 5,
+            decode_rejected: 6,
+            reclaimed_endpoints: 7,
+            skipped_backlog: 8,
+        },
+    ));
+    let transport = NavigationTransportDiagnosticsSnapshot::new(
+        header(now),
+        7,
+        Some(Id128::new([9; 16]).expect("nonzero command")),
+        channels,
+    )
+    .expect("transport snapshot");
+    let _ = transport_publisher.try_publish_without_subscriber(transport);
+    let participation_before = participation_publisher.counters();
+    let transport_before = transport_publisher.counters();
+
+    let dashboard = btctl()
+        .args(["observe", "--ipc-root"])
+        .arg(&root)
+        .arg("--plain")
+        .output()
+        .expect("btctl runs");
+    assert!(dashboard.status.success());
+    assert!(dashboard.stderr.is_empty());
+    let stdout = String::from_utf8(dashboard.stdout).expect("UTF-8");
+    assert!(stdout.starts_with("sample=1\nsection=tree\n"));
+    assert!(stdout.contains("state=active reason=executing"));
+    assert!(stdout.contains("tree_node depth=1 id=tree.navigate_to_pose"));
+    assert!(stdout.contains("section=nodes\nsnapshot generation=1"));
+    assert!(stdout.contains("participant id=control.proposal state=active"));
+    assert!(stdout.contains("section=transport\ntransport generation=1"));
+    assert!(stdout.contains(
+        "channel id=navigation.authority.v1 published=12 consumed=11 overwritten=1 full=2 disconnected=3"
+    ));
+    assert!(stdout.contains("attach_rejected=4 read_races=5 decode_rejected=6"));
+    let tree_index = stdout.find("section=tree").expect("tree section");
+    let nodes_index = stdout.find("section=nodes").expect("nodes section");
+    let transport_index = stdout.find("section=transport").expect("transport section");
+    assert!(tree_index < nodes_index && nodes_index < transport_index);
+
+    assert_eq!(participation_publisher.counters(), participation_before);
+    assert_eq!(transport_publisher.counters(), transport_before);
+}
+
+#[test]
+fn observe_watch_is_bounded_and_missing_transport_is_explicit() {
+    let temporary = tempfile::tempdir().expect("temporary namespace");
+    let root = temporary.path().join("navigation-ipc");
+    let namespace = NavigationIpcNamespace::new(&root).expect("namespace");
+    namespace.create_layouts().expect("layouts");
+    let mut publisher = namespace
+        .attach_participation_publisher()
+        .expect("publisher");
+    let now = monotonic_ns();
+    let mut participants = ArrayVec::new();
+    participants.push(NavigationParticipant::new(
+        AsciiId::parse("tree.root").expect("static ID"),
+        NavigationParticipantState::Active,
+        NavigationParticipantReason::Executing,
+    ));
+    let snapshot = NavigationParticipationSnapshot::new(
+        header(now),
+        7,
+        Some(Id128::new([9; 16]).expect("nonzero command")),
+        participants,
+    )
+    .expect("snapshot");
+    let _ = publisher.try_publish_without_subscriber(snapshot);
+    let before = publisher.counters();
+
+    let watch = btctl()
+        .args(["observe", "--ipc-root"])
+        .arg(&root)
+        .args([
+            "--section",
+            "nodes",
+            "--interval-ms",
+            "1",
+            "--samples",
+            "2",
+            "--plain",
+        ])
+        .output()
+        .expect("btctl runs");
+    assert!(watch.status.success());
+    assert!(watch.stderr.is_empty());
+    let stdout = String::from_utf8(watch.stdout).expect("UTF-8");
+    assert_eq!(stdout.matches("section=nodes").count(), 2);
+    assert!(stdout.contains("sample=1\nsection=nodes"));
+    assert!(stdout.contains("sample=2\nsection=nodes"));
+    assert!(!stdout.contains("section=tree"));
+    assert!(!stdout.contains("section=transport"));
+    assert_eq!(publisher.counters(), before);
+
+    let missing = btctl()
+        .args(["observe", "--ipc-root"])
+        .arg(&root)
+        .arg("--plain")
+        .output()
+        .expect("btctl runs");
+    assert!(!missing.status.success());
+    assert!(missing.stdout.is_empty());
+    assert!(
+        String::from_utf8(missing.stderr)
+            .expect("UTF-8")
+            .contains("no current navigation transport diagnostics snapshot")
     );
 }
 

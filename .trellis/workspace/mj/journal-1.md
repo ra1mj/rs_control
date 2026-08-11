@@ -513,3 +513,36 @@ Added behavior-tree-driven motor-disabled navigation participation, a read-only 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 16: Live node observability CLI
+
+**Date**: 2026-08-11
+**Task**: Live node observability CLI
+**Branch**: `main`
+
+### Summary
+
+Added a read-only three-pane behavior-tree, node-state, and transport diagnostics dashboard with plain machine output, protocol tests, CLI tests, documentation, and full CI validation.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `74dcbac` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

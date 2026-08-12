@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 16
-- **Last Active**: 2026-08-11
+- **Total Sessions**: 17
+- **Last Active**: 2026-08-12
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~548 | Active |
+| `journal-1.md` | ~581 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 17 | 2026-08-12 | Adaptive arm gravity simulation | `e484cc4` | `main` |
 | 16 | 2026-08-11 | Live node observability CLI | `74dcbac` | `main` |
 | 15 | 2026-08-10 | Behavior-tree navigation participation | `0b6fd08` | `main` |
 | 14 | 2026-08-05 | Complete motor-disabled chassis navigation plugin | `7324724` | `main` |

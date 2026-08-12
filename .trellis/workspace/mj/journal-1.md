@@ -546,3 +546,36 @@ Added a read-only three-pane behavior-tree, node-state, and transport diagnostic
 ### Next Steps
 
 - None - task complete
+
+
+## Session 17: Adaptive arm gravity simulation
+
+**Date**: 2026-08-12
+**Task**: Adaptive arm gravity simulation
+**Branch**: `main`
+
+### Summary
+
+Added deterministic host-only articulated-arm simulation, prepared gravity/payload regressor, bounded batch QR plus projected RLS adaptation, feed-forward proposal builders, evidence wrapper, process documentation, and full validation gates. Archived task after commit.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e484cc4` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

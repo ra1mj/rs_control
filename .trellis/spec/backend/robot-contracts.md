@@ -669,6 +669,18 @@ The checked-in profile lives at
   Action discovery alone is not readiness for lifecycle-managed servers. A
   supervisor may release at most one bounded pending goal only after the
   action is discoverable and every required lifecycle node reports `active`.
+- On a weak host, lifecycle readiness uses one short-lived ROS process that
+  waits for both the action server and the lifecycle manager's aggregate
+  `is_active` service. Do not poll every managed node by repeatedly spawning
+  `ros2 lifecycle get`; those processes consume memory and can contend with
+  lifecycle transitions. The aggregate probe must have a finite timeout and
+  exit after reporting ready.
+- After exact manifest and asset-digest validation, a weak-host production
+  supervisor may execute the pinned native ROS nodes directly. It must retain
+  the exact launch parameters, remappings, lifecycle membership, fail-together
+  semantics and process-group shutdown behavior. A persistent Python
+  `ros2 launch` process is reserved for development when this equivalent
+  native supervision path is enabled.
 
 ### 4. Validation & Error Matrix
 
@@ -689,6 +701,7 @@ The checked-in profile lives at
 | Unknown action/cancel/status enum | `contract-codec` | `CodecError::UnknownEnum` |
 | Feedback/result ROS UUID does not match the active bounded binding | action adapter | reject the event; retain no inferred correlation |
 | Action is discoverable while a required lifecycle node is inactive | supervisor/readiness gate | keep admission closed and retain at most one bounded pending goal |
+| Weak-host readiness probe times out, aggregate lifecycle readiness is false, or any directly supervised native node exits | supervisor/readiness gate | fail closed; stop the process group and expose no navigation admission |
 | Zero/non-increasing supervisor epoch or evidence from another epoch | `RuntimeGate` | typed epoch error; no report/admission |
 | Ready adapter omits or mismatches profile/descriptor/manifest/bridge identity | `RuntimeGate` | `MissingIdentity` / field-specific `IdentityMismatch` |
 | Adapter, native Zenoh, ROS graph or required ros2dds path is not ready | `RuntimeGate` | route admission is `Closed` with the exact path failure |
@@ -704,13 +717,17 @@ The checked-in profile lives at
 - Good runtime: current-epoch evidence matches every checked-in identity and
   required path; sensor routes are available while command routes still
   require local validation.
+- Good weak-host runtime: one bounded probe observes action discovery and the
+  lifecycle manager's aggregate active state, then exits; the supervisor runs
+  the validated native nodes as one fail-together process group.
 - Bad: infer ROS names from Zenoh keys, put route/QoS fields in robot YAML,
   accept `KEEP_ALL`, copy source monotonic time into a ROS stamp, mint a lease
   from a ROS publisher, load ros2dds into the native router, or emulate
   `rmw_zenoh` private keys. Never assume a client-generated ROS UUID equals a
   canonical command ID, retain readiness across an adapter restart, use action
   discovery as lifecycle readiness, or treat bridge availability as an
-  authority grant.
+  authority grant. Do not replace one bounded aggregate readiness probe with a
+  loop that repeatedly launches a ROS CLI process for every lifecycle node.
 
 ### 6. Tests Required
 
@@ -731,6 +748,12 @@ The checked-in profile lives at
   binding, rejection of a mismatched result UUID and release only after the
   correlated terminal result. Assert that action discovery before lifecycle
   activation sends no pending goal.
+- Exercise the weak-host supervisor with the exact validated asset set. Assert
+  the single readiness probe exits after aggregate readiness, times out
+  fail-closed, and that any native node exit terminates the supervised group.
+  Compare its steady-state process/resource evidence with the development
+  launch path; measurement evidence is not a hard budget unless the manifest
+  declares one.
 - Assert exact sensor/command/service/action route policies and exact bridge
   identity pins. Mutate every identity dimension and external component state;
   prove restart invalidation, fail-closed admission, action cancel acceptance
@@ -803,6 +826,25 @@ let ros_goal_uuid = requested.goal_id().0;
 active_binding.bind(canonical_command_id, ros_goal_uuid)?;
 let goal_client = requested.await.ok_or(ActionError::Rejected)?;
 ```
+
+#### Wrong weak-host readiness
+
+```sh
+# Each query creates another ROS/Python process while lifecycle transitions run.
+for node in map_server controller_server planner_server bt_navigator; do
+  until ros2 lifecycle get "/$node" | grep -q active; do sleep 0.2; done
+done
+```
+
+#### Correct weak-host readiness
+
+```sh
+# One bounded process checks ActionClient discovery plus the manager aggregate.
+wait_nav2_ready.py \
+  /navigate_to_pose 60 /lifecycle_manager_navigation
+# The probe exits after ready; native nodes remain under fail-together supervision.
+```
+
 ## Scenario: Host arm simulation and adaptive payload gravity
 
 ### 1. Scope / Trigger

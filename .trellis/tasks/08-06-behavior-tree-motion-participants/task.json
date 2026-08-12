@@ -1,0 +1,29 @@
+{
+  "id": "behavior-tree-motion-participants",
+  "name": "behavior-tree-motion-participants",
+  "title": "Complete project behavior-tree framework",
+  "description": "Project-native event-driven behavior-tree framework, followed by a motor-disabled navigation participation slice.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "mj",
+  "assignee": "mj",
+  "createdAt": "2026-08-06",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-06-behavior-tree-core",
+    "08-06-behavior-tree-navigation-participation"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

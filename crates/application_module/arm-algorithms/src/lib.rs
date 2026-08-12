@@ -4,6 +4,7 @@
 //! SI values. They do not grant authority, perform I/O, or emit hardware
 //! frames.
 
+pub mod adaptive_gravity;
 pub mod dynamics;
 mod error;
 mod evidence;

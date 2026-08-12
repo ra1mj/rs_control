@@ -1,6 +1,6 @@
 use arm_control::{
     ActuatorControlLimits, ArmControlAdmission, ArmControlConfig, ArmControlError,
-    ArmControlIntent, LogExecutor, SimExecutor,
+    ArmControlIntent, LogExecutor, SimExecutor, direct_effort_proposal, mit_feed_forward_proposal,
 };
 use arm_model::{
     ARM_PROFILE_SCHEMA_VERSION, ArmModel, ArmProfileClass, ArmProfileSpec,
@@ -9,10 +9,11 @@ use arm_model::{
 use arrayvec::ArrayVec;
 use control_core::{LeaseEnforcementCache, LeaseEvent, LifecycleState};
 use message_model::{
-    ActionStatus, ArmActuatorVector, ArmControlProposal, ArmEffort, ArmJointKind,
-    ArmJointObservation, ArmJointSample, ArmProposalContext, AsciiId, ClockState, ClockStatus,
-    CommandEnvelope, CommandEnvelopeFields, DataQuality, Header, HeaderFields, Id128, MAX_JOINTS,
-    ResourceLease, ResourceLeaseFields, RotaryMitSetpoint, RotaryTorqueNm,
+    ActionStatus, ArmActuatorVector, ArmControlMode, ArmControlProposal, ArmControlValue,
+    ArmEffort, ArmJointKind, ArmJointObservation, ArmJointSample, ArmJointVector, ArmPosition,
+    ArmProposalContext, ArmVelocity, AsciiId, ClockState, ClockStatus, CommandEnvelope,
+    CommandEnvelopeFields, DataQuality, Header, HeaderFields, Id128, MAX_JOINTS, ResourceLease,
+    ResourceLeaseFields, RotaryMitSetpoint, RotaryTorqueNm,
 };
 
 const SYNTHETIC_6DOF: &str = include_str!("../../arm-model/tests/fixtures/synthetic_6dof.urdf");
@@ -180,6 +181,63 @@ fn torque_proposal(config: &ArmControlConfig, torque_nm: f64) -> ArmControlPropo
             .unwrap(),
         ArmActuatorVector::new(config.actuator_order().clone(), values).unwrap(),
     )
+}
+
+#[test]
+fn feed_forward_builders_preserve_power_and_fixed_gains() {
+    let model = model();
+    let config = config(&model);
+    let order = config.joint_order().clone();
+    let mut positions = ArrayVec::<ArmPosition, MAX_JOINTS>::new();
+    let mut velocities = ArrayVec::<ArmVelocity, MAX_JOINTS>::new();
+    let mut efforts = ArrayVec::<ArmEffort, MAX_JOINTS>::new();
+    for descriptor in order.joints() {
+        positions.push(
+            match descriptor.kind() {
+                ArmJointKind::Revolute | ArmJointKind::Continuous => ArmPosition::angular_rad(0.1),
+                ArmJointKind::Prismatic => ArmPosition::linear_m(0.1),
+            }
+            .unwrap(),
+        );
+        velocities.push(
+            match descriptor.kind() {
+                ArmJointKind::Revolute | ArmJointKind::Continuous => {
+                    ArmVelocity::angular_radps(0.2)
+                }
+                ArmJointKind::Prismatic => ArmVelocity::linear_mps(0.2),
+            }
+            .unwrap(),
+        );
+        efforts.push(
+            match descriptor.kind() {
+                ArmJointKind::Revolute | ArmJointKind::Continuous => ArmEffort::torque_nm(100.0),
+                ArmJointKind::Prismatic => ArmEffort::force_n(100.0),
+            }
+            .unwrap(),
+        );
+    }
+    let positions = ArmJointVector::new(order.clone(), positions).unwrap();
+    let velocities = ArmJointVector::new(order.clone(), velocities).unwrap();
+    let efforts = ArmJointVector::new(order, efforts).unwrap();
+
+    let direct = direct_effort_proposal(&config, &efforts).unwrap();
+    assert_eq!(direct.mode(), ArmControlMode::DirectRotaryTorque);
+    assert!(direct.values().iter().all(|value| matches!(
+        value,
+        ArmControlValue::RotaryTorque(torque) if torque.get() == 1.0
+    )));
+
+    let mit = mit_feed_forward_proposal(&config, &positions, &velocities, &efforts).unwrap();
+    assert_eq!(mit.mode(), ArmControlMode::Mit);
+    assert!(mit.values().iter().all(|value| matches!(
+        value,
+        ArmControlValue::Mit(setpoint)
+            if setpoint.position_rad() == 10.0
+                && setpoint.velocity_radps() == 20.0
+                && setpoint.kp() == 20.0
+                && setpoint.kd() == 1.0
+                && setpoint.feed_forward_torque_nm() == 1.0
+    )));
 }
 
 #[test]

@@ -803,3 +803,103 @@ let ros_goal_uuid = requested.goal_id().0;
 active_binding.bind(canonical_command_id, ros_goal_uuid)?;
 let goal_client = requested.await.ok_or(ActionError::Rejected)?;
 ```
+## Scenario: Host arm simulation and adaptive payload gravity
+
+### 1. Scope / Trigger
+
+Use this contract when adding or consuming the motor-disabled articulated-arm
+qualification composition root, prepared gravity geometry, payload adaptation,
+or joint-space feed-forward proposal helpers. The simulation is host evidence
+only; it is never a physical executor or an authority shortcut.
+
+### 2. Signatures
+
+```rust
+PreparedGravity::new(chain, gravity_mps2, generation)
+PreparedGravity::workspace()
+PreparedGravity::{gravity_compensation, payload_regressor, payload_gravity}
+AdaptiveGravityEstimator::{new, start_collection, observe_window, solve_batch,
+                           validate_candidate, activate, update_rls, evaluate}
+ArmDynamics::new_with_payload(chain, gravity_mps2, payload)
+direct_effort_proposal(config, joint_effort)
+mit_feed_forward_proposal(config, positions, velocities, effort)
+```
+
+```text
+tools/run-arm-simulation.sh qualify [output]
+tools/run-arm-simulation.sh verify
+tools/run-arm-simulation.sh test
+```
+
+### 3. Contracts
+
+- The adaptive vector is exactly `[m, m*cx, m*cy, m*cz]`; payload rotational
+  inertia is plant-only data and is never passed to the estimator.
+- Prepared evaluators and the estimator bind profile, group, exact joint order
+  and non-zero model generation. Warm FK, gravity, regressor, evaluation and
+  eligible RLS updates use caller-owned bounded storage and allocate nothing.
+- Estimator input is limited to estimator-visible regressor, measured effort
+  residual, identity and gate evidence. Simulation-only payload truth and ABA
+  state remain in the composition root and are used only for qualification
+  metrics.
+- Candidate activation is a validated snapshot swap. Adaptive effort is a
+  bounded feed-forward contribution inside an ordinary `ArmControlProposal`;
+  lease, deadline, lifecycle, freshness, magnitude, slew and collision gates
+  remain the sole owners of admission and authority.
+- The report is deterministic and host-scoped. `verify` is read-only, and a
+  `qualify --output` destination is created only when absent; existing
+  evidence is never truncated or replaced.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+|---|---|
+| Zero generation, missing link inertia or unsupported mimic dynamics | typed preparation/dynamics error; no ready evaluator |
+| Wrong profile/group/order/generation or stale sample | typed mismatch or bounded identity/stale skip counter |
+| Moving, saturated, contact or non-finite estimator observation | skip/freeze learning; retain the last accepted snapshot |
+| Rank/conditioning failure or held-out candidate residual above threshold | `Rejected`; active snapshot remains unchanged |
+| Invalid payload mass/CoG/inertia, non-finite regressor or output bound | fail closed with typed error; no plant or proposal update |
+| Existing qualification output path | create-new refusal or wrapper read-only verification; never overwrite |
+| Hardware, ROS or unknown wrapper argument | usage error before Cargo/device access |
+
+### 5. Good / Base / Bad Cases
+
+- Good: run the fixed synthetic profile through payload-augmented ABA, prepared
+  FK/IK, nominal gravity and both admitted direct-torque and MIT proposals;
+  compare byte-identical nominal/adaptive runs and retain the report hash.
+- Base: collect diverse settled windows, solve weighted QR, validate held-out
+  observations, activate once, then apply gated projected RLS.
+- Bad: let an estimator consume simulator truth, add adaptive effort directly
+  to an admitted command, reuse a generation after model reload, or rewrite a
+  checked-in report during CI.
+
+### 6. Tests Required
+
+- `arm-algorithms` dynamics tests retain the pendulum golden and compare the
+  prepared payload regressor with independent Featherstone payload gravity.
+- `gravity_prepared` and `adaptive_gravity` assert zero warm allocations,
+  stable identity/order failures, bounded state transitions and frozen RLS.
+- `gravity_performance` and `ik_performance` run the isolated Release P95 gates.
+- `rs-arm-simulation` qualification tests assert deterministic reports,
+  calibration/held-out/RLS limits, mismatch and matched-model gates, and
+  invalid timestep/step-budget fail-closed behavior.
+- CLI tests assert stable stdout/stderr, create-new output behavior and
+  read-only verification; shell syntax and `tools/ci.sh` invoke `verify`.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```sh
+tools/run-arm-simulation.sh qualify   # truncates an existing evidence file
+```
+
+#### Correct
+
+```sh
+tools/run-arm-simulation.sh qualify /tmp/new-arm-report.json
+tools/run-arm-simulation.sh verify
+```
+
+The first command creates a new explicitly selected report; the second checks
+the immutable checked-in report without changing it.

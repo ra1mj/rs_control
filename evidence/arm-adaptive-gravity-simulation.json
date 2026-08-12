@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "safety_scope": "host-only; no hardware, ROS, motor output, or physical stability claim",
+  "seed": 5932159142072701519,
+  "model_generation": 1,
+  "timestep_s": 0.0002,
+  "integration": "ABA + semi-implicit Euler",
+  "control_path": "alternating admitted direct-torque and fixed-gain MIT proposals",
+  "calibration_pose_windows": 20,
+  "held_out_poses": 8,
+  "rls_accepted_updates": 40,
+  "payload_truth": {
+    "mass_kg": 2.4,
+    "cog_m": [
+      0.08,
+      -0.025,
+      0.12
+    ]
+  },
+  "payload_estimate": {
+    "mass_kg": 2.400000157438117,
+    "cog_m": [
+      0.08000000950712491,
+      -0.025000000639864964,
+      0.12000000517683815
+    ]
+  },
+  "mass_relative_error": 6.559921550408632e-8,
+  "cog_error_m": 1.084409998211705e-8,
+  "held_out_torque_rmse_nm": 7.818542273636751e-7,
+  "held_out_peak_torque_nm": 16.616796493530273,
+  "held_out_normalized_rmse": 4.7052043254431684e-8,
+  "mismatch_nominal_holding_rms": 0.09125287261404304,
+  "mismatch_adaptive_holding_rms": 1.1205915643841419e-8,
+  "mismatch_improvement": 0.9999998771993109,
+  "matched_degradation": 0.0,
+  "fk_ik_position_error_m": 3.4433010700654614e-8,
+  "fk_ik_orientation_error_rad": 1.108321419400895e-7,
+  "aba_steps": 6000,
+  "admitted_control_steps": 6000,
+  "gates": {
+    "torque_accuracy": true,
+    "mismatch_improvement": true,
+    "matched_model": true,
+    "mass_accuracy": true,
+    "cog_accuracy": true,
+    "bounded_calibration": true,
+    "bounded_rls": true,
+    "fk_ik_round_trip": true,
+    "all_passed": true
+  },
+  "functional_sha256": "75a787cca4e2650501088359349693d68c43cbafb684e81dce91505518245340"
+}

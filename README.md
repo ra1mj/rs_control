@@ -49,6 +49,31 @@ The motor-disabled `chassis_nav` integration, isolated ROS 2 bridge and host
 qualification boundary are documented in
 [docs/navigation-plugin.md](docs/navigation-plugin.md).
 
+## Arm simulation and adaptive gravity compensation
+
+The repository includes a deterministic articulated-arm host simulation that
+exercises prepared FK/IK, RNEA/ABA dynamics, nominal gravity compensation and
+bounded payload identification. Run it from any working directory with:
+
+```bash
+tools/run-arm-simulation.sh qualify [output-path]
+tools/run-arm-simulation.sh verify
+tools/run-arm-simulation.sh test
+```
+
+`qualify` performs the fixed-step simulation and writes a canonical report only
+when the destination does not exist (the optional path defaults to
+`evidence/arm-adaptive-gravity-simulation.json`). If the destination already
+exists, it performs the same read-only byte comparison as `verify` instead of
+overwriting evidence. `verify` always checks the checked-in report. `test` runs
+the focused algorithm, control and simulation suites.
+
+This simulation is host-only. It opens no hardware or ROS endpoint, produces
+no motor frame, and does not qualify physical-arm accuracy, controller
+stability, realtime timing or safe payload limits. The complete calibration,
+activation, gating and rollback process is in
+[docs/arm-payload-identification.md](docs/arm-payload-identification.md).
+
 The first hardware target is Orange Pi 5 Plus/RK3588 with Ubuntu 22.04 and the
 pinned Rockchip 5.10 PREEMPT_RT baseline. See the
 [platform runbooks](platform/orangepi5plus/README.md) for the guarded build,

@@ -17,7 +17,7 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
 use super::super::KinematicChain;
-use crate::ArmAlgorithmError;
+use crate::{ArmAlgorithmError, kinematics::ArmPose};
 
 /// Hard upper bound for one prepared IK candidate set.
 pub const MAX_IK_CANDIDATES: usize = 32;
@@ -326,6 +326,21 @@ impl<'model> PreparedKinematics<'model> {
             });
         }
         IkWorkspace::new(self, maximum_population)
+    }
+
+    /// Evaluates the prepared forward kinematics path using caller-owned
+    /// workspace.  The workspace is generation-bound in exactly the same way
+    /// as prepared IK, so a stale model cannot silently be evaluated.
+    pub fn forward(
+        &self,
+        positions: &ArmJointVector<ArmPosition>,
+        workspace: &mut IkWorkspace,
+    ) -> Result<ArmPose, ArmAlgorithmError> {
+        workspace.require_context(self)?;
+        let mut values = [0.0_f64; MAX_JOINTS];
+        self.copy_positions(positions, &mut values)?;
+        let transform = self.evaluate(workspace, &values[..self.dof()])?;
+        ArmPose::from_isometry(&transform)
     }
 
     pub(crate) fn validate_values(&self, values: &[f64]) -> Result<(), ArmAlgorithmError> {

@@ -2,7 +2,7 @@ mod common;
 
 use arm_algorithms::{
     ArmAlgorithmError,
-    dynamics::ArmDynamics,
+    dynamics::{ArmDynamics, AttachedPayloadInertia, PreparedGravity},
     kinematics::KinematicChain,
     trajectory::{ArmTrajectory, TrajectorySampling},
 };
@@ -108,6 +108,27 @@ fn pendulum_gravity_matches_analytic_golden() {
     let mut dynamics = ArmDynamics::new(chain, [0.0, -9.81, 0.0]).unwrap();
     let gravity = dynamics.gravity_compensation(&positions).unwrap();
     assert_near(gravity.values()[0].value_si(), 4.905, 1.0e-3);
+    let prepared = PreparedGravity::new(chain, [0.0, -9.81, 0.0], 1).unwrap();
+    let mut workspace = prepared.workspace();
+    let fast = prepared
+        .gravity_compensation(&positions, &mut workspace)
+        .unwrap();
+    assert_near(fast.values()[0].value_si(), 4.905, 1.0e-12);
+
+    let payload =
+        AttachedPayloadInertia::new(2.0, [0.25, 0.0, 0.0], [0.01, 0.0, 0.0, 0.01, 0.0, 0.01])
+            .unwrap();
+    let mut payload_dynamics =
+        ArmDynamics::new_with_payload(chain, [0.0, -9.81, 0.0], payload).unwrap();
+    let payload_total = payload_dynamics.gravity_compensation(&positions).unwrap();
+    let predicted = prepared
+        .payload_gravity(&positions, [2.0, 0.5, 0.0, 0.0], &mut workspace)
+        .unwrap();
+    assert_near(
+        payload_total.values()[0].value_si() - gravity.values()[0].value_si(),
+        predicted.values()[0].value_si(),
+        2.0e-3,
+    );
     let mass = dynamics.mass_matrix(&positions).unwrap();
     assert_eq!(mass.dof(), 1);
     assert!(mass.get(0, 0).unwrap() > 0.0);
@@ -124,6 +145,45 @@ fn rnea_aba_round_trip_and_mass_matrix_properties_hold() {
     let qd = velocities(order, &[0.1, -0.2, 0.15, 0.05, -0.1, 0.2]);
     let qdd = accelerations(order, &[0.3, -0.2, 0.1, -0.1, 0.2, -0.15]);
     let mut dynamics = ArmDynamics::new(chain, [0.0, 0.0, -9.81]).unwrap();
+    let backend_gravity = dynamics.gravity_compensation(&q).unwrap();
+    let prepared = PreparedGravity::new(chain, [0.0, 0.0, -9.81], 7).unwrap();
+    let mut gravity_workspace = prepared.workspace();
+    let analytical_gravity = prepared
+        .gravity_compensation(&q, &mut gravity_workspace)
+        .unwrap();
+    for (actual, expected) in analytical_gravity
+        .values()
+        .iter()
+        .zip(backend_gravity.values())
+    {
+        assert_near(actual.value_si(), expected.value_si(), 3.0e-3);
+    }
+    for cog in [[0.0, 0.2, 0.0], [0.0, 0.0, 0.2]] {
+        let payload =
+            AttachedPayloadInertia::new(1.0, cog, [0.01, 0.0, 0.0, 0.01, 0.0, 0.01]).unwrap();
+        let mut with_payload =
+            ArmDynamics::new_with_payload(chain, [0.0, 0.0, -9.81], payload).unwrap();
+        let total = with_payload.gravity_compensation(&q).unwrap();
+        let mut theta = [1.0, 0.0, 0.0, 0.0];
+        theta[1] = cog[0];
+        theta[2] = cog[1];
+        theta[3] = cog[2];
+        let predicted = prepared
+            .payload_gravity(&q, theta, &mut gravity_workspace)
+            .unwrap();
+        for ((actual, nominal), expected) in total
+            .values()
+            .iter()
+            .zip(backend_gravity.values())
+            .zip(predicted.values())
+        {
+            assert_near(
+                actual.value_si() - nominal.value_si(),
+                expected.value_si(),
+                3.0e-3,
+            );
+        }
+    }
     let effort = dynamics.inverse_dynamics(&q, &qd, &qdd).unwrap();
     let recovered = dynamics.forward_dynamics(&q, &qd, &effort).unwrap();
     for (actual, expected) in recovered
@@ -195,5 +255,19 @@ fn missing_inertia_fails_closed_and_timed_effort_is_checked() {
             .values()
             .iter()
             .all(|value| value.value_si().is_finite())
+    );
+}
+
+#[test]
+fn attached_payload_inertia_rejects_nonfinite_and_non_positive_tensors() {
+    assert!(
+        AttachedPayloadInertia::new(0.0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 1.0, 0.0, 1.0],).is_err()
+    );
+    assert!(
+        AttachedPayloadInertia::new(1.0, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0, 0.0, 1.0],).is_err()
+    );
+    assert!(
+        AttachedPayloadInertia::new(1.0, [f64::NAN, 0.0, 0.0], [1.0, 0.0, 0.0, 1.0, 0.0, 1.0],)
+            .is_err()
     );
 }

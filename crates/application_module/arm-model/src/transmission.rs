@@ -80,6 +80,19 @@ impl RotaryTransmission {
         finite(value.value_si() / self.scale_rad_per_joint_unit)
     }
 
+    /// Converts actuator torque back to joint effort while preserving power.
+    pub fn joint_effort(self, torque_nm: f64) -> Result<ArmEffort, TransmissionError> {
+        let value = finite(finite(torque_nm)? * self.scale_rad_per_joint_unit)?;
+        match self.joint_kind {
+            ArmJointKind::Revolute | ArmJointKind::Continuous => {
+                ArmEffort::torque_nm(value).map_err(|_| TransmissionError::NonFinite)
+            }
+            ArmJointKind::Prismatic => {
+                ArmEffort::force_n(value).map_err(|_| TransmissionError::NonFinite)
+            }
+        }
+    }
+
     /// Converts actuator position back into a tagged joint coordinate.
     pub fn joint_position(self, position_rad: f64) -> Result<ArmPosition, TransmissionError> {
         let value =
@@ -150,6 +163,7 @@ mod tests {
                 .unwrap(),
             2.0
         );
+        assert_eq!(transmission.joint_effort(2.0).unwrap().value_si(), 40.0);
         let joint_position = transmission.joint_position(4.1).unwrap().value_si();
         assert!((joint_position - 0.2).abs() < 1.0e-12);
     }

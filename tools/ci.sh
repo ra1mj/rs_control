@@ -16,6 +16,7 @@ cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
 cargo test --locked --workspace --all-features
 cargo run --locked -p architecture-check -- check
 cargo run --locked -p proto-compat-check
+tools/run-arm-simulation.sh verify
 
 tools/bufw format --diff --exit-code
 tools/bufw lint

@@ -21,6 +21,12 @@ use crate::{
     trajectory::ArmTrajectory,
 };
 
+mod gravity;
+pub mod payload;
+
+pub use gravity::{GravityWorkspace, PreparedGravity};
+pub use payload::{AttachedPayloadError, AttachedPayloadInertia};
+
 /// Validated symmetric group mass matrix in row-major order.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ArmMassMatrix {
@@ -92,6 +98,25 @@ impl ArmDynamics {
     pub fn new(
         chain: KinematicChain<'_>,
         gravity_mps2: [f64; 3],
+    ) -> Result<Self, ArmAlgorithmError> {
+        Self::build(chain, gravity_mps2, None)
+    }
+
+    /// Builds a dynamics backend and optionally appends a fixed terminal
+    /// payload body.  The payload path is intended for deterministic host
+    /// simulation; nominal callers retain the exact `new` behaviour.
+    pub fn new_with_payload(
+        chain: KinematicChain<'_>,
+        gravity_mps2: [f64; 3],
+        payload: AttachedPayloadInertia,
+    ) -> Result<Self, ArmAlgorithmError> {
+        Self::build(chain, gravity_mps2, Some(payload))
+    }
+
+    fn build(
+        chain: KinematicChain<'_>,
+        gravity_mps2: [f64; 3],
+        payload: Option<AttachedPayloadInertia>,
     ) -> Result<Self, ArmAlgorithmError> {
         if gravity_mps2.iter().any(|value| !value.is_finite()) {
             return Err(ArmAlgorithmError::NonFinite {
@@ -189,6 +214,29 @@ impl ArmDynamics {
                 });
             }
             parent_body = body_index;
+        }
+        if let Some(payload) = payload {
+            if chain.model().link(chain.group().tip_link()).is_none() {
+                return Err(ArmAlgorithmError::InvalidModel {
+                    reason: "dynamics group tip link does not exist",
+                });
+            }
+            let body_index = backend.add_body(
+                "__sim_payload",
+                parent_body as i32,
+                GenJoint::Fixed,
+                SpatialInertia::from_mass_inertia(
+                    f32_checked(payload.mass_kg(), "dynamics.payload.mass")?,
+                    payload_backend_cog(payload)?,
+                    payload_spatial_inertia(payload)?,
+                ),
+                SpatialTransform::identity(),
+            );
+            if body_index <= parent_body {
+                return Err(ArmAlgorithmError::InvalidModel {
+                    reason: "payload terminal body insertion failed",
+                });
+            }
         }
         if backend.dof_count() != chain.dof() || effort_limits.len() != chain.dof() {
             return Err(ArmAlgorithmError::InvalidModel {
@@ -378,6 +426,31 @@ impl ArmDynamics {
         }
         Ok(())
     }
+}
+
+fn payload_spatial_inertia(
+    payload: AttachedPayloadInertia,
+) -> Result<Matrix3<f32>, ArmAlgorithmError> {
+    let [ixx, ixy, ixz, iyy, iyz, izz] = payload.inertia_kg_m2();
+    Ok(Matrix3::new(
+        f32_checked(ixx, "dynamics.payload.inertia")?,
+        f32_checked(ixy, "dynamics.payload.inertia")?,
+        f32_checked(ixz, "dynamics.payload.inertia")?,
+        f32_checked(ixy, "dynamics.payload.inertia")?,
+        f32_checked(iyy, "dynamics.payload.inertia")?,
+        f32_checked(iyz, "dynamics.payload.inertia")?,
+        f32_checked(ixz, "dynamics.payload.inertia")?,
+        f32_checked(iyz, "dynamics.payload.inertia")?,
+        f32_checked(izz, "dynamics.payload.inertia")?,
+    ))
+}
+
+fn payload_backend_cog(payload: AttachedPayloadInertia) -> Result<Vector3<f32>, ArmAlgorithmError> {
+    let [x, y, z] = payload.cog_m();
+    // The pinned Featherstone backend's spatial body convention reverses the
+    // terminal body's local Z coordinate relative to the project tool frame.
+    // Keep that conversion confined to this adapter boundary.
+    vector3_f32([x, y, -z], "dynamics.payload.cog")
 }
 
 fn spatial_inertia(inertia: LinkInertia) -> Result<SpatialInertia, ArmAlgorithmError> {

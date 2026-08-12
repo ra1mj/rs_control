@@ -2531,6 +2531,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "rs-arm-simulation"
+version = "0.1.0"
+dependencies = [
+ "arm-algorithms",
+ "arm-control",
+ "arm-model",
+ "arrayvec",
+ "clap",
+ "control-core",
+ "message-model",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "rs-navigation-e2e"
 version = "0.1.0"
 dependencies = [

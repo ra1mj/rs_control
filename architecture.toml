@@ -1,5 +1,5 @@
 version = 1
-composition_roots = ["btctl", "robotctl", "rs-navigation-e2e"]
+composition_roots = ["btctl", "robotctl", "rs-arm-simulation", "rs-navigation-e2e"]
 
 [classes.hardware_module]
 allowed_dependencies = ["hardware_module"]
@@ -61,6 +61,7 @@ path_prefixes = ["tools/"]
 "proto-compat-check" = "tool"
 "robotctl" = "app"
 "rs-navigation-e2e" = "app"
+"rs-arm-simulation" = "app"
 "ros2-mapping" = "integration"
 "state-estimation-2d" = "application_module"
 "test-support" = "test-support"

@@ -945,3 +945,125 @@ tools/run-arm-simulation.sh verify
 
 The first command creates a new explicitly selected report; the second checks
 the immutable checked-in report without changing it.
+
+## Scenario: Host motion runtime recording and replay
+
+### 1. Scope / Trigger
+
+Use this contract when composing a motor-disabled host motion runtime, adding
+motion authority evidence, or recording already-encoded protocol data to MCAP.
+It establishes host software behavior only. It does not establish a scheduler,
+CAN, device, motor, target-storage, or realtime qualification claim.
+
+### 2. Signatures
+
+```rust
+MotionControlWorker::step_at(
+    state: Option<ControlState>,
+    command: Option<CommandEnvelope>,
+    new_command: bool,
+    availability: RuntimeAvailability,
+    now_monotonic_ns: u64,
+) -> MotionDecision
+
+TelemetryRecord::new(topic, protobuf_bytes, priority, metadata)
+TelemetryIngress::{try_push, drain_into}
+TelemetryRecorder::{open, append, seal}
+replay_file(sealed_path, replay_policy) -> Result<Vec<ReplayInput>, ReplayError>
+```
+
+### 3. Contracts
+
+- `control-core` owns `MotionControlWorker`, `ControlState`, exact lease
+  authorization, command boot/sequence admission, typed `MotionDecision`, and
+  `MotionDiagnostics`. The app composition root may wire ports and a fake sink,
+  but it must not reimplement an authority check.
+- A control tick receives an explicit local monotonic time. After construction
+  it has no clock, filesystem, network, formatting, allocation-growth,
+  blocking receive, logging, or device-I/O operation. Host tests call
+  `step_at`; they never claim scheduling qualification.
+- `Apply` requires current state, bridge/diagnostic/recorder availability,
+  `DataQuality::Valid`, a strictly newer sequence for a newly received command,
+  and `LeaseEnforcementCache::authorize`. State expiry, a stale/new invalid
+  command, authority mismatch, loss, and shutdown produce `SafeStop`.
+- `motion-rt` uses preallocated local latest/ordered ports and a fixed fake
+  sink. Diagnostics are copyable typed snapshots. A stalled latest diagnostic
+  drain can overwrite but cannot block control; a disconnected diagnostic or
+  recorder boundary is observed on a subsequent bounded tick and fails closed.
+- `telemetry-recorder` is integration-class and accepts bounded original
+  Protobuf bytes only. It records `FILE_DESCRIPTOR_SET`, canonical topic/channel
+  metadata, source/boot identity, full source sequence, source/publish/record
+  timestamps, and priority. Recording, hashing, rotation, recovery and replay
+  remain outside the control path.
+- Recording creates a new `.mcap.staging` file, seals it by atomic rename to
+  `.mcap`, and writes a create-new SHA-256 manifest. It reserves independent
+  bounded priority queues, permits at most 64 topic/source/boot channels per
+  output, and caps MCAP chunks at 1 MiB. Gap metadata is charged against the
+  same quota; pressure writes a typed gap or degrades instead of waiting on a
+  producer. Startup scans only its configured prefix's staging names; valid
+  complete MCAPs are sealed and malformed/conflicting staging is retained as
+  `.failed` evidence.
+- Replay accepts only a sealed `.mcap` path, an exact descriptor digest, an
+  explicit nonempty topic allowlist, and an item bound. It validates MCAP
+  structure, descriptor schema, schema-backed channels, identity metadata,
+  timestamps and per-channel source sequence before returning replay-only data.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+|---|---|
+| State missing, unavailable or at its exclusive deadline | `MotionDecision::SafeStop` with the matching state reason |
+| Zero/repeated/regressed new command sequence, wrong source or non-valid quality | typed `SafeStop`; never updates accepted command order |
+| Lease/owner/epoch/deadline mismatch | `LeaseEnforcementCache` rejects it and the worker returns `SafeStop` |
+| Bridge, diagnostic, recorder or control-worker loss | bounded `SafeStop`; no loss event creates or extends authority |
+| Full telemetry class | saturating class gap counter; producer returns `IngressOutcome::Dropped` without waiting |
+| Quota or MCAP/storage failure | recorder becomes `Degraded`; producer authority and fake-sink decision remain independent |
+| Existing output/manifest or malformed recovery input | no overwrite; retain a `.failed` staging artifact where applicable |
+| Staging output with valid MCAP footer and CRCs | atomically seal and create its manifest |
+| Unsealed path, descriptor/channel mismatch, absent metadata, unknown topic or order regression | `ReplayError`; no command, driver or sink is constructed |
+
+### 5. Good / Base / Bad Cases
+
+- Good: synthetic I/O publishes a fresh state, the control role applies a
+  current exact lease command at an injected tick, then a non-realtime drain
+  records its original Protobuf evidence and seals an MCAP with a manifest.
+- Base: a stalled drain overwrites a latest diagnostic snapshot; control keeps
+  its bounded decision cadence while counters retain the loss evidence.
+- Bad: call `SystemTime::now`, format a log record, open a file, wait for a
+  queue, decode generated Protobuf, or open a device from `MotionControlWorker`.
+  Do not replay an MCAP into a command port or treat host tests as hardware
+  qualification.
+
+### 6. Tests Required
+
+- Assert a warm control/diagnostic loop allocates zero times and exact current
+  authority is the sole route to `Apply`.
+- Cover expired/stale/wrong-lease commands, bridge/diagnostic/recorder/control
+  loss, ordered shutdown and bounded fake-sink SafeStop evidence.
+- Cover priority pressure/gap metadata, quota degradation, valid/malformed
+  staging recovery, create-new manifests, descriptor mismatch and deterministic
+  replay of unchanged payload bytes.
+- Run warnings-denied Clippy for `control-core`, `motion-rt` and
+  `telemetry-recorder`; run architecture, metadata, dependency/source policy
+  and `tools/ci.sh`. Keep Linux target/RT/CAN qualification as an additional
+  target-board gate.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+// App wiring duplicates authority and lets a recorder failure create a new lease.
+if recorder.write(bytes).is_ok() {
+    fake_sink.apply(command);
+}
+```
+
+#### Correct
+
+```rust
+// Safety is decided in the application owner; recording is a later best-effort drain.
+let decision = worker.step_at(state, command, received_new, availability, tick_ns);
+fake_sink.record(decision);
+let _ = telemetry_ingress.try_push(encoded_evidence);
+```

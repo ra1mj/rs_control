@@ -1,0 +1,21 @@
+[package]
+name = "telemetry-recorder"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+arrayvec.workspace = true
+mcap.workspace = true
+message-model.workspace = true
+proto-generated.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

@@ -1,5 +1,5 @@
 version = 1
-composition_roots = ["btctl", "robotctl", "rs-arm-simulation", "rs-navigation-e2e"]
+composition_roots = ["btctl", "motion-rt", "robotctl", "rs-arm-simulation", "rs-navigation-e2e"]
 
 [classes.hardware_module]
 allowed_dependencies = ["hardware_module"]
@@ -52,10 +52,12 @@ path_prefixes = ["tools/"]
 "middleware-api" = "protocol_module"
 "middleware-local" = "protocol_module"
 "middleware-qualification" = "integration"
+"telemetry-recorder" = "integration"
 "middleware-shm" = "protocol_module"
 "middleware-zenoh" = "protocol_module"
 "navigation-ipc" = "protocol_module"
 "motor-damiao" = "hardware_module"
+"motion-rt" = "app"
 "navigation-plugin-config" = "integration"
 "proto-generated" = "protocol_module"
 "proto-compat-check" = "tool"

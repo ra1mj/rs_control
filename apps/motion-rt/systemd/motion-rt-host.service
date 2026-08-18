@@ -1,0 +1,23 @@
+[Unit]
+Description=RS Control host-only motion runtime
+After=local-fs.target
+
+[Service]
+Type=exec
+Environment=RS_CONTROL_MOTOR_MODE=disabled
+ExecStart=/usr/local/bin/motion-rt
+NoNewPrivileges=true
+CapabilityBoundingSet=
+DevicePolicy=closed
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX
+ReadWritePaths=/var/lib/rs-control/telemetry
+
+[Install]
+WantedBy=multi-user.target

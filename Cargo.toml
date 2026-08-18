@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "apps/btctl",
+    "apps/motion-rt",
     "apps/robotctl",
     "apps/rs-navigation-e2e",
     "apps/rs-arm-simulation",
@@ -8,6 +9,7 @@ members = [
     "crates/integration/cross-language-contract",
     "crates/integration/ros2-mapping",
     "crates/integration/test-support",
+    "crates/integration/telemetry-recorder",
     "crates/integration/middleware-qualification",
     "crates/integration/navigation-plugin-config",
     "crates/hardware_module/hardware-module-core",
@@ -67,6 +69,7 @@ middleware-api = { version = "0.1.0", path = "crates/protocol_module/middleware-
 middleware-local = { version = "0.1.0", path = "crates/protocol_module/middleware-local" }
 middleware-shm = { version = "0.1.0", path = "crates/protocol_module/middleware-shm" }
 middleware-zenoh = { version = "0.1.0", path = "crates/protocol_module/middleware-zenoh" }
+mcap = { version = "=0.25.0", default-features = false }
 navigation-ipc = { version = "0.1.0", path = "crates/protocol_module/navigation-ipc" }
 navigation-plugin-config = { version = "0.1.0", path = "crates/integration/navigation-plugin-config" }
 motor-damiao = { version = "0.1.0", path = "crates/hardware_module/motor-damiao" }
@@ -95,6 +98,7 @@ sha2 = "0.11.0"
 socketcan = { version = "=3.6.2", default-features = false }
 statig = { version = "=0.4.1", default-features = false }
 tempfile = "=3.27.0"
+telemetry-recorder = { version = "0.1.0", path = "crates/integration/telemetry-recorder" }
 thiserror = "2.0.19"
 toml = "1.1.4"
 waitfree-sync = "=0.3.3"

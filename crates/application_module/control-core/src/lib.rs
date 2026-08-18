@@ -3,6 +3,7 @@
 mod lease;
 mod lifecycle;
 mod mission;
+mod motion;
 
 /// Project-native facade for the bounded, event-driven behavior-tree runtime.
 pub mod behavior_tree;
@@ -11,6 +12,7 @@ pub use behavior_tree::*;
 pub use lease::*;
 pub use lifecycle::*;
 pub use mission::*;
+pub use motion::*;
 
 use message_model::Header;
 

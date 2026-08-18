@@ -1,0 +1,22 @@
+[package]
+name = "motion-rt"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+arrayvec.workspace = true
+control-core.workspace = true
+message-model.workspace = true
+middleware-api.workspace = true
+middleware-local.workspace = true
+telemetry-recorder.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+allocation-counter.workspace = true
+
+[lints]
+workspace = true

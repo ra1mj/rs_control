@@ -36,7 +36,8 @@
     "07-31-chassis-estimation-control",
     "07-31-cross-language-ros2-contract",
     "07-31-kinetic-arm-algorithms",
-    "08-03-chassis-navigation-plugin"
+    "08-03-chassis-navigation-plugin",
+    "08-18-host-motion-runtime-recording"
   ],
   "parent": null,
   "relatedFiles": [],

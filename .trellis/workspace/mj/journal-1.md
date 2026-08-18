@@ -678,3 +678,36 @@ Mapped all KAS acceptance criteria to project-native arm model, algorithm and co
 ### Next Steps
 
 - None - task complete
+
+
+## Session 21: Close kinetic arm algorithms integration
+
+**Date**: 2026-08-18
+**Task**: Close kinetic arm algorithms integration
+**Branch**: `main`
+
+### Summary
+
+Closed the parent integration after both arm-stack and RL-policy children: recorded cross-child profile, generation, authority, and collision-boundary evidence; full host gates and isolated Release performance reports passed. Physical arm, target-board, CAN, and collision qualification remain open.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `86201bf` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

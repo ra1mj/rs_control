@@ -24,7 +24,7 @@ Rollback: no production crate should yet depend on rejected libraries.
 - [x] Add absolute position, position residual, velocity, direct rotary torque
       and MIT proposal variants.
 - [x] Add validated bounded arm trajectory action goal/feedback/result types.
-- [ ] Add good/base/bad tests for every constructor, all capacities,
+- [x] Add good/base/bad tests for every constructor, all capacities,
       duplicate/order mismatch and NaN/Inf.
 
 Validation:
@@ -63,10 +63,10 @@ cannot be made deterministic; do not use source XML bytes as the semantic hash.
 - [x] Scaffold `arm-algorithms` and its kinematics modules.
 - [x] Implement chain extraction, FK/all-link/batch FK and 6×N Jacobian.
 - [x] Implement condition/manipulability with typed singular evidence.
-- [ ] Port/rewrite DLS and FABRIK with strict dimension/limit checks.
-- [ ] Port/rewrite SQP and Bio-IK with explicit bounded work.
-- [ ] Port/rewrite OPW, Paden-Kahan/subproblem and compatible 7-DOF paths.
-- [ ] Implement geometry compatibility analysis, cache and batch queries.
+- [x] Port/rewrite DLS and FABRIK with strict dimension/limit checks.
+- [x] Port/rewrite SQP and Bio-IK with explicit bounded work.
+- [x] Port/rewrite OPW, Paden-Kahan/subproblem and compatible 7-DOF paths.
+- [x] Implement geometry compatibility analysis, cache and batch queries.
 - [x] Implement deterministic workspace/reachability sampling.
 - [x] Add solver capability reporting and deterministic `Auto` selection.
 - [x] Add per-file provenance only where code is substantially derived.
@@ -74,7 +74,7 @@ cannot be made deterministic; do not use source XML bytes as the semantic hash.
 Tests:
 
 - [x] Golden FK/Jacobian at zero, nominal and limits.
-- [ ] Reachable IK, unreachable target, wrong DOF, NaN/Inf, singular,
+- [x] Reachable IK, unreachable target, wrong DOF, NaN/Inf, singular,
       non-convergent and limit-violating cases.
 - [x] Specialized solver rejection on incompatible geometry.
 - [x] Repeat identical seeds and compare complete results/evidence.
@@ -97,35 +97,35 @@ Tests:
 
 - [x] Analytic one/two-link dynamics golden vectors and matrix properties.
 - [x] Nominal and boundary trajectory golden vectors.
-- [ ] Every violation kind with exact waypoint/joint evidence.
+- [x] Every violation kind with exact waypoint/joint evidence.
 
 ## 6. Planning
 
 - [x] Define planner/state-validator traits and
       `ArmPlan<CollisionEvidence>`.
 - [x] Implement deterministic configs with explicit seed/work budgets.
-- [ ] Port/rewrite RRT-Connect, RRT*, BiRRT* and BiTRRT.
-- [ ] Port/rewrite EST, KPIECE and PRM.
-- [ ] Port/rewrite GCS and IRIS-region surfaces.
-- [ ] Port/rewrite CHOMP and STOMP.
-- [ ] Implement Cartesian and constrained-RRT planning.
-- [ ] Implement shortcut, smoothing and pipeline composition.
+- [x] Port/rewrite RRT-Connect, RRT*, BiRRT* and BiTRRT.
+- [x] Port/rewrite EST, KPIECE and PRM.
+- [x] Port/rewrite GCS and IRIS-region surfaces.
+- [x] Port/rewrite CHOMP and STOMP.
+- [x] Implement Cartesian and constrained-RRT planning.
+- [x] Implement shortcut, smoothing and pipeline composition.
 - [x] Make every first-delivery result `CollisionUnchecked`.
 - [x] Return typed unsupported evidence for coordinated dual-arm planning.
 
 Tests:
 
-- [ ] Deterministic success/failure for every planner on small fixtures.
-- [ ] Sample/node/iteration/time-budget exhaustion.
-- [ ] Constraint violation, invalid seed and incompatible group rejection.
-- [ ] Compile/runtime tests proving unchecked plans cannot enter physical
+- [x] Deterministic success/failure for every planner on small fixtures.
+- [x] Sample/node/iteration/time-budget exhaustion.
+- [x] Constraint violation, invalid seed and incompatible group rejection.
+- [x] Compile/runtime tests proving unchecked plans cannot enter physical
       admission.
 
 ## 7. Reactive, grasp and task surfaces
 
 - [x] Implement twist, joint-jog and pose-tracking servo.
 - [x] Implement no-filter, EMA and Butterworth filters.
-- [ ] Implement RMP reach, joint-limit, singularity and damping policies.
+- [x] Implement RMP reach, joint-limit, singularity and damping policies.
 - [x] Return collision capability unavailable for obstacle/self-collision
       policies.
 - [x] Implement bounded primitive object/gripper descriptions.
@@ -133,7 +133,7 @@ Tests:
       plus ranking/reachability.
 - [x] Mark candidates collision unchecked.
 - [x] Implement bounded move/Cartesian/gripper/pick/place/sequence task stages.
-- [ ] Integrate task effects with existing action/cancellation semantics.
+- [x] Integrate task effects with existing action/cancellation semantics.
 
 ## 8. Arm control and simulated/logged execution
 
@@ -175,11 +175,11 @@ cargo test -p proto-generated -p message-model -p contract-codec -p motor-damiao
 
 - [x] Add all workspace dependencies through `[workspace.dependencies]`.
 - [x] Classify all new crates in `architecture.toml`.
-- [ ] Add positive real-graph checks and retain reverse-edge negative tests.
-- [ ] Scan the production graph for `kinetic`, KINETIC namespaces and
+- [x] Add positive real-graph checks and retain reverse-edge negative tests.
+- [x] Scan the production graph for `kinetic`, KINETIC namespaces and
       unreviewed Git/path sources.
-- [ ] Run targeted all-feature Clippy with warnings denied.
-- [ ] Run architecture, dependency and full host CI.
+- [x] Run targeted all-feature Clippy with warnings denied.
+- [x] Run architecture, dependency and full host CI.
 
 ```bash
 cargo metadata --no-deps --format-version 1
@@ -192,9 +192,9 @@ cargo deny check
 
 ## 11. Child completion gate
 
-- [ ] Public arm contracts are documented and stable for the RL child.
-- [ ] Every KAS requirement maps to at least one test.
-- [ ] No collision-unchecked value reaches executable admission.
-- [ ] No host output is described as physical or realtime qualification.
+- [x] Public arm contracts are documented and stable for the RL child.
+- [x] Every KAS requirement maps to at least one test.
+- [x] No collision-unchecked value reaches executable admission.
+- [x] No host output is described as physical or realtime qualification.
 - [ ] Commit and archive this child before starting
       `07-31-rl-policy-control`.

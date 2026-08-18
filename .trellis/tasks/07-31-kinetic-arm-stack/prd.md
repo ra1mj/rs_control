@@ -71,18 +71,18 @@ but owned by this project, with collision-unchecked fail-closed admission.
 
 ## Acceptance Criteria
 
-- [ ] A clean checkout builds without any KINETIC
+- [x] A clean checkout builds without any KINETIC
       Git/path/submodule/workspace dependency, while substantially derived
       files retain auditable Apache-2.0 provenance.
-- [ ] Golden FK/Jacobian/IK/trajectory/dynamics tests cover nominal, boundary,
+- [x] Golden FK/Jacobian/IK/trajectory/dynamics tests cover nominal, boundary,
       unreachable, singular and invalid inputs.
-- [ ] The synthetic 6-DOF fixture has deterministic joint order and cannot be
+- [x] The synthetic 6-DOF fixture has deterministic joint order and cannot be
       mistaken for a real-arm hardware profile.
-- [ ] Profile identity prevents plans and control proposals from crossing
+- [x] Profile identity prevents plans and control proposals from crossing
       incompatible morphology, joint-order, limit or controller mappings.
-- [ ] A multi-group fixture isolates group joint sets, while floating-base and
+- [x] A multi-group fixture isolates group joint sets, while floating-base and
       coordinated dual-arm requests produce typed unsupported evidence.
-- [ ] Planning/reactive/task/grasp/sim/log surfaces are testable and cannot
+- [x] Planning/reactive/task/grasp/sim/log surfaces are testable and cannot
       elevate `CollisionUnchecked` output into an executable action.
-- [ ] The public API is bounded, finite, SI-valued and stable for the RL child.
-- [ ] Architecture, Clippy, tests, dependency policy and full host CI pass.
+- [x] The public API is bounded, finite, SI-valued and stable for the RL child.
+- [x] Architecture, Clippy, tests, dependency policy and full host CI pass.

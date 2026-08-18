@@ -711,3 +711,36 @@ Closed the parent integration after both arm-stack and RL-policy children: recor
 ### Next Steps
 
 - None - task complete
+
+
+## Session 22: Close behavior-tree integration
+
+**Date**: 2026-08-18
+**Task**: Close behavior-tree integration
+**Branch**: `main`
+
+### Summary
+
+Closed the behavior-tree parent integration: validated bounded event-driven reducer behavior, exact navigation acknowledgement, read-only participation snapshots, and motor-disabled fail-closed E2E coverage. Full host gates passed; existing real-Nav2 evidence remains host-only and no physical or target-board qualification was claimed.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7bca464` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

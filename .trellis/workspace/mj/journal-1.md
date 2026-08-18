@@ -579,3 +579,36 @@ Added deterministic host-only articulated-arm simulation, prepared gravity/paylo
 ### Next Steps
 
 - None - task complete
+
+
+## Session 18: Integrate arm reactive task performance gates
+
+**Date**: 2026-08-18
+**Task**: Integrate arm reactive task performance gates
+**Branch**: `main`
+
+### Summary
+
+Added prepared singularity-aware RMP, bounded task compilation and invalidation, uniform host-only Release performance reports with same-host regression gating, typestate proof, and full host quality evidence.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a22e93a` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

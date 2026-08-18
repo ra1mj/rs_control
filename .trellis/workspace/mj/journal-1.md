@@ -777,3 +777,36 @@ Added bounded host-only motion composition, control-core authority decisions, no
 ### Next Steps
 
 - None - task complete
+
+
+## Session 24: Archive Linux task coordination
+
+**Date**: 2026-08-18
+**Task**: Archive Linux task coordination
+**Branch**: `main`
+
+### Summary
+
+Archived the active-task coordination after host deliveries passed and documented exact Orange Pi/RK3588 qualification blockers without making host-only claims.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e2e2b59` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

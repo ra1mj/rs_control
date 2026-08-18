@@ -58,6 +58,12 @@ impl PreparedChomp {
         })
     }
 
+    /// Returns the storage reserved while preparing the covariant metric.
+    #[must_use]
+    pub fn allocated_bytes(&self) -> usize {
+        self.inverse_metric.capacity() * std::mem::size_of::<f64>()
+    }
+
     /// Optimizes one caller-supplied feasible seed trajectory.
     #[allow(clippy::too_many_arguments)]
     pub fn optimize(

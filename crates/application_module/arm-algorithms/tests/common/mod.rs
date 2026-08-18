@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+pub mod performance;
+
 use arm_model::{
     ARM_PROFILE_SCHEMA_VERSION, ArmModel, ArmProfileClass, ArmProfileSpec,
     JointAccelerationLimitSpec, KinematicGroupSpec, RotaryTransmissionSpec,

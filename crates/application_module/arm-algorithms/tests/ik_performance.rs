@@ -2,17 +2,13 @@ mod common;
 
 use std::{hint::black_box, time::Instant};
 
+use allocation_counter::measure;
 use arm_algorithms::kinematics::{
     IkCache, IkSolveConfig, IkSolverKind, KinematicChain, PreparedKinematics,
 };
-use common::{id, opw_model, synthetic_model};
+use common::{id, opw_model, performance::report, synthetic_model};
 
 const SAMPLES: usize = 2_000;
-
-fn percentile_95(mut samples_ns: Vec<u128>) -> u128 {
-    samples_ns.sort_unstable();
-    samples_ns[(samples_ns.len() * 95).div_ceil(100) - 1]
-}
 
 #[test]
 #[ignore = "release-only isolated host latency gate"]
@@ -87,13 +83,80 @@ fn warm_ik_p95_meets_microsecond_targets() {
         dls.push(started.elapsed().as_nanos());
     }
 
-    let analytical_p95 = percentile_95(analytical);
-    let cache_p95 = percentile_95(cached);
-    let numerical_p95 = percentile_95(dls);
-    eprintln!(
-        "IK host Release P95: analytical={analytical_p95} ns cache={cache_p95} ns numerical={numerical_p95} ns"
+    let analytical_result = opw
+        .solve(
+            IkSolverKind::Opw,
+            opw_target,
+            &opw_initial,
+            config,
+            &mut opw_workspace,
+        )
+        .unwrap();
+    let analytical_allocations = measure(|| {
+        black_box(
+            opw.solve(
+                IkSolverKind::Opw,
+                opw_target,
+                &opw_initial,
+                config,
+                &mut opw_workspace,
+            )
+            .unwrap(),
+        );
+    });
+    let cache_allocations = measure(|| {
+        black_box(cache.lookup(&opw, opw_target).unwrap().unwrap());
+    });
+    let numerical_result = numerical
+        .solve(
+            IkSolverKind::DampedLeastSquares,
+            target,
+            &initial,
+            config,
+            &mut numerical_workspace,
+        )
+        .unwrap();
+    let numerical_allocations = measure(|| {
+        black_box(
+            numerical
+                .solve(
+                    IkSolverKind::DampedLeastSquares,
+                    target,
+                    &initial,
+                    config,
+                    &mut numerical_workspace,
+                )
+                .unwrap(),
+        );
+    });
+    let analytical_report = report(
+        "ik_opw",
+        &mut analytical,
+        analytical_allocations,
+        opw_workspace.allocated_bytes(),
+        u64::from(analytical_result.work().evaluations()),
     );
-    assert!(analytical_p95 <= 50_000, "analytical P95 exceeded 50 us");
-    assert!(cache_p95 <= 50_000, "cache P95 exceeded 50 us");
-    assert!(numerical_p95 <= 500_000, "numerical P95 exceeded 500 us");
+    let cache_report = report(
+        "ik_cache_lookup",
+        &mut cached,
+        cache_allocations,
+        opw_workspace.allocated_bytes(),
+        1,
+    );
+    let numerical_report = report(
+        "ik_damped_least_squares",
+        &mut dls,
+        numerical_allocations,
+        numerical_workspace.allocated_bytes(),
+        u64::from(numerical_result.work().evaluations()),
+    );
+    assert!(
+        analytical_report.p95_ns() <= 50_000,
+        "analytical P95 exceeded 50 us"
+    );
+    assert!(cache_report.p95_ns() <= 50_000, "cache P95 exceeded 50 us");
+    assert!(
+        numerical_report.p95_ns() <= 500_000,
+        "numerical P95 exceeded 500 us"
+    );
 }

@@ -2,6 +2,7 @@ mod common;
 
 use std::{hint::black_box, time::Instant};
 
+use allocation_counter::measure;
 use arm_algorithms::{
     kinematics::{KinematicChain, PreparedKinematics},
     planning::{
@@ -9,7 +10,7 @@ use arm_algorithms::{
         PreparedRoadmap, PrmQueryOptions,
     },
 };
-use common::{id, synthetic_model};
+use common::{id, performance::report, synthetic_model};
 
 const SAMPLES: usize = 1_000;
 const FAMILY_SAMPLES: usize = 250;
@@ -24,11 +25,6 @@ impl ArmStateValidator for CentralBox {
             Ok(())
         }
     }
-}
-
-fn percentile_95(mut samples_ns: Vec<u128>) -> u128 {
-    samples_ns.sort_unstable();
-    samples_ns[(samples_ns.len() * 95).div_ceil(100) - 1]
 }
 
 #[test]
@@ -102,11 +98,77 @@ fn warm_planning_p95_meets_microsecond_targets() {
         );
         direct_samples.push(started.elapsed().as_nanos());
     }
-    let prm_p95 = percentile_95(prm_samples);
-    let direct_p95 = percentile_95(direct_samples);
-    eprintln!("planning host Release P95: prepared_prm={prm_p95} ns nominal={direct_p95} ns");
-    assert!(prm_p95 <= 200_000, "prepared PRM P95 exceeded 200 us");
-    assert!(direct_p95 <= 1_000_000, "nominal planner P95 exceeded 1 ms");
+    let prm_result = roadmap
+        .query(
+            &prepared,
+            &start,
+            &goal,
+            config,
+            &CentralBox,
+            &mut workspace,
+        )
+        .unwrap();
+    let prm_allocations = measure(|| {
+        black_box(
+            roadmap
+                .query(
+                    &prepared,
+                    &start,
+                    &goal,
+                    config,
+                    &CentralBox,
+                    &mut workspace,
+                )
+                .unwrap(),
+        );
+    });
+    let direct_result = prepared
+        .plan(
+            PlannerKind::RrtConnect,
+            &start,
+            &direct_goal,
+            config,
+            &CentralBox,
+            &mut workspace,
+        )
+        .unwrap();
+    let direct_allocations = measure(|| {
+        black_box(
+            prepared
+                .plan(
+                    PlannerKind::RrtConnect,
+                    &start,
+                    &direct_goal,
+                    config,
+                    &CentralBox,
+                    &mut workspace,
+                )
+                .unwrap(),
+        );
+    });
+    let prepared_bytes = workspace.allocated_bytes();
+    let prm_report = report(
+        "prepared_prm_query",
+        &mut prm_samples,
+        prm_allocations,
+        prepared_bytes,
+        u64::from(prm_result.statistics().iterations()),
+    );
+    let direct_report = report(
+        "planner_direct_edge",
+        &mut direct_samples,
+        direct_allocations,
+        prepared_bytes,
+        u64::from(direct_result.statistics().iterations()),
+    );
+    assert!(
+        prm_report.p95_ns() <= 200_000,
+        "prepared PRM P95 exceeded 200 us"
+    );
+    assert!(
+        direct_report.p95_ns() <= 1_000_000,
+        "nominal planner P95 exceeded 1 ms"
+    );
 
     for planner in [
         PlannerKind::RrtConnect,
@@ -126,8 +188,28 @@ fn warm_planning_p95_meets_microsecond_targets() {
             );
             samples.push(started.elapsed().as_nanos());
         }
-        let p95 = percentile_95(samples);
-        eprintln!("planning host Release P95: {}={p95} ns", planner.name());
-        assert!(p95 <= 1_000_000, "{} P95 exceeded 1 ms", planner.name());
+        let result = prepared
+            .plan(planner, &start, &goal, config, &CentralBox, &mut workspace)
+            .unwrap();
+        let allocations = measure(|| {
+            black_box(
+                prepared
+                    .plan(planner, &start, &goal, config, &CentralBox, &mut workspace)
+                    .unwrap(),
+            );
+        });
+        let kernel = format!("planner_{}", planner.name());
+        let performance = report(
+            &kernel,
+            &mut samples,
+            allocations,
+            workspace.allocated_bytes(),
+            u64::from(result.statistics().iterations()),
+        );
+        assert!(
+            performance.p95_ns() <= 1_000_000,
+            "{} P95 exceeded 1 ms",
+            planner.name()
+        );
     }
 }

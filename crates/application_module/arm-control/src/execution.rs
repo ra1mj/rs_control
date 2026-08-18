@@ -140,6 +140,18 @@ impl<const CAPACITY: usize> LogExecutor<CAPACITY> {
 ///
 /// This delivery exposes no constructor or elevation path for
 /// `AdmittedArmCommand<CollisionChecked>`.
+///
+/// ```compile_fail
+/// use arm_algorithms::task::ArmTaskProposal;
+/// use arm_control::PhysicalArmExecutor;
+///
+/// fn cannot_execute_a_semantic_task_proposal<E: PhysicalArmExecutor>(
+///     executor: &mut E,
+///     proposal: ArmTaskProposal,
+/// ) {
+///     executor.execute(&proposal);
+/// }
+/// ```
 pub trait PhysicalArmExecutor {
     /// Backend-specific typed failure.
     type Error;

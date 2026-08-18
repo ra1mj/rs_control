@@ -392,6 +392,17 @@ pub struct GravityWorkspace {
 }
 
 impl GravityWorkspace {
+    /// Returns the storage reserved during gravity workspace preparation.
+    #[must_use]
+    pub fn allocated_bytes(&self) -> usize {
+        self.transforms.capacity() * std::mem::size_of::<Isometry3<f64>>()
+            + self.origins.capacity() * std::mem::size_of::<Vector3<f64>>()
+            + self.axes.capacity() * std::mem::size_of::<Vector3<f64>>()
+            + self.cogs.capacity() * std::mem::size_of::<Vector3<f64>>()
+            + self.regressor.capacity() * std::mem::size_of::<f64>()
+            + std::mem::size_of::<[f64; MAX_JOINTS]>()
+    }
+
     fn require(&self, prepared: &PreparedGravity) -> Result<(), ArmAlgorithmError> {
         if self.generation != prepared.generation {
             return Err(ArmAlgorithmError::PreparedGenerationMismatch {

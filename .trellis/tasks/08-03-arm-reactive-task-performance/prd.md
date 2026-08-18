@@ -35,19 +35,19 @@ committed and archived before this child starts.
 
 ## Acceptance Criteria
 
-- [ ] RMP stays finite and within acceleration limits near singularities and
+- [x] RMP stays finite and within acceleration limits near singularities and
       joint boundaries; collision RMP remains unavailable.
-- [ ] Each supported task stage produces the correct typed proposal or exact
+- [x] Each supported task stage produces the correct typed proposal or exact
       failure evidence under the selected solver/planner.
-- [ ] Cancellation, stage failure and profile/prepared-generation changes reject
+- [x] Cancellation, stage failure and profile/prepared-generation changes reject
       late results and cannot renew lease/deadline validity.
-- [ ] Compile/runtime tests prove collision-unchecked results cannot reach
+- [x] Compile/runtime tests prove collision-unchecked results cannot reach
       physical admission.
-- [ ] Benchmarks cover every named solver/planner with separated preparation
+- [x] Benchmarks cover every named solver/planner with separated preparation
       and warm-query measurements.
-- [ ] Warm nominal targets and release floors pass on the recorded reference
+- [x] Warm nominal targets and release floors pass on the recorded reference
       host; regressions are reported against the same host/profile only.
-- [ ] Full non-hardware workspace quality gates pass.
+- [x] Full non-hardware workspace quality gates pass.
 
 ## Out of Scope
 

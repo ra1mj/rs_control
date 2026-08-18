@@ -2,6 +2,7 @@ mod common;
 
 use std::{hint::black_box, time::Instant};
 
+use allocation_counter::measure;
 use arm_algorithms::{
     kinematics::{IkSolveConfig, IkSolverKind, KinematicChain, PreparedKinematics},
     planning::{
@@ -11,7 +12,7 @@ use arm_algorithms::{
         PreparedRegionGraph, PreparedStomp, RegionConstraintProvider, TrajectoryCost,
     },
 };
-use common::{id, synthetic_model};
+use common::{id, performance::report, synthetic_model};
 
 const SAMPLES: usize = 500;
 const OPTIMIZER_SAMPLES: usize = 200;
@@ -94,11 +95,6 @@ impl ArmStateValidator for CentralQ0Q2 {
             Ok(())
         }
     }
-}
-
-fn percentile_95(mut samples_ns: Vec<u128>) -> u128 {
-    samples_ns.sort_unstable();
-    samples_ns[(samples_ns.len() * 95).div_ceil(100) - 1]
 }
 
 #[test]
@@ -355,23 +351,208 @@ fn prepared_optimization_planners_meet_microsecond_targets() {
         constrained_samples.push(started.elapsed().as_nanos());
     }
 
-    let gcs_query_p95 = percentile_95(gcs_query);
-    let gcs_build_query_p95 = percentile_95(gcs_build_query);
-    let chomp_p95 = percentile_95(chomp_samples);
-    let stomp_p95 = percentile_95(stomp_samples);
-    let cartesian_p95 = percentile_95(cartesian_samples);
-    let constrained_p95 = percentile_95(constrained_samples);
-    eprintln!(
-        "optimization planning host Release P95: prepared_gcs={gcs_query_p95} ns gcs_build_query={gcs_build_query_p95} ns chomp={chomp_p95} ns stomp={stomp_p95} ns cartesian={cartesian_p95} ns constrained_rrt={constrained_p95} ns"
+    let gcs_query_result = graph
+        .query(
+            &prepared,
+            &region_seeds[0],
+            region_seeds.last().unwrap(),
+            planner_config,
+            &region_provider,
+            &mut planner_workspace,
+        )
+        .unwrap();
+    let gcs_query_allocations = measure(|| {
+        black_box(
+            graph
+                .query(
+                    &prepared,
+                    &region_seeds[0],
+                    region_seeds.last().unwrap(),
+                    planner_config,
+                    &region_provider,
+                    &mut planner_workspace,
+                )
+                .unwrap(),
+        );
+    });
+    let gcs_build_query_allocations = measure(|| {
+        let rebuilt = PreparedRegionGraph::build(
+            &prepared,
+            &regions,
+            planner_config,
+            &region_provider,
+            &mut planner_workspace,
+        )
+        .unwrap();
+        black_box(
+            rebuilt
+                .query(
+                    &prepared,
+                    &region_seeds[0],
+                    region_seeds.last().unwrap(),
+                    planner_config,
+                    &region_provider,
+                    &mut planner_workspace,
+                )
+                .unwrap(),
+        );
+    });
+    let chomp_result = chomp
+        .optimize(
+            &prepared,
+            &optimization_seed,
+            planner_config,
+            chomp_config,
+            &objective,
+            &JointLimitsOnly,
+            &mut chomp_workspace,
+        )
+        .unwrap();
+    let chomp_allocations = measure(|| {
+        black_box(
+            chomp
+                .optimize(
+                    &prepared,
+                    &optimization_seed,
+                    planner_config,
+                    chomp_config,
+                    &objective,
+                    &JointLimitsOnly,
+                    &mut chomp_workspace,
+                )
+                .unwrap(),
+        );
+    });
+    let stomp_result = stomp
+        .optimize(
+            &prepared,
+            &optimization_seed,
+            planner_config,
+            stomp_config,
+            &objective,
+            &UpperHalf,
+            &mut stomp_workspace,
+        )
+        .unwrap();
+    let stomp_allocations = measure(|| {
+        black_box(
+            stomp
+                .optimize(
+                    &prepared,
+                    &optimization_seed,
+                    planner_config,
+                    stomp_config,
+                    &objective,
+                    &UpperHalf,
+                    &mut stomp_workspace,
+                )
+                .unwrap(),
+        );
+    });
+    let cartesian_result = cartesian
+        .plan(
+            &prepared,
+            &cartesian_start,
+            cartesian_target,
+            cartesian_config,
+            &JointLimitsOnly,
+        )
+        .unwrap();
+    let cartesian_allocations = measure(|| {
+        black_box(
+            cartesian
+                .plan(
+                    &prepared,
+                    &cartesian_start,
+                    cartesian_target,
+                    cartesian_config,
+                    &JointLimitsOnly,
+                )
+                .unwrap(),
+        );
+    });
+    let constrained_result = prepared
+        .plan_constrained(
+            &constrained_start,
+            &constrained_goal,
+            planner_config,
+            &FixedSecondJoint,
+            &CentralQ0Q2,
+            &mut planner_workspace,
+        )
+        .unwrap();
+    let constrained_allocations = measure(|| {
+        black_box(
+            prepared
+                .plan_constrained(
+                    &constrained_start,
+                    &constrained_goal,
+                    planner_config,
+                    &FixedSecondJoint,
+                    &CentralQ0Q2,
+                    &mut planner_workspace,
+                )
+                .unwrap(),
+        );
+    });
+    let planner_bytes = planner_workspace.allocated_bytes();
+    let gcs_query_report = report(
+        "prepared_gcs_query",
+        &mut gcs_query,
+        gcs_query_allocations,
+        planner_bytes,
+        u64::from(gcs_query_result.statistics().iterations()),
     );
-    assert!(gcs_query_p95 <= 200_000, "prepared GCS P95 exceeded 200 us");
-    for (name, p95) in [
-        ("gcs_build_query", gcs_build_query_p95),
-        ("chomp", chomp_p95),
-        ("stomp", stomp_p95),
-        ("cartesian", cartesian_p95),
-        ("constrained_rrt", constrained_p95),
+    let gcs_build_query_report = report(
+        "prepared_gcs_build_query",
+        &mut gcs_build_query,
+        gcs_build_query_allocations,
+        planner_bytes,
+        0,
+    );
+    let chomp_report = report(
+        "prepared_chomp",
+        &mut chomp_samples,
+        chomp_allocations,
+        chomp.allocated_bytes() + chomp_workspace.allocated_bytes(),
+        u64::from(chomp_result.statistics().iterations()),
+    );
+    let stomp_report = report(
+        "prepared_stomp",
+        &mut stomp_samples,
+        stomp_allocations,
+        stomp.allocated_bytes() + stomp_workspace.allocated_bytes(),
+        u64::from(stomp_result.statistics().iterations()),
+    );
+    let cartesian_report = report(
+        "prepared_cartesian",
+        &mut cartesian_samples,
+        cartesian_allocations,
+        cartesian.allocated_bytes(),
+        cartesian_result.achieved_steps() as u64,
+    );
+    let constrained_report = report(
+        "prepared_constrained_rrt",
+        &mut constrained_samples,
+        constrained_allocations,
+        planner_bytes,
+        u64::from(constrained_result.statistics().iterations()),
+    );
+    assert!(
+        gcs_query_report.p95_ns() <= 200_000,
+        "prepared GCS P95 exceeded 200 us"
+    );
+    for (name, report) in [
+        ("gcs_build_query", gcs_build_query_report),
+        ("chomp", chomp_report),
+        ("stomp", stomp_report),
+        ("cartesian", cartesian_report),
+        ("constrained_rrt", constrained_report),
     ] {
-        assert!(p95 <= 1_000_000, "{name} P95 exceeded 1 ms: {p95} ns");
+        assert!(
+            report.p95_ns() <= 1_000_000,
+            "{name} P95 exceeded 1 ms: {} ns",
+            report.p95_ns()
+        );
     }
 }

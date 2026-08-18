@@ -2,19 +2,15 @@ mod common;
 
 use std::{hint::black_box, time::Instant};
 
+use allocation_counter::measure;
 use arm_algorithms::{
     adaptive_gravity::{AdaptiveGravityConfig, AdaptiveGravityEstimator, AdaptiveSampleContext},
     dynamics::PreparedGravity,
     kinematics::{KinematicChain, PreparedKinematics},
 };
-use common::{id, synthetic_model};
+use common::{id, performance::report, synthetic_model};
 
 const SAMPLES: usize = 2_000;
-
-fn p95(mut values: Vec<u128>) -> u128 {
-    values.sort_unstable();
-    values[(values.len() * 95).div_ceil(100) - 1]
-}
 
 #[test]
 #[ignore = "release-only isolated host latency gate"]
@@ -100,16 +96,77 @@ fn prepared_gravity_and_adaptation_p95_meet_50us_gate() {
         );
         rls_times.push(started.elapsed().as_nanos());
     }
-    let fk_p95 = p95(fk_times);
-    let gravity_p95 = p95(gravity_times);
-    let regressor_p95 = p95(regressor_times);
-    let evaluation_p95 = p95(evaluation_times);
-    let rls_p95 = p95(rls_times);
-    eprintln!(
-        "prepared FK/gravity/regressor/adaptive/RLS P95: {fk_p95}/{gravity_p95}/{regressor_p95}/{evaluation_p95}/{rls_p95} ns"
+    let fk_allocations = measure(|| {
+        black_box(prepared_fk.forward(&positions, &mut fk_workspace).unwrap());
+    });
+    let gravity_allocations = measure(|| {
+        black_box(
+            prepared
+                .gravity_compensation(&positions, &mut workspace)
+                .unwrap(),
+        );
+    });
+    let regressor_allocations = measure(|| {
+        prepared
+            .payload_regressor(&positions, &mut workspace, &mut regressor)
+            .unwrap();
+    });
+    let evaluation_allocations = measure(|| {
+        estimator.evaluate(&regressor, &mut output).unwrap();
+    });
+    let rls_allocations = measure(|| {
+        black_box(
+            estimator
+                .update_rls(context, batch_rows[0], residual[0])
+                .unwrap(),
+        );
+    });
+    let fk_report = report(
+        "prepared_forward_kinematics",
+        &mut fk_times,
+        fk_allocations,
+        fk_workspace.allocated_bytes(),
+        chain.dof() as u64,
     );
-    for value in [fk_p95, gravity_p95, regressor_p95, evaluation_p95, rls_p95] {
-        assert!(value <= 50_000);
+    let gravity_report = report(
+        "prepared_gravity_compensation",
+        &mut gravity_times,
+        gravity_allocations,
+        workspace.allocated_bytes(),
+        chain.dof() as u64,
+    );
+    let regressor_report = report(
+        "prepared_payload_regressor",
+        &mut regressor_times,
+        regressor_allocations,
+        workspace.allocated_bytes(),
+        regressor.len() as u64,
+    );
+    let evaluation_report = report(
+        "adaptive_gravity_evaluate",
+        &mut evaluation_times,
+        evaluation_allocations,
+        std::mem::size_of_val(&estimator),
+        4,
+    );
+    let rls_report = report(
+        "adaptive_gravity_rls",
+        &mut rls_times,
+        rls_allocations,
+        std::mem::size_of_val(&estimator),
+        u64::from(estimator.counters().accepted_rls_updates),
+    );
+    for report in [
+        fk_report,
+        gravity_report,
+        regressor_report,
+        evaluation_report,
+        rls_report,
+    ] {
+        assert!(report.p95_ns() <= 50_000);
     }
-    assert_eq!(estimator.counters().accepted_rls_updates, SAMPLES as u32);
+    assert_eq!(
+        estimator.counters().accepted_rls_updates,
+        (SAMPLES + 1) as u32
+    );
 }

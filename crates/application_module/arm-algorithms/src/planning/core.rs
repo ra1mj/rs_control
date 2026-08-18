@@ -254,6 +254,20 @@ impl PlannerWorkspace {
             })
     }
 
+    /// Returns the storage reserved during workspace preparation.
+    #[must_use]
+    pub fn allocated_bytes(&self) -> usize {
+        self.first.capacity() * size_of::<Node>()
+            + self.second.capacity() * size_of::<Node>()
+            + self.neighbors.capacity() * size_of::<usize>()
+            + self.density.capacity() * size_of::<u32>()
+            + self.cells.capacity() * size_of::<ProjectionCell>()
+            + self.path.capacity() * size_of::<State>()
+            + self.scores.capacity() * size_of::<f64>()
+            + self.parents.capacity() * size_of::<usize>()
+            + self.open.capacity() * size_of::<OpenEntry>()
+    }
+
     /// Allocates only when the storage estimate fits the caller's byte ceiling.
     pub fn with_byte_limit(
         prepared: &PreparedPlanning<'_, '_>,

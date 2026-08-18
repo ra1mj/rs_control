@@ -324,6 +324,12 @@ impl IkSolveConfig {
     pub const fn seed(self) -> [u8; 32] {
         self.seed
     }
+
+    /// Returns the preparation-time Bio-IK population capacity.
+    #[must_use]
+    pub const fn population_size(self) -> usize {
+        self.population_size
+    }
 }
 
 /// Reproducible solver work evidence.

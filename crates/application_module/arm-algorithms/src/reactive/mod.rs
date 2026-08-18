@@ -2,13 +2,13 @@
 
 use arrayvec::ArrayVec;
 use message_model::{
-    ArmAcceleration, ArmJointKind, ArmJointVector, ArmPosition, ArmVelocity, MAX_JOINTS,
+    ArmAcceleration, ArmJointId, ArmJointKind, ArmJointVector, ArmPosition, ArmVelocity, MAX_JOINTS,
 };
 use nalgebra::{DMatrix, DVector};
 
 use crate::{
     ArmAlgorithmError,
-    kinematics::{ArmPose, KinematicChain},
+    kinematics::{ArmPose, IkWorkspace, KinematicChain, PreparedKinematics},
 };
 
 /// Finite base-frame Cartesian twist.
@@ -358,6 +358,8 @@ pub struct RmpConfig {
     damping_gain: f64,
     joint_limit_gain: f64,
     joint_limit_margin: f64,
+    singularity_gain: f64,
+    singularity_threshold: f64,
 }
 
 impl RmpConfig {
@@ -383,7 +385,30 @@ impl RmpConfig {
             damping_gain,
             joint_limit_gain,
             joint_limit_margin,
+            singularity_gain: 0.0,
+            singularity_threshold: 1.0,
         })
+    }
+
+    /// Adds bounded velocity damping as the prepared Jacobian approaches a
+    /// singular configuration.
+    pub fn with_singularity(
+        mut self,
+        singularity_gain: f64,
+        singularity_threshold: f64,
+    ) -> Result<Self, ArmAlgorithmError> {
+        if !singularity_gain.is_finite()
+            || singularity_gain < 0.0
+            || !singularity_threshold.is_finite()
+            || singularity_threshold <= 0.0
+        {
+            return Err(ArmAlgorithmError::NonFinite {
+                field: "reactive.rmp_singularity",
+            });
+        }
+        self.singularity_gain = singularity_gain;
+        self.singularity_threshold = singularity_threshold;
+        Ok(self)
     }
 
     /// Returns balanced host defaults.
@@ -394,7 +419,236 @@ impl RmpConfig {
             damping_gain: 1.5,
             joint_limit_gain: 0.2,
             joint_limit_margin: 0.2,
+            singularity_gain: 2.0,
+            singularity_threshold: 0.05,
         }
+    }
+}
+
+/// Immutable prepared RMP policy bound to one arm model generation.
+pub struct PreparedRmp<'prepared, 'model> {
+    kinematics: &'prepared PreparedKinematics<'model>,
+    config: RmpConfig,
+}
+
+impl<'prepared, 'model> PreparedRmp<'prepared, 'model> {
+    /// Binds the RMP policy to one prepared kinematics identity.
+    #[must_use]
+    pub const fn new(kinematics: &'prepared PreparedKinematics<'model>, config: RmpConfig) -> Self {
+        Self { kinematics, config }
+    }
+
+    /// Allocates all Jacobian and kinematics scratch before warm calls.
+    pub fn workspace(&self) -> Result<RmpWorkspace, ArmAlgorithmError> {
+        RmpWorkspace::new(self.kinematics)
+    }
+
+    /// Evaluates bounded reach, damping, joint-limit and singularity RMP
+    /// components without allocating after workspace preparation.
+    pub fn accelerate(
+        &self,
+        positions: &ArmJointVector<ArmPosition>,
+        velocities: &ArmJointVector<ArmVelocity>,
+        target: &ArmJointVector<ArmPosition>,
+        workspace: &mut RmpWorkspace,
+    ) -> Result<PreparedRmpOutput, ArmAlgorithmError> {
+        workspace.require(self.kinematics)?;
+        self.kinematics
+            .copy_positions(positions, &mut workspace.current)?;
+        self.kinematics
+            .copy_positions(target, &mut workspace.target)?;
+        self.kinematics.jacobian_into(
+            positions,
+            &mut workspace.kinematics_workspace,
+            &mut workspace.jacobian,
+        )?;
+        if velocities.order() != self.kinematics.order() {
+            return Err(ArmAlgorithmError::JointOrderMismatch {
+                group: self.kinematics.group_id(),
+            });
+        }
+
+        let (smallest_singular_value, singularity_rotations) =
+            smallest_singular_value(&workspace.jacobian, self.kinematics.dof());
+        let singularity_scale = if smallest_singular_value < self.config.singularity_threshold {
+            1.0 - smallest_singular_value / self.config.singularity_threshold
+        } else {
+            0.0
+        };
+        let chain = self.kinematics.chain();
+        let mut reach = ArrayVec::<ArmAcceleration, MAX_JOINTS>::new();
+        let mut damping = ArrayVec::<ArmAcceleration, MAX_JOINTS>::new();
+        let mut joint_limit = ArrayVec::<ArmAcceleration, MAX_JOINTS>::new();
+        let mut singularity = ArrayVec::<ArmAcceleration, MAX_JOINTS>::new();
+        let mut total = ArrayVec::<ArmAcceleration, MAX_JOINTS>::new();
+
+        for (index, descriptor) in self.kinematics.order().joints().iter().enumerate() {
+            let velocity = velocities.values()[index];
+            if velocity.kind() != descriptor.kind().coordinate_kind() {
+                return Err(ArmAlgorithmError::UnitMismatch {
+                    joint: descriptor.joint_id(),
+                });
+            }
+            let limits = chain
+                .model()
+                .joint(descriptor.joint_id())
+                .and_then(|joint| joint.limits())
+                .ok_or(ArmAlgorithmError::InvalidModel {
+                    reason: "prepared RMP active joint has no limits",
+                })?;
+            let maximum = limits.max_acceleration();
+            let reach_value = clamp_component(
+                self.config.reach_gain * (workspace.target[index] - workspace.current[index]),
+                maximum,
+            );
+            let damping_value =
+                clamp_component(-self.config.damping_gain * velocity.value_si(), maximum);
+            let limit_value = clamp_component(
+                joint_limit_repulsion(
+                    chain,
+                    descriptor.joint_id(),
+                    workspace.current[index],
+                    self.config,
+                )?,
+                maximum,
+            );
+            let singularity_value = clamp_component(
+                -self.config.singularity_gain * singularity_scale * velocity.value_si(),
+                maximum,
+            );
+            let total_value = clamp_component(
+                reach_value + damping_value + limit_value + singularity_value,
+                maximum,
+            );
+            reach.push(acceleration(descriptor.kind(), reach_value)?);
+            damping.push(acceleration(descriptor.kind(), damping_value)?);
+            joint_limit.push(acceleration(descriptor.kind(), limit_value)?);
+            singularity.push(acceleration(descriptor.kind(), singularity_value)?);
+            total.push(acceleration(descriptor.kind(), total_value)?);
+        }
+        let order = self.kinematics.order().clone();
+        Ok(PreparedRmpOutput {
+            reach: ArmJointVector::new(order.clone(), reach).map_err(rmp_output_error)?,
+            damping: ArmJointVector::new(order.clone(), damping).map_err(rmp_output_error)?,
+            joint_limit: ArmJointVector::new(order.clone(), joint_limit)
+                .map_err(rmp_output_error)?,
+            singularity: ArmJointVector::new(order.clone(), singularity)
+                .map_err(rmp_output_error)?,
+            acceleration: ArmJointVector::new(order, total).map_err(rmp_output_error)?,
+            smallest_singular_value,
+            singularity_rotations,
+        })
+    }
+}
+
+/// Reusable workspace for one prepared RMP identity.
+pub struct RmpWorkspace {
+    profile_id: message_model::ArmProfileId,
+    group_id: message_model::KinematicGroupId,
+    generation: u64,
+    dof: usize,
+    kinematics_workspace: IkWorkspace,
+    jacobian: Vec<f64>,
+    current: [f64; MAX_JOINTS],
+    target: [f64; MAX_JOINTS],
+}
+
+impl RmpWorkspace {
+    fn new(kinematics: &PreparedKinematics<'_>) -> Result<Self, ArmAlgorithmError> {
+        Ok(Self {
+            profile_id: kinematics.profile_id(),
+            group_id: kinematics.group_id(),
+            generation: kinematics.generation(),
+            dof: kinematics.dof(),
+            kinematics_workspace: kinematics.workspace(2)?,
+            jacobian: vec![0.0; 6 * kinematics.dof()],
+            current: [0.0; MAX_JOINTS],
+            target: [0.0; MAX_JOINTS],
+        })
+    }
+
+    /// Returns all storage reserved during preparation.
+    #[must_use]
+    pub fn allocated_bytes(&self) -> usize {
+        self.kinematics_workspace.allocated_bytes()
+            + self.jacobian.capacity() * std::mem::size_of::<f64>()
+            + std::mem::size_of::<[f64; MAX_JOINTS]>() * 2
+    }
+
+    fn require(&self, kinematics: &PreparedKinematics<'_>) -> Result<(), ArmAlgorithmError> {
+        if self.generation != kinematics.generation() {
+            return Err(ArmAlgorithmError::PreparedGenerationMismatch {
+                expected: kinematics.generation(),
+                actual: self.generation,
+            });
+        }
+        if self.profile_id != kinematics.profile_id() || self.group_id != kinematics.group_id() {
+            return Err(ArmAlgorithmError::PreparedWorkspaceMismatch {
+                reason: "RMP profile or group changed",
+            });
+        }
+        if self.dof != kinematics.dof() {
+            return Err(ArmAlgorithmError::PreparedWorkspaceMismatch {
+                reason: "RMP degree of freedom changed",
+            });
+        }
+        Ok(())
+    }
+}
+
+/// Bounded RMP components and their combined acceleration.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PreparedRmpOutput {
+    reach: ArmJointVector<ArmAcceleration>,
+    damping: ArmJointVector<ArmAcceleration>,
+    joint_limit: ArmJointVector<ArmAcceleration>,
+    singularity: ArmJointVector<ArmAcceleration>,
+    acceleration: ArmJointVector<ArmAcceleration>,
+    smallest_singular_value: f64,
+    singularity_rotations: u32,
+}
+
+impl PreparedRmpOutput {
+    /// Returns the bounded reach component.
+    #[must_use]
+    pub const fn reach(&self) -> &ArmJointVector<ArmAcceleration> {
+        &self.reach
+    }
+
+    /// Returns the bounded velocity damping component.
+    #[must_use]
+    pub const fn damping(&self) -> &ArmJointVector<ArmAcceleration> {
+        &self.damping
+    }
+
+    /// Returns the bounded joint-limit repulsion component.
+    #[must_use]
+    pub const fn joint_limit(&self) -> &ArmJointVector<ArmAcceleration> {
+        &self.joint_limit
+    }
+
+    /// Returns the bounded singularity damping component.
+    #[must_use]
+    pub const fn singularity(&self) -> &ArmJointVector<ArmAcceleration> {
+        &self.singularity
+    }
+
+    /// Returns the bounded total acceleration.
+    #[must_use]
+    pub const fn acceleration(&self) -> &ArmJointVector<ArmAcceleration> {
+        &self.acceleration
+    }
+
+    /// Returns the smallest prepared-Jacobian singular value estimate.
+    #[must_use]
+    pub const fn smallest_singular_value(&self) -> f64 {
+        self.smallest_singular_value
+    }
+
+    /// Returns the fixed-storage Jacobi rotations used for singularity evidence.
+    #[must_use]
+    pub const fn singularity_rotations(&self) -> u32 {
+        self.singularity_rotations
     }
 }
 
@@ -471,6 +725,126 @@ impl KinematicChain<'_> {
             surface: "reactive_rmp",
         })
     }
+}
+
+fn joint_limit_repulsion(
+    chain: KinematicChain<'_>,
+    joint_id: ArmJointId,
+    position: f64,
+    config: RmpConfig,
+) -> Result<f64, ArmAlgorithmError> {
+    let joint = chain
+        .model()
+        .joint(joint_id)
+        .ok_or(ArmAlgorithmError::InvalidModel {
+            reason: "prepared RMP group references missing joint",
+        })?;
+    let Some([lower, upper]) = joint.limits().and_then(|limits| limits.position()) else {
+        return Ok(0.0);
+    };
+    let lower_distance = position - lower;
+    let upper_distance = upper - position;
+    let mut repulsion = 0.0;
+    if lower_distance < config.joint_limit_margin {
+        repulsion += config.joint_limit_gain
+            * (1.0 / lower_distance.max(1.0e-6) - 1.0 / config.joint_limit_margin);
+    }
+    if upper_distance < config.joint_limit_margin {
+        repulsion -= config.joint_limit_gain
+            * (1.0 / upper_distance.max(1.0e-6) - 1.0 / config.joint_limit_margin);
+    }
+    Ok(repulsion)
+}
+
+fn clamp_component(value: f64, maximum: f64) -> f64 {
+    value.clamp(-maximum, maximum)
+}
+
+fn acceleration(kind: ArmJointKind, value: f64) -> Result<ArmAcceleration, ArmAlgorithmError> {
+    match kind {
+        ArmJointKind::Revolute | ArmJointKind::Continuous => ArmAcceleration::angular_radps2(value),
+        ArmJointKind::Prismatic => ArmAcceleration::linear_mps2(value),
+    }
+    .map_err(|_| ArmAlgorithmError::NonFinite {
+        field: "reactive.prepared_rmp_acceleration",
+    })
+}
+
+fn rmp_output_error<T>(_error: T) -> ArmAlgorithmError {
+    ArmAlgorithmError::InvalidModel {
+        reason: "prepared RMP output dimension changed",
+    }
+}
+
+fn smallest_singular_value(jacobian: &[f64], dof: usize) -> (f64, u32) {
+    let mut gram = [0.0_f64; MAX_JOINTS * MAX_JOINTS];
+    let mut rotations = 0_u32;
+    for row in 0..dof {
+        for column in 0..=row {
+            let value = (0..6)
+                .map(|axis| jacobian[axis * dof + row] * jacobian[axis * dof + column])
+                .sum::<f64>();
+            gram[row * MAX_JOINTS + column] = value;
+            gram[column * MAX_JOINTS + row] = value;
+        }
+    }
+
+    // Jacobi rotations on the fixed maximum joint matrix avoid an allocation
+    // or a dynamic SVD on the warm reactive-control path.
+    for _ in 0..(MAX_JOINTS * MAX_JOINTS * 4) {
+        let mut pivot = None;
+        let mut magnitude = 0.0_f64;
+        for row in 0..dof {
+            for column in (row + 1)..dof {
+                let candidate = gram[row * MAX_JOINTS + column].abs();
+                if candidate > magnitude {
+                    magnitude = candidate;
+                    pivot = Some((row, column));
+                }
+            }
+        }
+        let Some((left, right)) = pivot else {
+            break;
+        };
+        if magnitude <= 1.0e-12 {
+            break;
+        }
+        let left_value = gram[left * MAX_JOINTS + left];
+        let right_value = gram[right * MAX_JOINTS + right];
+        let angle = 0.5 * (2.0 * gram[left * MAX_JOINTS + right]).atan2(right_value - left_value);
+        let cosine = angle.cos();
+        let sine = angle.sin();
+        for index in 0..dof {
+            if index == left || index == right {
+                continue;
+            }
+            let left_entry = gram[index * MAX_JOINTS + left];
+            let right_entry = gram[index * MAX_JOINTS + right];
+            let rotated_left = cosine.mul_add(left_entry, -sine * right_entry);
+            let rotated_right = sine.mul_add(left_entry, cosine * right_entry);
+            gram[index * MAX_JOINTS + left] = rotated_left;
+            gram[left * MAX_JOINTS + index] = rotated_left;
+            gram[index * MAX_JOINTS + right] = rotated_right;
+            gram[right * MAX_JOINTS + index] = rotated_right;
+        }
+        let diagonal_left = cosine * cosine * left_value
+            - 2.0 * sine * cosine * gram[left * MAX_JOINTS + right]
+            + sine * sine * right_value;
+        let diagonal_right = sine * sine * left_value
+            + 2.0 * sine * cosine * gram[left * MAX_JOINTS + right]
+            + cosine * cosine * right_value;
+        gram[left * MAX_JOINTS + left] = diagonal_left;
+        gram[right * MAX_JOINTS + right] = diagonal_right;
+        gram[left * MAX_JOINTS + right] = 0.0;
+        gram[right * MAX_JOINTS + left] = 0.0;
+        rotations = rotations.saturating_add(1);
+    }
+    (
+        (0..dof)
+            .map(|index| gram[index * MAX_JOINTS + index].max(0.0).sqrt())
+            .fold(f64::INFINITY, f64::min),
+        rotations,
+    )
 }
 
 fn clamp_velocities(

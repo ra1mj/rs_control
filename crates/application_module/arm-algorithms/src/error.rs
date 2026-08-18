@@ -227,4 +227,10 @@ pub enum ArmAlgorithmError {
         /// Rejected surface.
         surface: &'static str,
     },
+    /// A task compiler result no longer matches the active task request.
+    #[error("task compilation result is stale: {reason}")]
+    StaleTaskResult {
+        /// Stable rejection reason.
+        reason: &'static str,
+    },
 }

@@ -6,7 +6,7 @@
 //! Pose interpolation is combined with the project's sole prepared KINETIC IK
 //! boundary, continuity checks and exact semantic path validation.
 
-use std::marker::PhantomData;
+use std::{marker::PhantomData, mem::size_of};
 
 use message_model::{
     ArmJointOrder, ArmJointVector, ArmPosition, ArmProfileId, KinematicGroupId,
@@ -103,6 +103,12 @@ impl CartesianConfig {
     #[must_use]
     pub const fn allow_partial(self) -> bool {
         self.allow_partial
+    }
+
+    /// Returns the prepared IK population capacity required by this policy.
+    #[must_use]
+    pub const fn maximum_ik_population(self) -> usize {
+        self.ik.population_size()
     }
 }
 
@@ -342,6 +348,14 @@ impl PreparedCartesianPlanner {
             CartesianTermination::Complete,
             config.ik.seed(),
         ))
+    }
+
+    /// Returns the storage reserved during Cartesian and IK preparation.
+    #[must_use]
+    pub fn allocated_bytes(&self) -> usize {
+        self.ik_workspace.allocated_bytes()
+            + self.states.capacity() * size_of::<State>()
+            + self.positions.capacity() * size_of::<ArmJointVector<ArmPosition>>()
     }
 
     fn require_context(

@@ -126,3 +126,95 @@ let solution = prepared.solve(
 )?;
 assert_eq!(solution.solver(), IkSolverKind::Opw);
 ```
+
+## Scenario: Add a prepared reactive RMP policy
+
+### 1. Scope / Trigger
+
+Use this contract when a reactive arm policy consumes FK/Jacobian evidence or
+adds singularity handling under `arm-algorithms::reactive`. The policy remains
+collision independent and is not a physical command path.
+
+### 2. Signatures
+
+```rust
+let rmp = PreparedRmp::new(&kinematics, RmpConfig::host_default());
+let mut workspace = rmp.workspace()?;
+let output = rmp.accelerate(&positions, &velocities, &target, &mut workspace)?;
+
+output.smallest_singular_value();
+output.singularity_rotations();
+workspace.allocated_bytes();
+```
+
+### 3. Contracts
+
+- `PreparedRmp` borrows exactly one `PreparedKinematics`; its workspace binds
+  profile, group, DOF and non-zero model generation.
+- Preparation owns Jacobian and IK scratch. A warmed `accelerate` call has no
+  heap allocation, container growth, clock read, logging, I/O or blocking.
+- Reach, ordinary damping, finite joint-limit repulsion and singularity
+  damping are individually finite and clamped before their deterministic sum
+  is clamped to each joint's acceleration limit.
+- The singularity metric is computed from the prepared Jacobian using the
+  fixed-size Jacobi workspace. `singularity_rotations` is deterministic work
+  evidence, not a collision or physical-safety claim.
+- `RmpWorkspace::allocated_bytes()` reports preparation-owned dynamic and
+  fixed scratch for test and host evidence only; it is not a runtime budget
+  refresh mechanism.
+- Obstacle/self-collision RMP remains `CollisionCapabilityUnavailable` until a
+  separately validated collision provider exists.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+|---|---|
+| RMP workspace generation differs | `PreparedGenerationMismatch` |
+| Profile, group or DOF differs | `PreparedWorkspaceMismatch` |
+| Position/target/velocity order differs | `JointOrderMismatch` |
+| Velocity coordinate kind differs | `UnitMismatch` |
+| Active joint has no finite limits | `InvalidModel` |
+| Gain, threshold or component becomes non-finite | `NonFinite` |
+| Collision-dependent policy is requested | `CollisionCapabilityUnavailable` |
+
+### 5. Good, Base and Bad Cases
+
+- Good: prepare once, retain the workspace, repeatedly evaluate the same
+  seeded/prepared arm state, and record zero warm allocations plus the bounded
+  Jacobi rotation count.
+- Base: apply only reach and ordinary damping with a valid `RmpConfig`.
+- Bad: dynamically allocate an SVD in the servo call, combine unbounded
+  components before validation, reuse a workspace after model reload, or
+  interpret a small singular value as collision qualification.
+
+### 6. Tests Required
+
+- Assert each reported component and total is finite and within the compiled
+  acceleration limits near a joint boundary and a singular configuration.
+- Assert warmed `accelerate` reports zero allocations, stale generation is
+  rejected, and rotation evidence is within the fixed Jacobi iteration bound.
+- Run the isolated Release host report:
+
+  ```text
+  cargo test --release -p arm-algorithms --test reactive_task_performance -- --ignored --nocapture
+  ```
+
+  The output is host-only evidence, never RK3588, realtime or physical-arm
+  qualification.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+// Dynamic matrix decomposition and formatted telemetry are not servo-safe.
+let singularity = jacobian.svd(true, true).singular_values;
+println!("singularity={singularity:?}");
+```
+
+#### Correct
+
+```rust
+let output = rmp.accelerate(&positions, &velocities, &target, &mut workspace)?;
+assert!(output.singularity_rotations() <= MAX_JOINTS as u32 * MAX_JOINTS as u32 * 4);
+```

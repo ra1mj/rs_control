@@ -1,5 +1,7 @@
 //! Prepared contracts and fixed-capacity storage for trajectory optimization.
 
+use std::mem::size_of;
+
 use message_model::{ArmProfileId, KinematicGroupId, MAX_TRAJECTORY_POINTS};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -247,6 +249,17 @@ impl OptimizationWorkspace {
             weights: Vec::with_capacity(config.population_size),
             rng: ChaCha8Rng::from_seed(config.seed),
         })
+    }
+
+    /// Returns the storage reserved during optimizer workspace preparation.
+    #[must_use]
+    pub fn allocated_bytes(&self) -> usize {
+        self.trajectory.capacity() * size_of::<State>()
+            + self.candidate.capacity() * size_of::<State>()
+            + self.gradient.capacity() * size_of::<State>()
+            + self.noises.capacity() * size_of::<State>()
+            + self.sample_costs.capacity() * size_of::<f64>()
+            + self.weights.capacity() * size_of::<f64>()
     }
 
     pub(crate) fn reset(

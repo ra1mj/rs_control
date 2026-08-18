@@ -211,3 +211,108 @@ assert!(matches!(
     }
 ));
 ```
+
+## Scenario: Compile bounded task stages and report host performance
+
+### 1. Scope / Trigger
+
+Use this contract when converting an `ArmTaskProgram` stage to a semantic
+proposal, adding task cancellation/reload correlation, exposing prepared-byte
+evidence, or changing an isolated Release algorithm benchmark.
+
+### 2. Signatures
+
+```rust
+let compiler = ArmTaskCompiler::new(&program, &planning, policy)?;
+let mut workspace = compiler.workspace()?;
+let request = cursor.begin_compile(compiler.context().clone())?;
+let result = compiler.compile(request, &start, validator, &mut workspace)?;
+cursor.accept_compilation(&result, compiler.context())?;
+
+workspace.allocated_bytes();
+```
+
+The shared Release test report takes one named kernel, warm duration samples,
+`allocation_counter::AllocationInfo`, prepared bytes and a deterministic work
+counter. Its optional baseline inputs are:
+
+```text
+ARM_ALGORITHMS_BASELINE_HOST=<exact emitted host fingerprint>
+ARM_ALGORITHMS_BASELINE_<KERNEL>_P50_NS=<positive integer>
+```
+
+### 3. Contracts
+
+- A request records non-zero request ID, stage index, cursor generation,
+  profile, group, exact order, model generation and constraint generation.
+  Cancellation, failure and reload increment the cursor generation before any
+  late result can be accepted.
+- `ArmTaskCompiler` accepts only an exactly matching request/context and a
+  `TaskCompileWorkspace` bound to the same prepared planning identity.
+- `MoveJoint`, `MovePose`, `Cartesian`, `Pick` and `Place` return only
+  `CollisionUnchecked` plans; `Gripper` and `Hold` remain semantic intents.
+  Proposals carry no lease, command deadline, command envelope or device
+  bytes. `Recovery` remains typed unavailable until dispatch is designed.
+- Workspace capacity is fixed at preparation. A larger Cartesian policy used
+  with a smaller workspace returns `Capacity`; it must not grow scratch.
+- Every ignored Release benchmark prints P50/P95/P99, throughput, total output
+  allocations/bytes, prepared bytes, work count, host fingerprint and
+  `qualification=host-only`. Output allocation for a returned plan is reported
+  separately from prepared scratch and is not hidden as a warm-path allocation.
+- A median regression gate is inactive without a baseline. If a baseline is
+  supplied, its host fingerprint must match exactly and P50 greater than 115%
+  of baseline fails. Results never compare unlike hosts or profiles.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+|---|---|
+| Request/context differs from compiler | `StaleTaskResult` |
+| Prepared model or constraint generation differs | `PreparedGenerationMismatch` or `StaleTaskResult` |
+| Workspace context differs | `StaleTaskResult` |
+| Stage index is outside the program | `StaleTaskResult` |
+| Cartesian request exceeds prepared waypoints | `Capacity { field: "planner.cartesian_waypoints", .. }` |
+| Late result arrives after cancellation/reload | `StaleTaskResult`; cursor does not advance |
+| Recovery stage reaches compiler | `UnsupportedCapability { capability: "task_recovery_branch_dispatch" }` |
+| Baseline P50 is malformed/zero | isolated Release test fails before comparison |
+| Baseline host differs | isolated Release test fails rather than compare data |
+
+### 5. Good, Base and Bad Cases
+
+- Good: compile a stage against retained prepared kinematics/planning, record
+  result identity, then accept exactly that result while the cursor is running.
+- Base: compile `Hold` to a zero-allocation semantic proposal.
+- Bad: let a late result renew authority, attach a lease/deadline to a task
+  proposal, treat `CollisionUnchecked` as physically executable, or label a
+  workstation benchmark as a target-board result.
+
+### 6. Tests Required
+
+- Cover every supported stage, task cancellation/reload rejection, compiler
+  context mismatch, workspace mismatch and Cartesian capacity refusal without
+  a change in `allocated_bytes()`.
+- Keep a `compile_fail` proof that `ArmTaskProposal` cannot satisfy
+  `PhysicalArmExecutor`, alongside existing arm-control lease/deadline
+  admission tests.
+- For every named IK, planning, optimization, gravity, reactive and task
+  kernel, run its ignored Release report with `--nocapture`; retain output only
+  as host evidence and assert the documented P95 target separately.
+- Run `cargo deny check`, architecture check and `tools/ci.sh` after changing
+  the report convention or prepared workspace accounting.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+// A task proposal has no authority and cannot bypass collision typestate.
+physical_executor.execute(&compiled.proposal());
+```
+
+#### Correct
+
+```rust
+let compiled = compiler.compile(request, &start, validator, &mut workspace)?;
+assert!(matches!(compiled.proposal(), ArmTaskProposal::Hold { .. }));
+// A separate collision, lease, deadline and arm-control admission path is required.
+```

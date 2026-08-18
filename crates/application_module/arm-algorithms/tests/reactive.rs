@@ -3,9 +3,10 @@ mod common;
 use arm_algorithms::{
     ArmAlgorithmError,
     kinematics::KinematicChain,
+    kinematics::PreparedKinematics,
     reactive::{
-        ArmTwist, ButterworthFilter, EmaFilter, JointVelocityFilter, NoFilter, RmpConfig,
-        ServoConfig,
+        ArmTwist, ButterworthFilter, EmaFilter, JointVelocityFilter, NoFilter, PreparedRmp,
+        RmpConfig, ServoConfig,
     },
 };
 use arrayvec::ArrayVec;
@@ -115,5 +116,64 @@ fn rmp_combines_reach_damping_limits_and_rejects_collision_policy() {
     assert!(matches!(
         chain.require_collision_rmp(),
         Err(ArmAlgorithmError::CollisionCapabilityUnavailable { .. })
+    ));
+}
+
+#[test]
+fn prepared_rmp_reuses_jacobian_storage_and_rejects_stale_generation() {
+    let model = synthetic_model();
+    let chain = KinematicChain::new(&model, id("arm")).unwrap();
+    let positions = chain
+        .positions_from_values(&[0.1, -0.2, 0.15, 0.05, -0.1, 0.2])
+        .unwrap();
+    let target = chain
+        .positions_from_values(&[0.2, -0.1, 0.05, 0.1, -0.05, 0.15])
+        .unwrap();
+    let velocities = zero_velocities(chain);
+    let prepared = PreparedKinematics::new(chain, 7).unwrap();
+    let policy = PreparedRmp::new(
+        &prepared,
+        RmpConfig::host_default()
+            .with_singularity(3.0, 0.1)
+            .unwrap(),
+    );
+    let mut workspace = policy.workspace().unwrap();
+
+    let first = policy
+        .accelerate(&positions, &velocities, &target, &mut workspace)
+        .unwrap();
+    assert!(first.smallest_singular_value().is_finite());
+    assert!(first.singularity_rotations() <= (4 * MAX_JOINTS * MAX_JOINTS) as u32);
+    assert_eq!(first.acceleration().values().len(), chain.dof());
+    for component in [
+        first.reach(),
+        first.damping(),
+        first.joint_limit(),
+        first.singularity(),
+        first.acceleration(),
+    ] {
+        assert!(
+            component
+                .values()
+                .iter()
+                .all(|value| value.value_si().is_finite() && value.value_si().abs() <= 4.0)
+        );
+    }
+
+    let allocations = allocation_counter::measure(|| {
+        policy
+            .accelerate(&positions, &velocities, &target, &mut workspace)
+            .unwrap();
+    });
+    assert_eq!(allocations.count_total, 0);
+
+    let replacement = PreparedKinematics::new(chain, 8).unwrap();
+    let replacement_policy = PreparedRmp::new(&replacement, RmpConfig::host_default());
+    assert!(matches!(
+        replacement_policy.accelerate(&positions, &velocities, &target, &mut workspace),
+        Err(ArmAlgorithmError::PreparedGenerationMismatch {
+            expected: 8,
+            actual: 7
+        })
     ));
 }

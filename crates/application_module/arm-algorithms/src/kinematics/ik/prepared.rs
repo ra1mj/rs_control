@@ -343,6 +343,32 @@ impl<'model> PreparedKinematics<'model> {
         ArmPose::from_isometry(&transform)
     }
 
+    /// Writes the current 6xN geometric Jacobian into caller-owned storage.
+    ///
+    /// The output is row-major and must be exactly `6 * dof()` values long.
+    /// All frame and Jacobian scratch remains in the prepared workspace, so a
+    /// warmed call does not allocate.
+    pub fn jacobian_into(
+        &self,
+        positions: &ArmJointVector<ArmPosition>,
+        workspace: &mut IkWorkspace,
+        output: &mut [f64],
+    ) -> Result<(), ArmAlgorithmError> {
+        let expected = 6 * self.dof();
+        if output.len() != expected {
+            return Err(ArmAlgorithmError::DimensionMismatch {
+                field: "ik.jacobian_output",
+                expected,
+                actual: output.len(),
+            });
+        }
+        let mut values = [0.0_f64; MAX_JOINTS];
+        self.copy_positions(positions, &mut values)?;
+        self.evaluate(workspace, &values[..self.dof()])?;
+        output.copy_from_slice(&workspace.jacobian);
+        Ok(())
+    }
+
     pub(crate) fn validate_values(&self, values: &[f64]) -> Result<(), ArmAlgorithmError> {
         if values.len() != self.dof() {
             return Err(ArmAlgorithmError::DimensionMismatch {
@@ -371,7 +397,7 @@ impl<'model> PreparedKinematics<'model> {
         Ok(())
     }
 
-    pub(super) fn copy_positions(
+    pub(crate) fn copy_positions(
         &self,
         positions: &ArmJointVector<ArmPosition>,
         output: &mut [f64; MAX_JOINTS],

@@ -59,6 +59,12 @@ impl PreparedStomp {
         })
     }
 
+    /// Returns the storage reserved while preparing the temporal covariance.
+    #[must_use]
+    pub fn allocated_bytes(&self) -> usize {
+        self.inverse_covariance.capacity() * std::mem::size_of::<f64>()
+    }
+
     /// Optimizes one caller-supplied feasible seed with deterministic rollouts.
     #[allow(clippy::too_many_arguments)]
     pub fn optimize(

@@ -3,7 +3,7 @@
   "name": "advanced-arm-algorithms",
   "title": "Complete advanced arm algorithm implementations",
   "description": "Replace advanced arm IK, planner, reactive and task placeholders or shared fallback kernels with truthful bounded host-software implementations.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": "backend",
   "scope": "bounded multi-morphology IK, distinct planning kernels, collision-independent RMP policies and task-to-plan integration; no collision, dual-arm, floating-base, hardware or Orange Pi qualification",
   "package": "backend",

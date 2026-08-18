@@ -41,6 +41,10 @@ performance-sensitive callers use the prepared boundary.
 - Randomized kernels reset `ChaCha8Rng` from the request's recorded 32-byte
   seed. Equal prepared state, target, initial state, config and seed produce
   byte-equal semantic results and work evidence.
+- A population kernel ranks preallocated members with an allocation-free
+  in-place ordering. Its comparator must total-order fitness and a persistent
+  member ordinal: Rust's stable `sort_by` may allocate a temporary buffer in a
+  warm generation.
 - Generic DLS and SQP accept variable-DOF revolute, continuous and prismatic
   groups. FABRIK accepts rotary groups. Bio-IK requires an explicit seed.
 - OPW accepts only its measured Y-Z-Y wrist convention. Paden-Kahan accepts
@@ -90,7 +94,7 @@ performance-sensitive callers use the prepared boundary.
   iterations/evaluations/generations/candidate counts.
 - Cache tests cover quantized hits, full capacity and profile/group/order/
   generation rejection. Batch tests prove caller-owned capacity behavior.
-- `allocation-counter` reports zero allocations for warmed calls.
+- `allocation-counter` reports and asserts zero allocations for warmed calls.
 - Run the ignored Release gate explicitly:
 
   ```text

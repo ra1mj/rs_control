@@ -11,8 +11,8 @@
       random sources, allocation behavior and selected file hashes.
 - [x] Preserve KINETIC as an Apache-2.0 implementation reference only.
 - [x] Split work into independently verifiable child deliverables.
-- [ ] Complete and review all parent/child planning artifacts.
-- [ ] Start only child 1 after explicit planning approval.
+- [x] Complete and review all parent/child planning artifacts.
+- [x] Start only child 1 after explicit planning approval.
 
 ## 2. Child execution order
 
@@ -85,34 +85,34 @@ algorithm kernels or relax task authority.
 
 ## 3. Cross-child implementation rules
 
-- [ ] Load `trellis-before-dev` before each child changes production files.
-- [ ] Use project-owned semantic types; do not import KINETIC crates/types.
-- [ ] Use the reviewed KINETIC files as the sole IK kernel source, including
+- [x] Load `trellis-before-dev` before each child changes production files.
+- [x] Use project-owned semantic types; do not import KINETIC crates/types.
+- [x] Use the reviewed KINETIC files as the sole IK kernel source, including
       replacement/rebase of DLS; do not add another IK implementation source.
-- [ ] Put substantially adapted code behind per-file Apache-2.0 provenance.
-- [ ] Use explicit request seeds; no `thread_rng` or implicit entropy.
-- [ ] Preallocate validated workspaces; no post-preparation container growth.
-- [ ] Validate exact profile/group/order/generation at every prepared query.
-- [ ] Keep wall-clock enforcement outside deterministic kernels and discard
+- [x] Put substantially adapted code behind per-file Apache-2.0 provenance.
+- [x] Use explicit request seeds; no `thread_rng` or implicit entropy.
+- [x] Preallocate validated workspaces; no post-preparation container growth.
+- [x] Validate exact profile/group/order/generation at every prepared query.
+- [x] Keep wall-clock enforcement outside deterministic kernels and discard
       late worker/orchestration results.
-- [ ] Keep every result `CollisionUnchecked`; do not change physical admission.
-- [ ] Do not add hardware, Orange Pi, CAN, camera, live ROS, GPU or Python work.
+- [x] Keep every result `CollisionUnchecked`; do not change physical admission.
+- [x] Do not add hardware, Orange Pi, CAN, camera, live ROS, GPU or Python work.
 
 ## 4. Parent integration review
 
-- [ ] Prove advanced names cannot alias DLS, direct interpolation or
+- [x] Prove advanced names cannot alias DLS, direct interpolation or
       RRT-Connect using behavior-specific fixtures and statistics.
-- [ ] Prove profile/group/order/generation mismatch invalidates prepared IK,
+- [x] Prove profile/group/order/generation mismatch invalidates prepared IK,
       roadmap, region graph and optimizer state.
-- [ ] Prove deterministic repeatability for seeds, work counters, candidates
+- [x] Prove deterministic repeatability for seeds, work counters, candidates
       and complete plans.
-- [ ] Prove workspace and output capacity exhaustion is typed and bounded.
-- [ ] Prove GCS/IRIS regions are constraint-feasible only and remain collision
+- [x] Prove workspace and output capacity exhaustion is typed and bounded.
+- [x] Prove GCS/IRIS regions are constraint-feasible only and remain collision
       unchecked.
-- [ ] Prove task cancellation and context change reject late algorithm results.
-- [ ] Prove no plan/result grants or renews lease, deadline or hardware command
+- [x] Prove task cancellation and context change reject late algorithm results.
+- [x] Prove no plan/result grants or renews lease, deadline or hardware command
       authority.
-- [ ] Compare isolated Release benchmark results with KINETIC audit values and
+- [x] Compare isolated Release benchmark results with KINETIC audit values and
       record differences without inheriting upstream claims.
 
 ## 5. Validation commands
@@ -134,11 +134,13 @@ cargo deny check
 rg -n "softmata|KINETIC|kinetic[_-]" crates/application_module/arm-algorithms
 ```
 
-Isolated performance gate (exact command finalized by child 4 after benchmark
-dependency admission):
+Isolated performance gates:
 
 ```bash
-cargo bench -p arm-algorithms --bench advanced_algorithms
+cargo test --release -p arm-algorithms --test ik_performance -- --ignored --nocapture
+cargo test --release -p arm-algorithms --test planning_performance -- --ignored --nocapture
+cargo test --release -p arm-algorithms --test planning_optimization_performance -- --ignored --nocapture
+cargo test --release -p arm-algorithms --test reactive_task_performance -- --ignored --nocapture
 ```
 
 Full non-hardware host gates:
@@ -154,10 +156,10 @@ Do not run Orange Pi, live CAN, camera, physical-arm or live ROS gates.
 
 ## 6. Finish
 
-- [ ] Run `trellis-check` for each child and the final parent matrix.
-- [ ] Update project specs with durable prepared-algorithm and performance
+- [x] Run `trellis-check` for each child and the final parent matrix.
+- [x] Update project specs with durable prepared-algorithm and performance
       contracts after implementation proves them.
-- [ ] Commit and archive each child independently in dependency order.
+- [x] Commit and archive each child independently in dependency order.
 - [ ] Update the original `07-31-kinetic-arm-stack` checklist only from passing
       evidence.
 - [ ] Archive this parent, then finish the original arm-stack and

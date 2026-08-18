@@ -27,6 +27,7 @@ pub(super) fn solve(
     workspace.rng = ChaCha8Rng::from_seed(config.seed);
     workspace.population[0].coordinates = *seed;
     workspace.population[0].fitness = f64::INFINITY;
+    workspace.population[0].ordinal = 0;
     for member in 1..population_size {
         for joint in 0..dof {
             let [lower, upper] = prepared.bounds[joint].sampling;
@@ -34,6 +35,7 @@ pub(super) fn solve(
                 workspace.rng.random_range(lower..=upper);
         }
         workspace.population[member].fitness = f64::INFINITY;
+        workspace.population[member].ordinal = member;
     }
 
     let mut best = *seed;
@@ -48,8 +50,11 @@ pub(super) fn solve(
             evaluations = evaluations.saturating_add(1);
             workspace.population[member].fitness = fitness;
         }
-        workspace.population[..population_size]
-            .sort_by(|left, right| left.fitness.total_cmp(&right.fitness));
+        workspace.population[..population_size].sort_unstable_by(|left, right| {
+            left.fitness
+                .total_cmp(&right.fitness)
+                .then_with(|| left.ordinal.cmp(&right.ordinal))
+        });
         if workspace.population[0].fitness < best_fitness {
             best_fitness = workspace.population[0].fitness;
             best = workspace.population[0].coordinates;
@@ -74,7 +79,7 @@ pub(super) fn solve(
         }
 
         for elite in 0..config.elite_count {
-            workspace.next_population[elite] = workspace.population[elite].clone();
+            workspace.next_population[elite] = workspace.population[elite];
         }
         for member in config.elite_count..population_size {
             let parent = workspace.rng.random_range(0..=population_size / 2);
@@ -94,6 +99,7 @@ pub(super) fn solve(
             }
             workspace.next_population[member].coordinates = child;
             workspace.next_population[member].fitness = f64::INFINITY;
+            workspace.next_population[member].ordinal = member;
         }
         std::mem::swap(&mut workspace.population, &mut workspace.next_population);
         sigma = (sigma * 0.995).max(0.01);

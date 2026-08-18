@@ -162,33 +162,33 @@ contracts and fail-closed collision boundary.
 
 ## Acceptance Criteria
 
-- [ ] Capability tests prove every solver/planner is truthful and no advanced
+- [x] Capability tests prove every solver/planner is truthful and no advanced
       identity aliases DLS, direct interpolation or generic RRT-Connect.
-- [ ] FABRIK, SQP and Bio-IK pass reachable, unreachable, singular,
+- [x] FABRIK, SQP and Bio-IK pass reachable, unreachable, singular,
       limit-boundary, wrong-dimension and NaN/Inf cases on multiple DOF and
       mixed-joint fixtures where compatible.
-- [ ] OPW, Paden-Kahan and seven-DOF solvers pass dedicated compatible geometry
+- [x] OPW, Paden-Kahan and seven-DOF solvers pass dedicated compatible geometry
       goldens and reject near-miss geometries deterministically.
-- [ ] Batch/cache queries reject profile/group generation mismatches and are
+- [x] Batch/cache queries reject profile/group generation mismatches and are
       bit-for-bit repeatable for identical inputs and seeds.
-- [ ] Each planner has deterministic success and failure fixtures that exercise
+- [x] Each planner has deterministic success and failure fixtures that exercise
       behavior unique to its family, plus work-budget exhaustion evidence.
-- [ ] GCS/IRIS never claim collision-free regions without an explicit
+- [x] GCS/IRIS never claim collision-free regions without an explicit
       constraint/region provider.
-- [ ] CHOMP/STOMP objectives improve or return typed non-convergence without
+- [x] CHOMP/STOMP objectives improve or return typed non-convergence without
       emitting an invalid path.
-- [ ] RMP outputs stay finite and within acceleration limits near singularities
+- [x] RMP outputs stay finite and within acceleration limits near singularities
       and joint boundaries; collision RMP remains unavailable.
-- [ ] Task compilation produces bounded collision-unchecked proposals and
+- [x] Task compilation produces bounded collision-unchecked proposals and
       cancellation/reload/context mismatch invalidates pending results.
-- [ ] Compile/runtime tests prove collision-unchecked plans cannot reach
+- [x] Compile/runtime tests prove collision-unchecked plans cannot reach
       physical admission or extend authority.
-- [ ] Targeted Clippy, workspace tests, architecture, dependency/source policy,
+- [x] Targeted Clippy, workspace tests, architecture, dependency/source policy,
       schema compatibility and the complete non-hardware host gate pass.
-- [ ] Release benchmarks cover every independently implemented kernel and fail
+- [x] Release benchmarks cover every independently implemented kernel and fail
       on workspace-capacity overflow, post-initialization inner-loop allocation
       or an agreed latency regression threshold.
-- [ ] Warm nominal benchmarks meet the AA-06 microsecond targets on the recorded
+- [x] Warm nominal benchmarks meet the AA-06 microsecond targets on the recorded
       x86_64 reference host; the 10 ms P95 / 20 ms P99 values remain only
       release-blocking floors, never the reported target.
 

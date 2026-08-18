@@ -667,10 +667,11 @@ pub(super) struct EvaluatedFrame {
     binding: CoordinateBinding,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub(super) struct PopulationMember {
     pub coordinates: [f64; MAX_JOINTS],
     pub fitness: f64,
+    pub ordinal: usize,
 }
 
 impl Default for PopulationMember {
@@ -678,6 +679,7 @@ impl Default for PopulationMember {
         Self {
             coordinates: [0.0; MAX_JOINTS],
             fitness: f64::INFINITY,
+            ordinal: 0,
         }
     }
 }

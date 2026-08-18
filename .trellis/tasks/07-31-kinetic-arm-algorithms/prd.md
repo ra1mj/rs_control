@@ -237,40 +237,40 @@ the control layer.
 
 ## Acceptance criteria
 
-- [ ] A clean checkout builds the native arm stack without any KINETIC
+- [x] A clean checkout builds the native arm stack without any KINETIC
       Git/path/submodule/workspace dependency and passes license/source policy;
       every substantially derived source file has auditable provenance.
-- [ ] A bounded project-owned arm model loads a reference URDF and exposes an
+- [x] A bounded project-owned arm model loads a reference URDF and exposes an
       exact, stable base-to-tool joint order.
-- [ ] Multiple fixture morphologies produce distinct immutable profile
+- [x] Multiple fixture morphologies produce distinct immutable profile
       identities; plans, RL tensors and MIT proposals cannot be replayed across
       incompatible joint counts, ordering, limits or controller mappings.
-- [ ] A multi-group fixture proves that commands identify one exact group and
+- [x] A multi-group fixture proves that commands identify one exact group and
       cannot leak joints across groups; floating-base and coordinated dual-arm
       requests fail with typed unsupported evidence suitable for later
       extension.
-- [ ] Golden FK and Jacobian tests pass for zero, nominal and joint-boundary
+- [x] Golden FK and Jacobian tests pass for zero, nominal and joint-boundary
       configurations.
-- [ ] Seeded deterministic IK recovers reachable poses within explicit
+- [x] Seeded deterministic IK recovers reachable poses within explicit
       position/orientation tolerances and rejects unreachable, singular,
       non-convergent and limit-violating cases.
-- [ ] Every trajectory generator produces points obeying all dimensional,
+- [x] Every trajectory generator produces points obeying all dimensional,
       time, position, velocity, acceleration and applicable effort bounds.
-- [ ] Planning, reactive, task/grasp and simulated/logged execution surfaces
+- [x] Planning, reactive, task/grasp and simulated/logged execution surfaces
       are present; any path without collision evidence is mechanically marked
       `CollisionUnchecked` and rejected by executable admission.
-- [ ] Planning output cannot grant a lease, extend a local deadline or bypass
+- [x] Planning output cannot grant a lease, extend a local deadline or bypass
       action cancellation.
-- [ ] A reviewed policy manifest and model fixture load through the selected
+- [x] A reviewed policy manifest and model fixture load through the selected
       Rust inference runtime with exact hash, tensor and robot-DOF validation.
-- [ ] Policy tests cover valid inference, stale/missing observation, malformed
+- [x] Policy tests cover valid inference, stale/missing observation, malformed
       model/manifest, wrong tensor shape/type, NaN/Inf output, action limiting,
       timeout, queue saturation, restart/reload and fallback.
-- [ ] Golden tests cover direct-torque and MIT decoding in stable compiled
+- [x] Golden tests cover direct-torque and MIT decoding in stable compiled
       joint-to-actuator binding order, SI units, gain/effort/rate limiting and
       rejection before any raw motor frame can be constructed.
-- [ ] The learned policy never directly produces an executable motor command;
+- [x] The learned policy never directly produces an executable motor command;
       lease, local deadline, lifecycle and project-owned constraints remain
       authoritative.
-- [ ] Architecture, warnings-denied Clippy, workspace tests, dependency policy
+- [x] Architecture, warnings-denied Clippy, workspace tests, dependency policy
       and the full host software gate pass.

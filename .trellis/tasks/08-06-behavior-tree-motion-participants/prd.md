@@ -66,16 +66,16 @@ any stage is blocked or stopped.
 
 ## Acceptance criteria
 
-- [ ] A public, bounded project behavior-tree API executes the existing core
+- [x] A public, bounded project behavior-tree API executes the existing core
       composition set with deterministic, testable outcomes and cancellation.
-- [ ] A validated example tree dispatches `NavigateToPose` through the existing
+- [x] A validated example tree dispatches `NavigateToPose` through the existing
       navigation action boundary and receives correlated lifecycle results.
-- [ ] During that action, an inspection snapshot identifies active outer tree
+- [x] During that action, an inspection snapshot identifies active outer tree
       nodes, the external navigation leaf lifecycle, and every downstream
       motion stage through the fake sink.
-- [ ] Planning failure, proposal silence, bridge loss, authority rejection and
+- [x] Planning failure, proposal silence, bridge loss, authority rejection and
       local stop produce explicit participant states and typed reasons.
-- [ ] The framework and adapter are documented, have unit/integration tests,
+- [x] The framework and adapter are documented, have unit/integration tests,
       and preserve full host CI plus motor-disabled safety checks.
 
 ## Scope boundaries

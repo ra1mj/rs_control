@@ -744,3 +744,36 @@ Closed the behavior-tree parent integration: validated bounded event-driven redu
 ### Next Steps
 
 - None - task complete
+
+
+## Session 23: Host motion runtime and telemetry recording
+
+**Date**: 2026-08-18
+**Task**: Host motion runtime and telemetry recording
+**Branch**: `main`
+
+### Summary
+
+Added bounded host-only motion composition, control-core authority decisions, non-RT MCAP recording/recovery/replay, and host verification without hardware qualification.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1dbc58c` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

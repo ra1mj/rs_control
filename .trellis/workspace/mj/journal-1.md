@@ -810,3 +810,36 @@ Archived the active-task coordination after host deliveries passed and documente
 ### Next Steps
 
 - None - task complete
+
+
+## Session 25: Bilingual usage guide
+
+**Date**: 2026-08-20
+**Task**: Bilingual usage guide
+**Branch**: `main`
+
+### Summary
+
+Added complete English and Simplified Chinese operational guides, linked them from README, verified host-safe workflows and documentation consistency, and retained target and physical safety boundaries.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `72cbd6f` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

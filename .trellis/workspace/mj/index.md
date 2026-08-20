@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 24
-- **Last Active**: 2026-08-18
+- **Total Sessions**: 25
+- **Last Active**: 2026-08-20
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~812 | Active |
+| `journal-1.md` | ~845 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 25 | 2026-08-20 | Bilingual usage guide | `72cbd6f` | `main` |
 | 24 | 2026-08-18 | Archive Linux task coordination | `e2e2b59` | `main` |
 | 23 | 2026-08-18 | Host motion runtime and telemetry recording | `1dbc58c` | `main` |
 | 22 | 2026-08-18 | Close behavior-tree integration | `7bca464` | `main` |

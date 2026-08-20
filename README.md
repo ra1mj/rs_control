@@ -19,6 +19,13 @@ fake I/O and never transmit motor frames. The platform and motor path are **not
 hardware-qualified yet** and do not establish physical disable, watchdog,
 firmware compatibility, or realtime timing evidence.
 
+## Usage Guides / 使用文档
+
+Start with the paired operational guides for supported host workflows, target
+handoff, and safety boundaries: [English](docs/usage-guide.md) /
+[简体中文](docs/usage-guide.zh-CN.md). They link to the detailed platform and
+subsystem runbooks without treating host checks as hardware qualification.
+
 ## Configuration
 
 The robot YAML intentionally contains only:
